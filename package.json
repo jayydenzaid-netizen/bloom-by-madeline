@@ -16,7 +16,9 @@
     "db:reset": "prisma db push --force-reset && npm run db:seed",
     "test": "tsx --test tests/*.test.ts",
     "db:deploy": "node scripts/db-provider.mjs && prisma db push --accept-data-loss",
-    "desplegar": "node scripts/desplegar.mjs"
+    "desplegar": "node scripts/desplegar.mjs",
+    "qa": "node qa/audit.mjs",
+    "qa:compra": "node qa/compra.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
