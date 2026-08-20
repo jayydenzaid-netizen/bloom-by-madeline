@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bloom by Madeline — Boutique de Moda Femenina · Hamilton, Ohio</title>
+<meta name="description" content="Tendencias exclusivas seleccionadas a mano. Elevamos tu estilo casual elegante. Boutique de moda femenina en 1305 Grand Blvd, Hamilton, OH. Envíos a todo USA.">
+<link rel="canonical" href="https://bloom-by-madeline.vercel.app/">
+<!-- Open Graph / compartir en WhatsApp, Instagram, Facebook, iMessage -->
+<meta property="og:site_name" content="Bloom by Madeline">
+<meta property="og:title" content="Bloom by Madeline — Boutique de Moda Femenina">
+<meta property="og:description" content="Tendencias exclusivas · Elevamos tu estilo casual elegante · Hamilton, OH · Envíos a todo USA">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bloom-by-madeline.vercel.app/">
+<meta property="og:locale" content="es_US">
+<meta property="og:image" content="https://bloom-by-madeline.vercel.app/assets/og.jpg">
+<meta property="og:image:secure_url" content="https://bloom-by-madeline.vercel.app/assets/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Bloom by Madeline — boutique de moda femenina en Hamilton, Ohio">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bloom by Madeline — Boutique de Moda Femenina">
+<meta name="twitter:description" content="Tendencias exclusivas · Estilo casual elegante · Hamilton, OH · Envíos a todo USA">
+<meta name="twitter:image" content="https://bloom-by-madeline.vercel.app/assets/og.jpg">
+<meta name="theme-color" content="#ECE1CD">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ClothingStore",
+  "name": "Bloom by Madeline",
+  "description": "Boutique de moda femenina — tendencias exclusivas y estilo casual elegante. Envíos a todo Estados Unidos.",
+  "image": "https://bloom-by-madeline.vercel.app/assets/og.jpg",
+  "url": "https://bloom-by-madeline.vercel.app/",
+  "priceRange": "$$",
+  "currenciesAccepted": "USD",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "1305 Grand Blvd",
+    "addressLocality": "Hamilton",
+    "addressRegion": "OH",
+    "postalCode": "45011",
+    "addressCountry": "US"
+  },
+  "geo": { "@type": "GeoCoordinates", "latitude": 39.3819428, "longitude": -84.5505473 },
+  "openingHoursSpecification": [{
+    "@type": "OpeningHoursSpecification",
+    "dayOfWeek": ["Thursday", "Friday", "Saturday"],
+    "opens": "13:00",
+    "closes": "20:00"
+  }],
+  "sameAs": ["https://www.instagram.com/bloombymadelin/"]
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&family=Allura&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ══════════ PRELOADER ══════════ -->
+<div class="preloader" id="preloader" aria-hidden="true">
+  <div class="preloader-inner">
+    <svg class="preloader-lotus" viewBox="0 0 120 104" fill="none" aria-hidden="true">
+      <use href="#lotus"/>
+    </svg>
+    <span class="preloader-word">B&thinsp;L&thinsp;O&thinsp;O&thinsp;M</span>
+  </div>
+</div>
+
+<!-- ══════════ SVG DEFS: LOGO LOTUS ══════════ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="lotus" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none">
+      <!-- pétalo central -->
+      <path d="M60 88 C51 62 51.5 34 60 12 C68.5 34 69 62 60 88 Z"/>
+      <!-- pétalos medios -->
+      <path d="M60 88 C40 70 33 44 42 20 C56 36 61 62 60 88 Z"/>
+      <path d="M60 88 C80 70 87 44 78 20 C64 36 59 62 60 88 Z"/>
+      <!-- pétalos exteriores -->
+      <path d="M60 88 C34 82 15 62 13 34 C36 42 54 62 60 88 Z"/>
+      <path d="M60 88 C86 82 105 62 107 34 C84 42 66 62 60 88 Z"/>
+      <!-- venas interiores sutiles -->
+      <path d="M60 88 C48 66 45 46 50 28" stroke-width="1.4" opacity=".55"/>
+      <path d="M60 88 C72 66 75 46 70 28" stroke-width="1.4" opacity=".55"/>
+      <!-- línea de hoja bajo la flor -->
+      <path d="M18 95 C44 103 80 101 104 90" stroke-width="1.6" opacity=".8"/>
+    </g>
+  </defs>
+</svg>
+
+<!-- ══════════ NAV ══════════ -->
+<header class="nav" id="nav">
+  <a class="nav-brand" href="#inicio" aria-label="Bloom by Madeline — inicio">
+    <svg class="brand-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+    <span class="brand-text">
+      <span class="brand-bloom">BLOOM</span>
+      <span class="brand-by"><em>by</em> MADELINE</span>
+    </span>
+  </a>
+  <nav class="nav-links" aria-label="Navegación principal">
+    <a href="#coleccion">Nuevas Llegadas</a>
+    <a href="#filosofia">Filosofía</a>
+    <a href="#boutique">La Boutique</a>
+    <a href="#visitanos">Visítanos</a>
+  </nav>
+  <div class="nav-actions">
+    <a class="btn btn-ink btn-sm" href="https://ig.me/m/bloombymadelin" target="_blank" rel="noopener">Pedir por DM</a>
+    <button class="cart-btn" id="cartBtn" aria-label="Abrir carrito de compras">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 8V6.5a4 4 0 0 1 8 0V8"/>
+        <path d="M4.8 8h14.4l-1.1 11.1a2 2 0 0 1-2 1.9H7.9a2 2 0 0 1-2-1.9L4.8 8z"/>
+      </svg>
+      <span class="cart-count" id="cartCount" hidden>0</span>
+    </button>
+    <button class="nav-burger" id="burger" aria-label="Abrir menú" aria-expanded="false">
+      <span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<!-- menú móvil -->
+<div class="mobile-menu" id="mobileMenu" aria-hidden="true">
+  <nav aria-label="Menú móvil">
+    <a href="#coleccion" style="--i:0">Nuevas Llegadas</a>
+    <a href="#filosofia" style="--i:1">Filosofía</a>
+    <a href="#boutique" style="--i:2">La Boutique</a>
+    <a href="#visitanos" style="--i:3">Visítanos</a>
+    <a class="mm-cta" href="https://ig.me/m/bloombymadelin" target="_blank" rel="noopener" style="--i:4">Pedir por Instagram DM →</a>
+  </nav>
+  <p class="mm-foot">1305 Grand Blvd · Hamilton, OH<br>Jueves a Sábado · 1:00 – 8:00 PM</p>
+</div>
+
+<main id="inicio">
+
+<!-- ══════════ HERO ══════════ -->
+<section class="hero">
+  <svg class="hero-watermark" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+
+  <div class="hero-grid">
+    <div class="hero-copy">
+      <p class="overline reveal">Boutique de moda femenina · Hamilton, Ohio</p>
+      <h1 class="hero-title">
+        <span class="line"><span>Elevamos</span></span>
+        <span class="line"><span>tu estilo</span></span>
+        <span class="line"><span class="serif-it">casual&nbsp;elegante.</span></span>
+      </h1>
+      <p class="hero-sub reveal">Tendencias exclusivas seleccionadas a mano, nuevas llegadas
+      cada semana y una atención que se siente como ir de compras con tu mejor amiga.</p>
+      <div class="hero-ctas reveal">
+        <a class="btn btn-ink" href="#coleccion">Ver nuevas llegadas</a>
+        <a class="btn btn-ghost" href="https://www.instagram.com/bloombymadelin/" target="_blank" rel="noopener">@bloombymadelin</a>
+      </div>
+      <ul class="hero-stats reveal">
+        <li><strong>2,880+</strong><span>seguidoras</span></li>
+        <li><strong>S · M · L</strong><span>tallas disponibles</span></li>
+        <li><strong>USA</strong><span>envíos a todo el país</span></li>
+      </ul>
+    </div>
+
+    <div class="hero-visual">
+      <figure class="hero-arch" data-parallax="0.06">
+        <img src="assets/post-03-vestido-negro-olivo.jpg" alt="Vestido midi a rayas oliva y crema en maniquí dentro de la boutique Bloom by Madeline" loading="eager">
+      </figure>
+      <figure class="hero-polaroid" data-parallax="0.12">
+        <img src="assets/post-05-vestido-blanco.jpg" alt="Vestido mini verde lima en la boutique">
+      </figure>
+      <div class="hero-badge" aria-hidden="true">
+        <svg viewBox="0 0 100 100">
+          <defs><path id="circlePath" d="M50,50 m-37,0 a37,37 0 1,1 74,0 a37,37 0 1,1 -74,0"/></defs>
+          <text><textPath href="#circlePath">ENVÍOS A TODO USA · BLOOM ·</textPath></text>
+        </svg>
+        <svg class="badge-lotus" viewBox="0 0 120 104"><use href="#lotus"/></svg>
+      </div>
+      <span class="hero-pill"><i aria-hidden="true">✿</i> Nuevas llegadas esta semana</span>
+    </div>
+  </div>
+
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-track">
+      <span>Nuevas llegadas cada semana</span><i>✿</i>
+      <span>Tallas S · M · L</span><i>✿</i>
+      <span>Envíos a todo USA</span><i>✿</i>
+      <span>Pedidos por Instagram DM</span><i>✿</i>
+      <span>1305 Grand Blvd · Hamilton, OH</span><i>✿</i>
+      <span>Nuevas llegadas cada semana</span><i>✿</i>
+      <span>Tallas S · M · L</span><i>✿</i>
+      <span>Envíos a todo USA</span><i>✿</i>
+      <span>Pedidos por Instagram DM</span><i>✿</i>
+      <span>1305 Grand Blvd · Hamilton, OH</span><i>✿</i>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ COLECCIÓN ══════════ -->
+<section class="section coleccion" id="coleccion">
+  <div class="section-head">
+    <div>
+      <p class="overline reveal">01 — La Colección</p>
+      <h2 class="reveal">Nuevas <em class="serif-it">llegadas</em></h2>
+    </div>
+    <p class="section-note reveal">Cada pieza nombrada como una flor,<br>porque aquí todo florece.
+    <br><strong>Pedidos por DM · respuesta el mismo día.</strong></p>
+  </div>
+
+  <div class="product-grid">
+
+    <article class="product reveal" data-name="Set Margarita" data-desc="Top peplum de tiras y falda midi entallada en lunares. El conjunto que se lleva todas las miradas del escaparate." data-meta="Negro · Lunares — Tallas S / M / L" data-img="assets/post-02-tendencia.jpg">
+      <figure><img src="assets/post-02-tendencia.jpg" alt="Set Margarita: top peplum y falda midi de lunares negro" loading="lazy"><figcaption><span>Elegir talla</span></figcaption></figure>
+      <h3>Set Margarita</h3>
+      <p class="product-meta">Negro · Lunares — S / M / L</p>
+    </article>
+
+    <article class="product reveal" data-name="Vestido Salvia" data-desc="Midi de punto acanalado a rayas, cuello halter y silueta que abraza. Disponible en dos colores: oliva y negro." data-meta="Oliva &amp; Crema · también en Negro — Tallas S / M / L" data-img="assets/post-03-vestido-negro-olivo.jpg">
+      <figure><img src="assets/post-03-vestido-negro-olivo.jpg" alt="Vestido Salvia: midi de rayas oliva y crema" loading="lazy"><figcaption><span>Elegir talla</span></figcaption></figure>
+      <h3>Vestido Salvia</h3>
+      <p class="product-meta">Oliva &amp; Crema · Negro — S / M / L</p>
+    </article>
+
+    <article class="product reveal" data-name="Vestido Jazmín" data-desc="Maxi blanco perla con detalles de cristal en el escote y la cintura. Elegancia pura para una noche especial." data-meta="Blanco Perla · Cristales — Tallas S / M / L" data-img="assets/post-04-set-falda-diamantes.jpg">
+      <figure><img src="assets/post-04-set-falda-diamantes.jpg" alt="Vestido Jazmín: maxi blanco con detalles de cristales" loading="lazy"><figcaption><span>Elegir talla</span></figcaption></figure>
+      <h3>Vestido Jazmín</h3>
+      <p class="product-meta">Blanco Perla · Cristales — S / M / L</p>
+    </article>
+
+    <article class="product reveal" data-name="Vestido Mimosa" data-desc="Mini de punto acanalado con escote halter cruzado. Un color que no pide permiso." data-meta="Verde Lima — Tallas S / M / L" data-img="assets/post-05-vestido-blanco.jpg">
+      <figure><img src="assets/post-05-vestido-blanco.jpg" alt="Vestido Mimosa: mini halter verde lima" loading="lazy"><figcaption><span>Elegir talla</span></figcaption></figure>
+      <h3>Vestido Mimosa</h3>
+      <p class="product-meta">Verde Lima — S / M / L</p>
+    </article>
+
+    <article class="product reveal" data-name="Blusa Violeta" data-desc="Blusa blanca con mangas abullonadas a rayas lilas y corazón de cristales al centro. Súper fresca para el verano." data-meta="Blanco &amp; Lila · Corazón de cristales — Tallas S / M / L" data-img="assets/post-07-blusa-corazon.jpg">
+      <figure><img src="assets/post-07-blusa-corazon.jpg" alt="Blusa Violeta: mangas abullonadas lilas y corazón de cristales" loading="lazy"><figcaption><span>Elegir talla</span></figcaption></figure>
+      <h3>Blusa Violeta</h3>
+      <p class="product-meta">Blanco &amp; Lila — S / M / L</p>
+    </article>
+
+    <article class="product reveal" data-name="Top Lavanda" data-desc="Top lila con plumas de avestruz en el bajo. La pieza statement de la temporada — new arrival." data-meta="Lila · Plumas — Tallas S / M / L" data-img="assets/post-08-look-perfecto.jpg">
+      <figure><img src="assets/post-08-look-perfecto.jpg" alt="Top Lavanda: top lila con plumas de avestruz" loading="lazy"><figcaption><span>Elegir talla</span></figcaption></figure>
+      <h3>Top Lavanda</h3>
+      <p class="product-meta">Lila · Plumas — S / M / L</p>
+    </article>
+
+    <article class="product reveal" data-name="Vestido Amapola" data-desc="Mini naranja con mangas globo, cinturón a juego y falda con volumen. Para robar todas las miradas del verano." data-meta="Naranja — Tallas S / M / L" data-img="assets/post-10-vestido-orange.jpg">
+      <figure><img src="assets/post-10-vestido-orange.jpg" alt="Vestido Amapola: mini naranja con mangas globo y cinturón" loading="lazy"><figcaption><span>Elegir talla</span></figcaption></figure>
+      <h3>Vestido Amapola</h3>
+      <p class="product-meta">Naranja — S / M / L</p>
+    </article>
+
+    <article class="product reveal" data-name="Vestido Dalia" data-desc="Maxi durazno con cut-outs en la cintura, mangas transparentes abullonadas y argolla central. Romántico y atrevido a la vez." data-meta="Durazno — Tallas S / M / L" data-img="assets/post-12-vestido-coral.jpg">
+      <figure><img src="assets/post-12-vestido-coral.jpg" alt="Vestido Dalia: maxi durazno con cut-outs y mangas transparentes" loading="lazy"><figcaption><span>Elegir talla</span></figcaption></figure>
+      <h3>Vestido Dalia</h3>
+      <p class="product-meta">Durazno — S / M / L</p>
+    </article>
+
+  </div>
+
+  <div class="coleccion-cta reveal">
+    <p>¿Viste algo en nuestro Instagram que te enamoró?</p>
+    <a class="btn btn-ink" href="https://ig.me/m/bloombymadelin" target="_blank" rel="noopener">Escríbenos por DM y te lo apartamos</a>
+  </div>
+</section>
+
+<!-- ══════════ QUOTE ══════════ -->
+<section class="quote">
+  <svg class="quote-lotus reveal" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+  <blockquote class="reveal">
+    «&thinsp;Cada prenda cuenta una historia…<br>
+    <em>haz que la tuya brille con estilo.</em>&thinsp;»
+  </blockquote>
+</section>
+
+<!-- ══════════ FILOSOFÍA ══════════ -->
+<section class="section filosofia" id="filosofia">
+  <div class="filosofia-grid">
+    <div class="filosofia-copy">
+      <p class="overline overline-light reveal">02 — Nuestra Filosofía</p>
+      <h2 class="reveal">Vestir con <em class="serif-it">intención</em></h2>
+      <p class="filosofia-sub reveal">(No es moda… es presencia.)</p>
+      <p class="filosofia-text reveal">En Bloom no seguimos tendencias por seguirlas.
+      Seleccionamos cada pieza pensando en la mujer que la va a llevar:
+      su día, su cuerpo, su momento. Porque cuando te vistes con intención,
+      no entras a un lugar — <em>floreces en él</em>.</p>
+    </div>
+    <ol class="filosofia-list">
+      <li class="reveal"><span>01</span>Coherencia</li>
+      <li class="reveal"><span>02</span>Identidad</li>
+      <li class="reveal"><span>03</span>Presencia</li>
+      <li class="reveal"><span>04</span>Intención</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ══════════ LA BOUTIQUE ══════════ -->
+<section class="section boutique" id="boutique">
+  <div class="boutique-grid">
+    <div class="boutique-visual">
+      <figure class="boutique-main reveal" data-parallax="0.05">
+        <img src="assets/boutique-interior.jpg" alt="Interior de la boutique Bloom by Madeline: logo de loto en la pared y mostrador" loading="lazy">
+      </figure>
+      <figure class="boutique-small reveal">
+        <img src="assets/post-09-coleccion-exclusiva.jpg" alt="Escaparate de Bloom by Madeline con letrero de neón OPEN" loading="lazy">
+      </figure>
+    </div>
+    <div class="boutique-copy">
+      <p class="overline reveal">03 — La Boutique</p>
+      <h2 class="reveal">Un espacio pensado <em class="serif-it">para&nbsp;ti</em></h2>
+      <p class="reveal">En pleno Grand Blvd de Hamilton, nuestra boutique es ese lugar
+      donde entras «solo a mirar» y sales sintiéndote otra. Pruébate todo,
+      pide opinión y deja que armemos tu outfit juntas.</p>
+      <ul class="boutique-features">
+        <li class="reveal"><strong>Atención personalizada</strong>Te ayudamos a encontrar tu look, sin prisa y sin presión.</li>
+        <li class="reveal"><strong>Pruébatelo antes de llevarlo</strong>Probador en tienda para que salgas segura de tu compra.</li>
+        <li class="reveal"><strong>Nuevas llegadas semanales</strong>Cada semana llegan piezas nuevas — y vuelan rápido.</li>
+        <li class="reveal"><strong>Apartados por DM</strong>¿La viste en Instagram? Escríbenos y te la reservamos.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ CÓMO COMPRAR ══════════ -->
+<section class="section como-comprar">
+  <div class="section-head">
+    <div>
+      <p class="overline reveal">04 — Cómo Comprar</p>
+      <h2 class="reveal">Tan fácil como <em class="serif-it">enamorarse</em></h2>
+    </div>
+  </div>
+  <div class="pasos">
+    <div class="paso reveal">
+      <svg class="paso-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+      <span class="paso-num">01</span>
+      <h3>Visítanos en la boutique</h3>
+      <p>1305 Grand Blvd, Hamilton, OH. Pruébate todo lo que quieras — estamos de jueves a sábado, de 1:00 a 8:00 PM.</p>
+    </div>
+    <div class="paso reveal">
+      <svg class="paso-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+      <span class="paso-num">02</span>
+      <h3>O pide por Instagram DM</h3>
+      <p>¿Viste una pieza en nuestro perfil? Mándanos un mensaje con la foto y tu talla, y te confirmamos al momento.</p>
+    </div>
+    <div class="paso reveal">
+      <svg class="paso-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+      <span class="paso-num">03</span>
+      <h3>Envíos a todo USA</h3>
+      <p>¿No estás en Ohio? No importa. Hacemos envíos a todo Estados Unidos — tu look llega hasta tu puerta.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ VISÍTANOS ══════════ -->
+<section class="section visitanos" id="visitanos">
+  <div class="visitanos-grid">
+    <div class="visitanos-card reveal">
+      <p class="overline">05 — Visítanos</p>
+      <h2>Te esperamos<br>en <em class="serif-it">Hamilton</em></h2>
+      <dl class="visitanos-info">
+        <div>
+          <dt>Dirección</dt>
+          <dd>1305 Grand Blvd<br>Hamilton, OH 45011</dd>
+        </div>
+        <div>
+          <dt>Horario</dt>
+          <dd>Jueves a Sábado<br>1:00 PM – 8:00 PM</dd>
+        </div>
+        <div>
+          <dt>Pedidos &amp; Envíos</dt>
+          <dd>Instagram DM<br>@bloombymadelin</dd>
+        </div>
+      </dl>
+      <div class="visitanos-ctas">
+        <a class="btn btn-ink" href="https://www.google.com/maps/search/?api=1&query=1305+Grand+Blvd,+Hamilton,+OH+45011" target="_blank" rel="noopener">Cómo llegar</a>
+        <a class="btn btn-ghost" href="https://ig.me/m/bloombymadelin" target="_blank" rel="noopener">Enviar DM</a>
+      </div>
+      <p class="visitanos-note">El horario puede variar — confírmalo siempre en nuestro Instagram.</p>
+    </div>
+    <a class="visitanos-map reveal" href="https://www.google.com/maps/search/?api=1&query=1305+Grand+Blvd,+Hamilton,+OH+45011" target="_blank" rel="noopener" aria-label="Abrir en Google Maps: 1305 Grand Blvd, Hamilton OH">
+      <iframe title="Mapa de la boutique Bloom by Madeline en 1305 Grand Blvd, Hamilton OH"
+        src="https://www.openstreetmap.org/export/embed.html?bbox=-84.5585%2C39.3769%2C-84.5425%2C39.3869&layer=mapnik"
+        loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      <span class="map-pin" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+      </span>
+      <span class="map-cta">Ver en el mapa →</span>
+    </a>
+  </div>
+</section>
+
+<!-- ══════════ INSTAGRAM ══════════ -->
+<section class="section instagram">
+  <div class="ig-head reveal">
+    <p class="overline">Síguenos</p>
+    <h2><em class="serif-it">Enamórate</em> en Instagram</h2>
+    <p class="ig-sub">Únete a más de <strong>2,880 seguidoras</strong> que ven las nuevas llegadas antes que nadie.</p>
+  </div>
+  <div class="ig-grid">
+    <a class="reveal" href="https://www.instagram.com/bloombymadelin/" target="_blank" rel="noopener"><img src="assets/post-02-tendencia.jpg" alt="Publicación de Instagram: set de lunares" loading="lazy"></a>
+    <a class="reveal" href="https://www.instagram.com/bloombymadelin/" target="_blank" rel="noopener"><img src="assets/post-08-look-perfecto.jpg" alt="Publicación de Instagram: top de plumas lila" loading="lazy"></a>
+    <a class="reveal" href="https://www.instagram.com/bloombymadelin/" target="_blank" rel="noopener"><img src="assets/post-10-vestido-orange.jpg" alt="Publicación de Instagram: vestido naranja" loading="lazy"></a>
+    <a class="reveal" href="https://www.instagram.com/bloombymadelin/" target="_blank" rel="noopener"><img src="assets/post-12-vestido-coral.jpg" alt="Publicación de Instagram: vestido durazno" loading="lazy"></a>
+  </div>
+  <div class="ig-cta reveal">
+    <a class="btn btn-ink" href="https://www.instagram.com/bloombymadelin/" target="_blank" rel="noopener">Seguir a @bloombymadelin</a>
+  </div>
+</section>
+
+</main>
+
+<!-- ══════════ FOOTER ══════════ -->
+<footer class="footer">
+  <div class="footer-brand">
+    <svg class="footer-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+    <p class="footer-bloom">B&thinsp;L&thinsp;O&thinsp;O&thinsp;M</p>
+    <p class="footer-by"><em>by</em> MADELINE</p>
+  </div>
+  <div class="footer-cols">
+    <div>
+      <h4>Visítanos</h4>
+      <p>1305 Grand Blvd<br>Hamilton, OH 45011<br>Jueves a Sábado · 1–8 PM</p>
+    </div>
+    <div>
+      <h4>Síguenos</h4>
+      <p><a href="https://www.instagram.com/bloombymadelin/" target="_blank" rel="noopener">Instagram — @bloombymadelin</a><br>
+      <a href="https://ig.me/m/bloombymadelin" target="_blank" rel="noopener">Pedidos por DM</a></p>
+    </div>
+    <div>
+      <h4>Envíos</h4>
+      <p>A todo Estados Unidos<br>Coordina el tuyo por DM</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>© 2026 Bloom by Madeline · Hamilton, Ohio</p>
+    <p class="footer-tag">Tendencias exclusivas · Estilo casual elegante</p>
+  </div>
+</footer>
+
+<!-- ══════════ BOTÓN FLOTANTE DM ══════════ -->
+<a class="dm-fab" href="https://ig.me/m/bloombymadelin" target="_blank" rel="noopener" aria-label="Pedir por Instagram DM">
+  <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="2" width="20" height="20" rx="5.5"/>
+    <circle cx="12" cy="12" r="4.2"/>
+    <circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none"/>
+  </svg>
+  <span>Pedir por DM</span>
+</a>
+
+<!-- ══════════ LIGHTBOX ══════════ -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Detalle de producto" hidden>
+  <button class="lightbox-close" id="lightboxClose" aria-label="Cerrar">×</button>
+  <div class="lightbox-card">
+    <figure><img id="lbImg" src="" alt=""></figure>
+    <div class="lightbox-info">
+      <p class="overline">Nueva llegada</p>
+      <h3 id="lbName">Detalle de la pieza</h3>
+      <p id="lbDesc" class="lb-desc"></p>
+      <p id="lbMeta" class="lb-meta"></p>
+      <p class="lb-talla-label">Elige tu talla</p>
+      <div class="lb-tallas" id="lbTallas" role="group" aria-label="Elige tu talla"></div>
+      <div class="lb-actions">
+        <button class="btn btn-ink" id="lbAdd" type="button">Añadir al carrito</button>
+        <a class="btn btn-ghost" id="lbCta" href="https://ig.me/m/bloombymadelin" target="_blank" rel="noopener">o pedir por DM</a>
+      </div>
+      <p class="lb-note">También disponible en la boutique · 1305 Grand Blvd, Hamilton OH</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ CARRITO ══════════ -->
+<div class="cart-backdrop" id="cartBackdrop" aria-hidden="true"></div>
+<aside class="cart" id="cart" role="dialog" aria-modal="true" aria-label="Carrito de compras">
+  <header class="cart-head">
+    <h3>Tu <em class="serif-it">carrito</em></h3>
+    <button class="cart-close" id="cartClose" aria-label="Cerrar carrito">×</button>
+  </header>
+  <div class="cart-body" id="cartBody"></div>
+  <footer class="cart-foot" id="cartFoot" hidden>
+    <div class="cart-total"><span>Total</span><strong id="cartTotal"></strong></div>
+    <p class="cart-note">Los precios y el envío se confirman por DM — respuesta el mismo día.</p>
+    <button class="btn btn-ink cart-send" id="cartSend" type="button">Enviar pedido por DM</button>
+    <button class="btn btn-ghost cart-pay" type="button" disabled
+      title="Se activará cuando la boutique conecte su cuenta de pagos">Pagar con tarjeta · próximamente</button>
+    <p class="cart-hint" id="cartHint" hidden>✓ Pedido copiado — pégalo en el chat de Instagram</p>
+  </footer>
+</aside>
+
+<!-- toast de aviso -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="main.js"></script>
+</body>
+</html>
