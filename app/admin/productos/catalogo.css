@@ -223,3 +223,115 @@
   overflow-y: auto;
 }
 .cat-checks label { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
+
+/* ─────────────── Edición rápida de precio y stock en el listado ───────────────
+   Un clic sobre la celda abre un campo ahí mismo. El objetivo es que poner
+   precio sea un gesto, no un trámite. */
+
+.cat-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  background: none;
+  font: inherit;
+  color: inherit;
+  padding: 5px 9px;
+  border-radius: var(--adm-r-sm);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.cat-quick-btn:hover {
+  background: var(--adm-surface-2);
+  border-color: var(--adm-line);
+}
+/* El lápiz solo aparece al pasar por encima: la celda se ve limpia pero invita. */
+.cat-quick-lapiz {
+  font-size: 12px;
+  color: var(--adm-muted);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.cat-quick-btn:hover .cat-quick-lapiz { opacity: 1; }
+
+/* Cuando no hay precio, el botón es una llamada a la acción, no un dato gris. */
+.cat-quick-btn.es-vacio {
+  border-color: rgba(119, 48, 62, 0.35);
+  background: var(--adm-accent-soft);
+}
+.cat-quick-poner {
+  color: var(--adm-accent);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cat-quick {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.cat-quick-campo {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--adm-accent);
+  border-radius: var(--adm-r-sm);
+  background: var(--adm-surface);
+  padding-left: 8px;
+  box-shadow: 0 0 0 3px var(--adm-accent-soft);
+}
+.cat-quick-signo { color: var(--adm-muted); font-size: 14px; }
+.cat-quick-in {
+  width: 82px;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 6px 8px !important;
+  box-shadow: none !important;
+  text-align: right;
+  font: inherit;
+}
+.cat-quick-in:focus { outline: none; }
+.cat-quick-in-sm { width: 56px; }
+
+.cat-quick-nota { font-size: 11px; color: var(--adm-muted); }
+
+.cat-quick-mini {
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: var(--adm-r-sm);
+  border: 1px solid var(--adm-accent);
+  background: var(--adm-accent);
+  color: #fff;
+  cursor: pointer;
+}
+.cat-quick-mini-ghost {
+  background: transparent;
+  color: var(--adm-text-2);
+  border-color: var(--adm-line);
+}
+.cat-quick-mini:disabled { opacity: 0.5; cursor: default; }
+
+.cat-quick-err {
+  display: block;
+  width: 100%;
+  font-size: 11.5px;
+  color: var(--adm-danger);
+  text-align: right;
+}
+
+/* Ruedecita de "guardando" hecha con un borde girando: sin imágenes ni libs. */
+.cat-quick-spin {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--adm-line);
+  border-top-color: var(--adm-accent);
+  border-radius: 50%;
+  animation: cat-quick-giro 0.6s linear infinite;
+}
+@keyframes cat-quick-giro { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .cat-quick-spin { animation: none; }
+}

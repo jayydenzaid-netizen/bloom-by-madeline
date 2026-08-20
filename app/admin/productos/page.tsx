@@ -16,6 +16,7 @@ import {
   type Column,
 } from "../_components/ui";
 import { accionEnLote } from "./actions";
+import { PrecioRapido, StockRapido } from "./_components/EdicionRapida";
 import "./catalogo.css";
 
 /**
@@ -70,6 +71,7 @@ type FilaProducto = {
   controlaStock: boolean;
   agotado: boolean;
   sinFoto: boolean;
+  numVariantes: number;
 };
 
 export default async function ProductosPage({ searchParams }: { searchParams: Promise<Busqueda> }) {
@@ -197,6 +199,7 @@ export default async function ProductosPage({ searchParams }: { searchParams: Pr
       controlaStock,
       agotado: p.variants.some((v) => v.trackStock && v.stock <= 0),
       sinFoto: p.images.length === 0,
+      numVariantes: p.variants.length,
     };
   });
 
@@ -282,23 +285,20 @@ export default async function ProductosPage({ searchParams }: { searchParams: Pr
       key: "stock",
       header: "Stock",
       align: "right",
-      render: (p) =>
-        p.controlaStock ? (
-          <span className={p.agotado ? "cat-margen-malo" : undefined}>{p.stockTotal}</span>
-        ) : (
-          <span className="adm-muted adm-small">Sin control</span>
-        ),
+      render: (p) => (
+        <StockRapido
+          id={p.id}
+          stockTotal={p.stockTotal}
+          controlaStock={p.controlaStock}
+          variantes={p.numVariantes}
+        />
+      ),
     },
     {
       key: "precio",
       header: "Precio",
       align: "right",
-      render: (p) =>
-        p.priceCents > 0 ? (
-          <Money cents={p.priceCents} tone="strong" />
-        ) : (
-          <span className="cat-margen-malo">Sin precio</span>
-        ),
+      render: (p) => <PrecioRapido id={p.id} priceCents={p.priceCents} />,
     },
   ];
 
