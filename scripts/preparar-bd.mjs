@@ -30,20 +30,26 @@ function correr(comando) {
 console.log("▸ Creando o actualizando las tablas en Postgres…");
 correr("npx prisma db push --skip-generate");
 
-// ¿Está vacía? Se pregunta con el cliente ya generado, en un proceso aparte para
-// no arrastrar Prisma dentro del build de Next.
+// ¿Está vacía? Se consulta importando el cliente aquí mismo.
+//
+// La primera versión lanzaba un `node -e "…"` con el código en una cadena, y el
+// shell se comió el `$` de `$disconnect()`: quedó `d.()` y reventó con un
+// SyntaxError. El fallo se tragaba en el catch, el script decía "la tienda ya
+// tiene datos" y el build terminaba cantando "Base de datos lista" con la tienda
+// vacía. Nada de código dentro de comillas dentro de comillas.
 console.log("▸ Comprobando si la tienda ya tiene datos…");
 let vacia = false;
 try {
-  const salida = execSync(
-    `node -e "const{PrismaClient}=require('@prisma/client');const d=new PrismaClient();d.product.count().then(n=>{console.log('PRODUCTOS='+n);return d.$disconnect()}).catch(()=>{console.log('PRODUCTOS=-1');process.exit(0)})"`,
-    { encoding: "utf8", env: process.env },
-  );
-  const n = Number(salida.match(/PRODUCTOS=(-?\d+)/)?.[1] ?? -1);
+  const { PrismaClient } = await import("@prisma/client");
+  const cliente = new PrismaClient();
+  const n = await cliente.product.count();
+  await cliente.$disconnect();
   vacia = n === 0;
-  console.log(`  Productos en la base: ${n < 0 ? "no se pudo leer" : n}`);
-} catch {
-  console.log("  No se pudo comprobar; por prudencia NO se siembra.");
+  console.log(`  Productos en la base: ${n}`);
+} catch (e) {
+  // Si no se puede leer, NO se siembra: mejor una tienda vacía que duplicar el
+  // catálogo de Madeline. Pero se dice en voz alta, no en silencio.
+  console.log(`  ⚠ No se pudo comprobar (${String(e).slice(0, 120)}). No se siembra.`);
 }
 
 if (vacia) {

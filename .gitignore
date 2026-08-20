@@ -19,3 +19,5 @@ qa/informe.json
 public/uploads
 
 .env.production.local
+
+.env*
