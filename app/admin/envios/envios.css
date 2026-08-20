@@ -1,0 +1,231 @@
+/* Envíos e impuestos — estilos propios del módulo.
+   Solo tokens --adm-* del panel: si mañana cambia la paleta, esto la sigue. */
+
+.env-aviso {
+  margin: 0 0 16px;
+  padding: 11px 14px;
+  border-radius: var(--adm-r);
+  font-size: 14px;
+  border: 1px solid var(--adm-line);
+}
+.env-aviso.is-ok {
+  background: var(--adm-success-soft);
+  border-color: rgba(46, 107, 79, 0.28);
+  color: var(--adm-success);
+}
+.env-aviso.is-aviso {
+  background: var(--adm-warning-soft);
+  border-color: rgba(138, 87, 19, 0.28);
+  color: var(--adm-warning);
+}
+.env-aviso.is-error {
+  background: var(--adm-danger-soft);
+  border-color: rgba(160, 48, 42, 0.28);
+  color: var(--adm-danger);
+}
+
+.env-stats { margin-bottom: 20px; }
+.env-nota { margin-top: 10px; line-height: 1.6; }
+
+/* ── zonas ── */
+
+.env-zona-tit { display: inline-flex; align-items: center; gap: 9px; }
+
+.env-zona-reg {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  color: var(--adm-muted);
+}
+
+.env-zona-vacia {
+  margin: 0 0 14px;
+  padding: 11px 14px;
+  border-radius: var(--adm-r-sm);
+  background: var(--adm-warning-soft);
+  color: var(--adm-warning);
+  font-size: 13.5px;
+}
+
+.env-tarifas {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  overflow: hidden;
+}
+
+.env-tarifa {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) 96px minmax(0, 1.2fr) minmax(0, 1.2fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--adm-line-soft);
+  font-size: 14px;
+}
+.env-tarifa:last-child { border-bottom: 0; }
+.env-tarifa.is-editando { display: block; background: var(--adm-surface-2); }
+
+.env-tarifa-nombre { font-weight: 500; }
+.env-tarifa-tramo,
+.env-tarifa-eta { color: var(--adm-muted); font-size: 13px; }
+.env-tarifa-acc { display: inline-flex; align-items: center; gap: 10px; justify-content: flex-end; }
+
+.env-tarifa-form,
+.env-zona-form { display: grid; gap: 4px; }
+.env-tarifa-form { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 4px 16px; }
+.env-form-acc { grid-column: 1 / -1; margin-top: 6px; }
+
+.env-borrar-txt { margin: 0 0 14px; line-height: 1.65; }
+
+/* ── selector de regiones ── */
+
+.env-reg-atajos { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+
+.env-chip {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--adm-line);
+  background: var(--adm-surface);
+  color: var(--adm-text-2);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.env-chip:hover { border-color: var(--adm-accent); color: var(--adm-accent); }
+.env-chip.is-on {
+  background: var(--adm-accent);
+  border-color: var(--adm-accent);
+  color: #fff;
+}
+
+.env-reg-resumen { margin: 0 0 8px; font-size: 13.5px; color: var(--adm-text-2); }
+
+.env-reg-toggle {
+  font: inherit;
+  font-size: 13px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--adm-accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.env-reg-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  background: var(--adm-surface-2);
+}
+
+.env-reg-lista {
+  margin-top: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 2px 14px;
+}
+
+.env-reg-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: var(--adm-r-sm);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.env-reg-item:hover { background: var(--adm-surface); }
+.env-reg-item em { font-style: normal; font-size: 11.5px; color: var(--adm-muted); }
+
+/* ── simulador ── */
+
+.env-sim-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 4px 16px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+.env-sim-accion { padding-bottom: 15px; }
+
+.env-sim-res {
+  padding: 15px 16px;
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  background: var(--adm-surface-2);
+}
+.env-sim-cab { margin: 0 0 12px; font-size: 14px; }
+
+.env-sim-lista { list-style: none; margin: 0 0 12px; padding: 0; }
+.env-sim-lista li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 100px minmax(0, 1.4fr);
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--adm-line-soft);
+  font-size: 14px;
+}
+.env-sim-lista li:last-child { border-bottom: 0; }
+.env-sim-nombre { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+.env-sim-eta { color: var(--adm-muted); font-size: 13px; }
+
+.env-sim-pie { margin: 0; color: var(--adm-text-2); line-height: 1.6; }
+.env-sim-notas { margin: 10px 0 0; padding-left: 18px; color: var(--adm-muted); font-size: 12.5px; }
+
+/* ── impuestos ── */
+
+.env-tax-aviso {
+  padding: 13px 15px;
+  margin-bottom: 18px;
+  border-radius: var(--adm-r);
+  background: var(--adm-warning-soft);
+  border: 1px solid rgba(138, 87, 19, 0.28);
+  color: var(--adm-warning);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.env-tax-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 18px; }
+.env-tax-form > .adm-field:nth-child(4),
+.env-tax-form > .env-check,
+.env-tax-form > .adm-btn { grid-column: 1 / -1; }
+
+.env-check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 12px 0 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.env-check em {
+  display: block;
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--adm-muted);
+  margin-top: 3px;
+}
+
+/* ── móvil: las rejillas de columnas fijas no caben ── */
+
+@media (max-width: 720px) {
+  .env-tarifa,
+  .env-sim-lista li {
+    grid-template-columns: 1fr auto;
+    row-gap: 4px;
+  }
+  .env-tarifa-tramo,
+  .env-tarifa-eta,
+  .env-sim-eta { grid-column: 1 / -1; }
+  .env-tarifa-acc { grid-column: 1 / -1; justify-content: flex-start; }
+  .env-sim-accion { padding-bottom: 0; margin-bottom: 15px; }
+}

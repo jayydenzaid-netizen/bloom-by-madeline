@@ -169,30 +169,40 @@ export default function CommandPalette({
     return () => clearTimeout(temporizador);
   }, [abierto, consulta, buscar]);
 
-  /* Acciones + resultados en una sola lista: las flechas recorren todo seguido. */
+  /**
+   * Acciones + resultados en una sola lista: las flechas recorren todo seguido.
+   *
+   * El orden cambia según haya texto o no, y es a propósito. Sin escribir nada
+   * la paleta es un lanzador, así que manda la lista de atajos. En cuanto se
+   * escribe algo, mandan los resultados de verdad: buscando "ana" la clienta
+   * Ana Pérez tiene que salir antes que "Nuevo producto" —que casa por la
+   * palabra clave "añadir"—. Al revés, escribir un nombre te dejaba el dedo
+   * sobre el Enter equivocado.
+   */
   const filas: Fila[] = useMemo(() => {
     const texto = consulta.trim().toLowerCase();
     const accionesVisibles = texto
       ? acciones.filter((a) => `${a.titulo} ${a.claves}`.toLowerCase().includes(texto))
       : acciones;
 
-    return [
-      ...accionesVisibles.map((a) => ({
-        clase: "accion" as const,
-        clave: `a:${a.id}`,
-        titulo: a.titulo,
-        detalle: a.detalle,
-        href: a.href,
-      })),
-      ...resultados.map((r) => ({
-        clase: "resultado" as const,
-        clave: `r:${r.tipo}:${r.id}`,
-        titulo: r.titulo,
-        detalle: r.detalle,
-        href: r.href,
-        tipo: r.tipo,
-      })),
-    ];
+    const comoAccion = accionesVisibles.map((a) => ({
+      clase: "accion" as const,
+      clave: `a:${a.id}`,
+      titulo: a.titulo,
+      detalle: a.detalle,
+      href: a.href,
+    }));
+
+    const comoResultado = resultados.map((r) => ({
+      clase: "resultado" as const,
+      clave: `r:${r.tipo}:${r.id}`,
+      titulo: r.titulo,
+      detalle: r.detalle,
+      href: r.href,
+      tipo: r.tipo,
+    }));
+
+    return texto ? [...comoResultado, ...comoAccion] : comoAccion;
   }, [acciones, consulta, resultados]);
 
   /* Si la lista encoge, el resaltado no puede quedarse fuera de rango. */

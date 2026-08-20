@@ -76,7 +76,7 @@ pantalla, porque una captura no sabe si algo responde al ratón.
 
 ## Qué falta y depende de Madeline
 
-- Los 12 productos actuales están **en borrador y sin precio**: no los conocemos y no se
+- Los 8 productos actuales están **en borrador y sin precio**: no los conocemos y no se
   inventan. Ella les pone precio y los activa.
 - Teléfono y email de contacto verificados.
 - Reseñas reales (las tiene en un destacado de Instagram) para pasarlas al panel.

@@ -25,7 +25,7 @@ Vende hoy por DM de Instagram (@bloombymadelin). Jue–Sáb 1–8 PM.
 
 1. **El dinero va en centavos enteros (`Int`).** Nunca floats. Formatear solo con
    `formatCents()` de `lib/money.ts`. Parsear solo con `parseToCents()`.
-2. **No inventar precios ni datos de la clienta.** Los 12 productos actuales no tienen
+2. **No inventar precios ni datos de la clienta.** Los 8 productos actuales no tienen
    precio conocido: se siembran como borrador con precio 0 y hay que marcarlo en el admin.
    Nada de teléfonos, reseñas ni testimonios inventados.
 3. **No romper la identidad visual.** Paleta champán `--bone: #ECE1CD` (Gregory pidió

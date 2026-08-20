@@ -105,9 +105,14 @@ async function auditar(ruta) {
   errores.length = 0;
   const fila = { ruta, status: 0, titulo: "", texto: 0, bloqueo: null, enlaces: 0, errores: [] };
 
+  // `?static` apaga preloader y animaciones de entrada (el sitio ya lo traía).
+  // Sin esto la captura de la portada sale con el logo de carga y aparenta una
+  // página vacía: la imagen miente, no la página.
+  const url = BASE + ruta + (SHOTS && !ruta.startsWith("/admin") ? (ruta.includes("?") ? "&" : "?") + "static" : "");
+
   let res;
   try {
-    res = await page.goto(BASE + ruta, { waitUntil: "networkidle2", timeout: 45000 });
+    res = await page.goto(url, { waitUntil: "networkidle2", timeout: 45000 });
   } catch (e) {
     fila.status = -1;
     fila.errores.push(`navegación falló: ${String(e).slice(0, 120)}`);
@@ -115,6 +120,21 @@ async function auditar(ruta) {
   }
 
   fila.status = res?.status() ?? 0;
+
+  // El preloader de la portada tarda un poco en irse y `networkidle2` no lo
+  // espera: sin esto se captura la pantalla de carga y parece que la página
+  // está en blanco. Se espera a que desaparezca, con tope para no colgarse.
+  await page
+    .waitForFunction(
+      () => {
+        const pre = document.querySelector(".preloader") || document.getElementById("preloader");
+        if (!pre) return true;
+        const cs = getComputedStyle(pre);
+        return cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity) < 0.05;
+      },
+      { timeout: 6000 },
+    )
+    .catch(() => fila.errores.push("el preloader seguía visible tras 6 s"));
 
   const info = await page.evaluate(() => {
     // Hit-testing: ¿quién recibe el clic en nueve puntos repartidos por la

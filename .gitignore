@@ -8,3 +8,12 @@ out
 next-env.d.ts
 prisma/dev.db
 prisma/dev.db-journal
+
+# Restos de verificacion de los agentes
+*.tmp.cjs
+*.tmp.mjs
+*.tmp.txt
+*.bak
+qa/shots
+qa/informe.json
+public/uploads

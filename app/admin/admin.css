@@ -131,12 +131,13 @@ body:has(.adm-auth)::after {
 }
 .adm-side-name b {
   font-weight: 500;
-  font-size: 14px;
-  letter-spacing: 0.09em;
+  font-size: 13px;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* El nombre de la tienda se parte en dos líneas antes que truncarse: leer
+     "BLOOM BY MADELI…" en tu propio panel se ve descuidado. */
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 .adm-side-name span {
   font-size: 10px;
@@ -794,4 +795,315 @@ body:has(.adm-auth)::after {
   .adm-dt td.adm-dt-hide-m { display: none; }
   .adm-card-body.is-flush .adm-dt tbody tr { margin: 0 0 10px; }
   .adm-card-body.is-flush .adm-dt { padding: 12px 0 2px; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INTEGRACIÓN DEL PANEL — navegación agrupada, migas y buscador
+   ───────────────────────────────────────────────────────────
+   Añadido al final a propósito: aquí no se reescribe nada de arriba, solo se
+   suma lo que necesitan Sidebar.tsx, Breadcrumbs.tsx y CommandPalette.tsx.
+   Mismos tokens --adm-*, mismos radios, mismo burgundy como único color de
+   acción.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── buscador global: los dos disparadores ───────────────── */
+
+.adm-side-search { padding: 12px 12px 2px; }
+
+.adm-side-buscar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border-radius: var(--adm-r-sm);
+  border: 1px solid var(--adm-ink-line);
+  background: var(--adm-ink-2);
+  color: var(--adm-on-ink-dim);
+  font-family: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.adm-side-buscar svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.adm-side-buscar span { flex: 1 1 auto; text-align: left; }
+.adm-side-buscar kbd {
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--adm-ink-line);
+  border-radius: 5px;
+  padding: 2px 5px;
+}
+.adm-side-buscar:hover { background: var(--adm-ink-3); color: var(--adm-on-ink); }
+.adm-side-buscar:focus-visible { outline: 2px solid var(--adm-clay, #D2A08D); outline-offset: -2px; }
+
+.adm-topbar-acciones { display: flex; align-items: center; gap: 10px; }
+.adm-topbar-buscar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--adm-ink-2);
+  border: 1px solid var(--adm-ink-line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: var(--adm-on-ink-dim);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.adm-topbar-buscar svg { width: 14px; height: 14px; }
+
+/* ── grupos plegables del sidebar (solo escritorio) ──────── */
+
+.adm-navgroup { display: flex; flex-direction: column; }
+.adm-navgroup-head span { flex: 1 1 auto; }
+.adm-navgroup-head .adm-navgroup-chevron {
+  width: 13px;
+  height: 13px;
+  opacity: 0.65;
+  transition: transform 0.16s ease;
+}
+.adm-navgroup.is-open .adm-navgroup-head .adm-navgroup-chevron { transform: rotate(90deg); }
+/* Grupo cerrado que contiene la pantalla actual: el chevron lo delata. */
+.adm-navgroup-head.has-active { color: var(--adm-on-ink); }
+.adm-navgroup-head.has-active .adm-navgroup-chevron { opacity: 1; color: var(--adm-clay, #D2A08D); }
+
+.adm-navgroup-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 6px 20px;
+  padding-left: 8px;
+  border-left: 1px solid var(--adm-ink-line);
+}
+.adm-navlink.is-child { font-size: 13.5px; padding: 8px 10px; }
+.adm-navlink.is-child svg { width: 15px; height: 15px; opacity: 0.8; }
+
+/* La barra plana del teléfono no existe en escritorio. */
+.adm-side-bar { display: none; }
+
+/* El pie del sidebar ahora lleva a "Tu cuenta". */
+.adm-side-user { display: block; transition: color 0.16s ease; }
+.adm-side-user:hover { color: var(--adm-on-ink); }
+.adm-side-user.is-active { color: var(--adm-on-ink); }
+.adm-side-user.is-active b { color: #F7F0E1; }
+
+.adm-sheet-scroll { display: flex; flex-direction: column; gap: 2px; }
+.adm-sheet-group { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.adm-sheet-group-title {
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--adm-on-ink-dim);
+  padding: 8px 12px 2px;
+}
+.adm-sheet-cuenta { font-size: 12px; color: var(--adm-on-ink-dim); align-self: center; }
+
+/* ── migas de pan ────────────────────────────────────────── */
+
+.adm-crumbs { margin: -4px 0 14px; font-size: 12.5px; color: var(--adm-muted); }
+.adm-crumbs ol { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.adm-crumbs li { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.adm-crumbs a { color: var(--adm-muted); border-bottom: 1px solid transparent; }
+.adm-crumbs a:hover { color: var(--adm-accent); border-bottom-color: rgba(119, 48, 62, 0.3); }
+.adm-crumbs [aria-current="page"] {
+  color: var(--adm-text-2);
+  max-width: 46ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.adm-crumbs-sep { opacity: 0.45; }
+
+/* ── paleta de comandos ──────────────────────────────────── */
+
+/* Ojo: cuando está cerrada NO existe nada de esto en el DOM. El componente
+   devuelve null, no una capa con opacity 0 — ver CommandPalette.tsx. */
+.cmdp-back {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(20, 18, 14, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10vh 16px 16px;
+}
+.cmdp {
+  width: 100%;
+  max-width: 600px;
+  max-height: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r-lg);
+  box-shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.6);
+}
+.cmdp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--adm-line-soft);
+}
+.cmdp-lupa { width: 18px; height: 18px; flex: 0 0 auto; color: var(--adm-muted); }
+.cmdp-head input {
+  flex: 1 1 auto;
+  border-color: transparent;
+  background: transparent;
+  padding: 6px 0;
+  font-size: 16px; /* 16px evita que el teléfono haga zoom al enfocar */
+}
+.cmdp-head input:focus { border-color: transparent; box-shadow: none; outline: none; }
+.cmdp-cerrar {
+  flex: 0 0 auto;
+  font-family: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--adm-muted);
+  background: var(--adm-surface-2);
+  border: 1px solid var(--adm-line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.cmdp-cerrar:hover { color: var(--adm-text); }
+
+.cmdp-lista { flex: 1 1 auto; overflow-y: auto; padding: 6px; }
+.cmdp-fila {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  border-radius: var(--adm-r-sm);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cmdp-fila.is-sel { background: var(--adm-accent-soft); }
+.cmdp-fila-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cmdp-fila-txt b {
+  font-weight: 500;
+  font-size: 14.5px;
+  color: var(--adm-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmdp-fila-txt span {
+  font-size: 12.5px;
+  color: var(--adm-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmdp-tag {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: var(--adm-surface-2);
+  color: var(--adm-text-2);
+}
+.cmdp-tag-accion { background: var(--adm-accent-soft); color: var(--adm-accent); }
+.cmdp-tag-pedido { background: var(--adm-info-soft); color: var(--adm-info); }
+.cmdp-tag-producto { background: var(--adm-success-soft); color: var(--adm-success); }
+.cmdp-tag-clienta { background: var(--adm-warning-soft); color: var(--adm-warning); }
+.cmdp-vacio { padding: 26px 18px; text-align: center; color: var(--adm-muted); font-size: 13.5px; line-height: 1.6; }
+
+.cmdp-pie {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 9px 14px;
+  border-top: 1px solid var(--adm-line-soft);
+  background: var(--adm-surface-2);
+  font-size: 11.5px;
+  color: var(--adm-muted);
+}
+.cmdp-pie kbd {
+  font-family: inherit;
+  border: 1px solid var(--adm-line);
+  border-radius: 5px;
+  padding: 1px 5px;
+  background: var(--adm-surface);
+}
+
+/* ── accesos rápidos del resumen ─────────────────────────── */
+
+.adm-quick { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr)); }
+.adm-quick a {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  background: var(--adm-surface);
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+.adm-quick a:hover { border-color: var(--adm-accent); background: var(--adm-accent-soft); }
+.adm-quick b { font-weight: 500; font-size: 14px; color: var(--adm-text); }
+.adm-quick span { font-size: 12.5px; color: var(--adm-muted); line-height: 1.45; }
+
+.adm-allgood { display: flex; align-items: center; gap: 14px; }
+.adm-allgood-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--adm-success-soft);
+  color: var(--adm-success);
+}
+.adm-allgood-icon svg { width: 21px; height: 21px; }
+.adm-allgood b { display: block; font-weight: 500; font-size: 15px; }
+.adm-allgood span { font-size: 13.5px; color: var(--adm-muted); }
+
+/* ── teléfono ────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  /* En la barra inferior no caben ni el buscador de columna ni los grupos:
+     ahí va la lista plana, y el menú completo vive en la hoja "Más". */
+  .adm-side-search,
+  .adm-side-nav { display: none; }
+
+  .adm-side-bar {
+    display: flex;
+    flex-direction: row;
+    flex: 1 1 auto;
+    padding: 0;
+    gap: 0;
+    overflow: visible;
+  }
+
+  /* BUG ARREGLADO (venía de antes): el botón "Más" nunca se veía en el
+     teléfono. Lo apagaba `.adm-navlink:not(.is-primary) { display: none }`,
+     que pesa (0,2,0) contra el (0,1,0) de `.adm-more`, así que ganaba
+     estuviera donde estuviera en el fichero. Consecuencia real: en el móvil no
+     había NINGUNA forma de llegar a Ajustes, Informes, Clientas ni al resto —
+     comprobado con getComputedStyle, display:none. Se corrige con un selector
+     del mismo peso pero posterior, sin tocar la regla de arriba. */
+  .adm-side .adm-more { display: flex; flex: 0 0 72px; }
+
+  .cmdp-back { padding: 5vh 10px 10px; }
+  .cmdp { max-height: 80vh; }
+  .cmdp-pie { display: none; }
+
+  .adm-sheet-scroll { max-height: 58vh; overflow-y: auto; }
+
+  .adm-crumbs { margin: 0 0 12px; }
 }

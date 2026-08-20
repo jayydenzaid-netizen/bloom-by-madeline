@@ -257,7 +257,12 @@ const NAV: Entrada[] = [
     soloDuena: true,
     items: [
       { href: "/admin/ajustes", label: "Ajustes", icon: I.engranaje, soloDuena: true },
-      { href: "/admin/envios", label: "Envíos", icon: I.camion, soloDuena: true },
+      // ⚠️ "Envíos" NO está aquí a propósito: /admin/envios devuelve 404 hoy
+      // (comprobado con node qa/audit.mjs). La pantalla no existe todavía: lo
+      // que hay de envíos vive dentro de /admin/ajustes. Enlazar una sección
+      // que da error es peor que no enlazarla — Madeline pensaría que ha roto
+      // algo. En cuanto exista app/admin/envios/page.tsx, se descomenta:
+      // { href: "/admin/envios", label: "Envíos", icon: I.camion, soloDuena: true },
       { href: "/admin/plantillas", label: "Plantillas", icon: I.sobre, soloDuena: true },
       { href: "/admin/herramientas", label: "Herramientas", icon: I.llave, soloDuena: true },
       { href: "/admin/equipo", label: "Equipo", icon: I.persona, soloDuena: true },
@@ -422,7 +427,14 @@ export default function Sidebar({
         </button>
 
         <div className="adm-side-foot">
-          <Link href="/admin/cuenta" className="adm-side-user" onClick={cerrarHoja}>
+          {/* "Tu cuenta" no está en el menú: se llega desde aquí, que es donde
+              una persona busca su propio nombre. */}
+          <Link
+            href="/admin/cuenta"
+            className={`adm-side-user${pathname.startsWith("/admin/cuenta") ? " is-active" : ""}`}
+            aria-current={pathname.startsWith("/admin/cuenta") ? "page" : undefined}
+            onClick={cerrarHoja}
+          >
             <b>{adminName}</b>
             {rol === "owner" ? "Dueña · ver tu cuenta" : "Ayudante · ver tu cuenta"}
           </Link>
