@@ -1,0 +1,225 @@
+/*
+ * Estilos propios de las pantallas de catálogo (productos y colecciones).
+ * Vive aquí y no en admin.css porque admin.css lo comparten cuatro pantallas y
+ * tocarlo para un caso concreto rompería las otras. Todo va prefijado `cat-`.
+ * Los colores salen siempre de los tokens --adm-* del panel: nada a pelo.
+ */
+
+/* ── formulario del producto: contenido ancho + columna de ajustes ──────── */
+
+.cat-cols {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  align-items: start;
+}
+.cat-cols > * { min-width: 0; }
+
+@media (max-width: 1040px) {
+  .cat-cols { grid-template-columns: minmax(0, 1fr); }
+}
+
+.cat-stack { display: flex; flex-direction: column; gap: 20px; }
+
+/* ── avisos del formulario ─────────────────────────────────────────────── */
+
+.cat-aviso {
+  border-radius: var(--adm-r);
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  margin-bottom: 18px;
+  border: 1px solid transparent;
+}
+.cat-aviso-error {
+  background: var(--adm-danger-soft);
+  color: var(--adm-danger);
+  border-color: rgba(160, 48, 42, 0.28);
+}
+.cat-aviso-ok {
+  background: var(--adm-success-soft);
+  color: var(--adm-success);
+  border-color: rgba(46, 107, 79, 0.28);
+}
+.cat-aviso-info {
+  background: var(--adm-info-soft);
+  color: var(--adm-info);
+  border-color: rgba(43, 84, 112, 0.26);
+}
+.cat-aviso-warn {
+  background: var(--adm-warning-soft);
+  color: var(--adm-warning);
+  border-color: rgba(138, 87, 19, 0.28);
+}
+
+/* ── barra de filtros del listado ──────────────────────────────────────── */
+
+.cat-filtros {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.cat-filtros .adm-field { margin-bottom: 0; }
+.cat-filtros-busca { flex: 1 1 220px; }
+.cat-filtros .adm-field select,
+.cat-filtros .adm-field input { min-width: 150px; }
+
+/* ── celda de producto en la tabla ─────────────────────────────────────── */
+
+.cat-prod { display: flex; align-items: center; gap: 11px; }
+.cat-prod-txt { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cat-prod-txt b { font-weight: 500; }
+.cat-thumb-vacio {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: var(--adm-r-sm);
+  border: 1px dashed var(--adm-line);
+  display: grid;
+  place-items: center;
+  color: var(--adm-muted);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  background: var(--adm-surface-2);
+}
+.cat-flags { display: flex; gap: 5px; flex-wrap: wrap; }
+
+/* ── selección en lote ─────────────────────────────────────────────────── */
+
+.cat-check { width: 18px; height: 18px; accent-color: var(--adm-accent); cursor: pointer; }
+
+.cat-lote {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--adm-surface-2);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  margin-bottom: 16px;
+}
+.cat-lote-etiqueta {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--adm-muted);
+  margin-right: 2px;
+}
+.cat-lote-todos {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--adm-text-2);
+  cursor: pointer;
+}
+.cat-lote select { min-width: 160px; }
+
+/* ── paginación ────────────────────────────────────────────────────────── */
+
+.cat-pag { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* ── editor de variantes ───────────────────────────────────────────────── */
+
+.cat-opciones { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+.cat-opcion { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.cat-opcion .adm-field { margin-bottom: 0; }
+.cat-opcion-nombre { flex: 0 1 150px; }
+.cat-opcion-valores { flex: 1 1 260px; }
+
+.cat-bulk {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 11px 14px;
+  border: 1px dashed var(--adm-line);
+  border-radius: var(--adm-r);
+  background: var(--adm-surface-2);
+  margin: 14px 0;
+}
+.cat-bulk select { min-width: 120px; }
+.cat-bulk input { width: 100px; }
+.cat-bulk-sep { flex: 1 1 8px; }
+
+.cat-vt-in { width: 100%; min-width: 74px; }
+.cat-vt-in-sm { width: 100%; min-width: 62px; }
+.cat-vt-txt { width: 100%; min-width: 110px; }
+.cat-margen { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; line-height: 1.3; }
+.cat-margen-pct { font-size: 11.5px; }
+.cat-margen-bueno { color: var(--adm-success); }
+.cat-margen-justo { color: var(--adm-warning); }
+.cat-margen-malo { color: var(--adm-danger); }
+
+.cat-track { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--adm-text-2); }
+
+/* ── gestor de imágenes ────────────────────────────────────────────────── */
+
+.cat-imgs { display: flex; flex-direction: column; gap: 10px; }
+.cat-img {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  background: var(--adm-surface);
+}
+.cat-img.es-portada { border-color: rgba(119, 48, 62, 0.4); box-shadow: inset 3px 0 0 var(--adm-accent); }
+.cat-img-foto {
+  width: 62px;
+  height: 62px;
+  flex: none;
+  object-fit: cover;
+  border-radius: var(--adm-r-sm);
+  border: 1px solid var(--adm-line);
+  background: var(--adm-surface-2);
+}
+.cat-img-cuerpo { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.cat-img-cuerpo .adm-field { margin-bottom: 0; }
+.cat-img-acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+.cat-img-alta { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; margin-top: 12px; }
+.cat-img-alta .adm-field { margin-bottom: 0; flex: 1 1 220px; }
+
+/* ── vista previa de Google ────────────────────────────────────────────── */
+
+.cat-google {
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  padding: 13px 15px;
+  background: var(--adm-surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cat-google-url { font-size: 12.5px; color: var(--adm-success); word-break: break-all; }
+.cat-google-title {
+  font-size: 17px;
+  color: #1a3d8f; /* el azul de los resultados de Google: aquí imita, no decora */
+  line-height: 1.3;
+}
+.cat-google-desc { font-size: 13px; color: var(--adm-text-2); line-height: 1.5; }
+.cat-contador { font-variant-numeric: tabular-nums; }
+.cat-contador.se-pasa { color: var(--adm-danger); }
+
+/* ── colecciones ───────────────────────────────────────────────────────── */
+
+.cat-col-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: var(--adm-r-sm);
+  border: 1px solid var(--adm-line);
+  background: var(--adm-surface-2);
+}
+.cat-inline { display: inline-flex; gap: 6px; align-items: center; }
+.cat-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.cat-checks label { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }

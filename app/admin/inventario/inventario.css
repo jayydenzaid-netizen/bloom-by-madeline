@@ -1,0 +1,231 @@
+/*
+ * Estilos propios de las pantallas de inventario (listado y movimientos).
+ * Viven aquí y no en admin.css porque admin.css lo comparte todo el panel y
+ * tocarlo por un caso concreto rompería las demás pantallas. Todo va prefijado
+ * `inv-` y los colores salen siempre de los tokens --adm-*: nada a pelo.
+ */
+
+/* ── avisos y explicaciones ───────────────────────────────────────────── */
+
+.inv-aviso {
+  border-radius: var(--adm-r);
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  margin-bottom: 18px;
+  border: 1px solid transparent;
+}
+.inv-aviso-ok {
+  background: var(--adm-success-soft);
+  color: var(--adm-success);
+  border-color: rgba(46, 107, 79, 0.28);
+}
+.inv-aviso-error {
+  background: var(--adm-danger-soft);
+  color: var(--adm-danger);
+  border-color: rgba(160, 48, 42, 0.28);
+}
+.inv-aviso-info {
+  background: var(--adm-info-soft);
+  color: var(--adm-info);
+  border-color: rgba(43, 84, 112, 0.26);
+}
+
+/* Explicación fija de por qué hay variantes que no se cuentan. */
+.inv-explica {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--adm-text-2);
+}
+.inv-explica p { margin: 0 0 8px; }
+.inv-explica p:last-child { margin-bottom: 0; }
+.inv-explica b { color: var(--adm-text); }
+
+/* ── barra de filtros ─────────────────────────────────────────────────── */
+
+.inv-filtros {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.inv-filtros .adm-field { margin: 0; min-width: 150px; }
+.inv-filtros-busca { flex: 1 1 240px; }
+.inv-filtros-umbral { max-width: 110px; }
+
+@media (max-width: 640px) {
+  .inv-filtros .adm-field,
+  .inv-filtros-busca { flex: 1 1 100%; min-width: 0; }
+}
+
+/* ── celda de producto ────────────────────────────────────────────────── */
+
+.inv-prod {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+.inv-prod-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.inv-prod-var {
+  font-size: 13px;
+  color: var(--adm-muted);
+}
+.inv-thumb-vacio {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: var(--adm-r-sm);
+  border: 1px dashed var(--adm-line);
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--adm-muted);
+  background: var(--adm-surface-2);
+  text-align: center;
+}
+
+.inv-sku {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--adm-muted);
+  word-break: break-all;
+}
+
+/* ── números de stock ─────────────────────────────────────────────────── */
+
+.inv-num { font-variant-numeric: tabular-nums; font-weight: 600; }
+.inv-num-bajo { color: var(--adm-warning); }
+.inv-num-cero { color: var(--adm-danger); }
+.inv-sin-control {
+  font-size: 13px;
+  color: var(--adm-muted);
+}
+
+/* ── editor en línea ──────────────────────────────────────────────────── */
+
+.inv-ajuste {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.inv-ajuste input[type="number"] {
+  width: 72px;
+  text-align: right;
+  padding: 7px 8px;
+  font-variant-numeric: tabular-nums;
+}
+/* Los steppers nativos son diminutos en móvil; los sustituyen los botones. */
+.inv-ajuste input[type="number"]::-webkit-outer-spin-button,
+.inv-ajuste input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.inv-ajuste input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+/* Botones ± : cuadrados de 38 px, que es lo que ocupa un pulgar. */
+.inv-paso {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: var(--adm-r-sm);
+  border: 1px solid var(--adm-line);
+  background: var(--adm-surface);
+  color: var(--adm-text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.inv-paso:hover:not(:disabled) { background: var(--adm-surface-2); border-color: var(--adm-accent); }
+.inv-paso:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.inv-estado {
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 4px;
+  text-align: right;
+}
+.inv-estado-ok { color: var(--adm-success); }
+.inv-estado-error { color: var(--adm-danger); }
+
+/* ── barra de selección / lote ────────────────────────────────────────── */
+
+.inv-lote {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  background: var(--adm-surface-2);
+  margin-bottom: 18px;
+}
+.inv-lote .adm-field { margin: 0; min-width: 140px; }
+.inv-lote-cuenta {
+  font-weight: 600;
+  font-size: 14px;
+  padding-bottom: 9px;
+}
+.inv-lote-nota { flex: 1 1 200px; }
+
+@media (max-width: 640px) {
+  .inv-lote .adm-field { flex: 1 1 100%; min-width: 0; }
+}
+
+.inv-check {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--adm-accent);
+  cursor: pointer;
+}
+
+.inv-barra {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+/* ── paginación y pies ────────────────────────────────────────────────── */
+
+.inv-pag {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+/* ── historial de movimientos ─────────────────────────────────────────── */
+
+.inv-delta { font-variant-numeric: tabular-nums; font-weight: 600; }
+.inv-delta-mas { color: var(--adm-success); }
+.inv-delta-menos { color: var(--adm-danger); }
+.inv-salto {
+  font-variant-numeric: tabular-nums;
+  color: var(--adm-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.inv-nota-texto {
+  font-size: 13px;
+  color: var(--adm-text-2);
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,43 @@
+/* ═══════════════════════════════════════════════════════════
+   BLOOM BY MADELINE — lo poquito que la portada añade
+   ───────────────────────────────────────────────────────────
+   globals.css tiene el diseño entero de esta página y no se toca. Aquí solo
+   está lo que cambia porque la portada ya no depende de JavaScript propio.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ═══════════ PRELOADER SIN JAVASCRIPT ═══════════
+
+   El del sitio viejo se quitaba desde main.js (`preloader.classList.add("done")`).
+   Un telón a pantalla completa que depende de que el JS llegue y se ejecute es
+   justo la forma del P0 que ya se pagó aquí: si falla, la tienda queda tapada.
+
+   Aquí se apaga solo, con una animación `forwards` que corre aunque no haya nada
+   de JavaScript, y encima nunca captura clicks. Lo peor que puede pasar es que
+   se vea un rato de más; nunca que bloquee la tienda. */
+
+.home-preloader {
+  /* Cinturón: aunque quedara visible, se puede seguir comprando por debajo. */
+  pointer-events: none;
+  animation: preloader-fuera .6s var(--ease) 1.3s forwards;
+}
+
+@keyframes preloader-fuera {
+  to { opacity: 0; visibility: hidden; }
+}
+
+/* Con el movimiento reducido no hay telón que valga: fuera desde el primer frame
+   (la regla global deja las animaciones en .01ms, así que esto solo lo remata). */
+@media (prefers-reduced-motion: reduce) {
+  .home-preloader { opacity: 0; visibility: hidden; }
+}
+
+/* ═══════════ GALERÍA DE INSPIRACIÓN ═══════════
+
+   Cuando todavía no hay nada publicado, la rejilla enseña las prendas reales que
+   esperan precio y cada foto lleva al DM. Hereda todo de `.product`; lo único
+   propio es que "Preguntar por DM" es más largo que "Ver la pieza" y no debe
+   partirse en dos líneas dentro del marco. */
+
+.product-insp figcaption span {
+  white-space: nowrap;
+}

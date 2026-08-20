@@ -1,0 +1,597 @@
+/*
+ * MOSTRADOR (POS) — estilos propios de /admin/pos.
+ *
+ * Viven aquí y no en admin.css porque admin.css lo comparte todo el panel y
+ * tocarlo por una pantalla concreta rompería las demás. Todo va prefijado `pos-`
+ * y ningún color se escribe a pelo: salen de los tokens --adm-*.
+ *
+ * Esta pantalla se usa DE PIE, con el teléfono en una mano y una prenda en la
+ * otra. Por eso todo lo que se toca mide 48 px o más (recomendación de tamaño
+ * táctil de la WCAG), el ticket nunca desaparece de la vista, y el total se lee
+ * de un vistazo desde la distancia a la que se sostiene un móvil.
+ */
+
+/* ── avisos ───────────────────────────────────────────────────────────── */
+
+.pos-aviso {
+  border-radius: var(--adm-r);
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0 0 16px;
+  border: 1px solid transparent;
+}
+.pos-aviso-error {
+  background: var(--adm-danger-soft);
+  color: var(--adm-danger);
+  border-color: rgba(160, 48, 42, 0.28);
+}
+.pos-aviso-info {
+  background: var(--adm-info-soft);
+  color: var(--adm-info);
+  border-color: rgba(43, 84, 112, 0.26);
+}
+/* El aviso que NO se puede pasar por alto: "esto no cobra la tarjeta". */
+.pos-aviso-ojo {
+  background: var(--adm-warning-soft);
+  color: var(--adm-warning);
+  border-color: rgba(138, 87, 19, 0.32);
+}
+.pos-aviso a { color: inherit; text-decoration: underline; }
+
+/* ── esqueleto de dos columnas ────────────────────────────────────────── */
+
+.pos-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 358px;
+  gap: 18px;
+  align-items: start;
+}
+
+.pos-catalogo { min-width: 0; }
+
+.pos-filtros {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 16px;
+}
+.pos-filtros .adm-field { margin: 0; }
+.pos-filtros .adm-field:first-child { flex: 1 1 260px; }
+.pos-filtros .adm-field:last-child { flex: 0 1 200px; }
+/* Campos altos: se teclea con el pulgar, no con ratón. */
+.pos-filtros input,
+.pos-filtros select { min-height: 48px; }
+
+/* ── rejilla de productos ─────────────────────────────────────────────── */
+
+.pos-rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 12px;
+}
+
+.pos-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 8px 10px;
+  text-align: left;
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  color: var(--adm-text);
+  font: inherit;
+  cursor: pointer;
+  min-height: 200px;
+  transition: border-color 0.12s ease, transform 0.08s ease;
+}
+.pos-card:hover { border-color: var(--adm-accent); }
+/* La confirmación del toque tiene que verse en un móvil al sol. */
+.pos-card:active { transform: scale(0.97); }
+.pos-card:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.pos-card-foto {
+  display: block;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--adm-r-sm);
+  overflow: hidden;
+  background: var(--adm-surface-2);
+}
+.pos-card-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pos-card-sinfoto {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-size: 12px;
+  color: var(--adm-muted);
+}
+
+.pos-card-tit {
+  font-size: 13.5px;
+  line-height: 1.35;
+  font-weight: 500;
+  /* Dos líneas y punto: los títulos largos descuadrarían toda la rejilla. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pos-card-pie {
+  margin-top: auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.pos-card-precio { font-size: 15px; font-weight: 600; }
+.pos-card-stock { font-size: 11.5px; color: var(--adm-muted); }
+
+/* ── ticket ───────────────────────────────────────────────────────────── */
+
+.pos-ticket {
+  position: sticky;
+  top: 18px;
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r-lg);
+  padding: 14px;
+  box-shadow: var(--adm-shadow);
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+}
+
+.pos-ticket-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.pos-ticket-cab h2 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--adm-muted);
+}
+/* Solo hace falta cuando el ticket es una hoja desplegable (móvil). */
+.pos-cerrar-hoja {
+  display: none;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  background: transparent;
+  color: var(--adm-text-2);
+  font-size: 20px;
+  border-radius: var(--adm-r-sm);
+  cursor: pointer;
+}
+
+.pos-ticket-vacio {
+  margin: 0;
+  padding: 22px 6px;
+  text-align: center;
+  color: var(--adm-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.pos-lineas { list-style: none; margin: 0; padding: 0; }
+.pos-linea {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "txt fin" "ctl fin";
+  gap: 6px 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--adm-line-soft);
+}
+.pos-linea-txt { grid-area: txt; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pos-linea-tit { font-size: 14px; font-weight: 500; }
+.pos-linea-var { font-size: 12.5px; color: var(--adm-muted); }
+.pos-linea-precio { font-size: 12.5px; color: var(--adm-text-2); }
+
+.pos-linea-ctl { grid-area: ctl; display: flex; align-items: center; gap: 8px; }
+.pos-paso {
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--adm-line);
+  background: var(--adm-surface-2);
+  color: var(--adm-text);
+  border-radius: var(--adm-r-sm);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.pos-paso:active { background: var(--adm-accent-soft); }
+.pos-paso:disabled { opacity: 0.4; cursor: not-allowed; }
+.pos-linea-cant { min-width: 26px; text-align: center; font-size: 16px; font-weight: 600; }
+
+.pos-linea-fin {
+  grid-area: fin;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+}
+.pos-linea-total { font-size: 15px; font-weight: 600; }
+.pos-quitar {
+  border: 0;
+  background: transparent;
+  color: var(--adm-danger);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 8px 4px;
+  min-height: 44px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/*
+ * Los botones del panel miden 42 px (md) y 32 px (sm), que están bien con un
+ * ratón. Aquí se cobra de pie y con prisa, así que dentro del mostrador todos
+ * suben a 48 px. Se hace desde este fichero y acotado a contenedores `pos-*`:
+ * admin.css no se toca, y ninguna otra pantalla se entera.
+ */
+.pos-barra .adm-btn,
+.pos-ticket-acciones .adm-btn,
+.pos-modal-pie .adm-btn,
+.pos-recibo-botones .adm-btn {
+  min-height: 48px;
+}
+
+/* ── descuento ────────────────────────────────────────────────────────── */
+
+.pos-descuento { padding: 12px 0; border-bottom: 1px solid var(--adm-line-soft); }
+.pos-seg { display: flex; gap: 6px; }
+.pos-seg-btn {
+  flex: 1 1 0;
+  min-height: 48px;
+  padding: 6px 4px;
+  border: 1px solid var(--adm-line);
+  background: var(--adm-surface);
+  color: var(--adm-text-2);
+  border-radius: var(--adm-r-sm);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.pos-seg-btn.is-activo {
+  background: var(--adm-accent-soft);
+  border-color: var(--adm-accent);
+  color: var(--adm-accent);
+  font-weight: 600;
+}
+.pos-descuento-campos { margin-top: 10px; display: grid; gap: 6px; }
+.pos-descuento-campos .adm-field { margin: 0; }
+.pos-descuento-campos input { min-height: 48px; }
+
+/* ── sumas ────────────────────────────────────────────────────────────── */
+
+.pos-sumas { padding: 12px 0; display: grid; gap: 6px; }
+.pos-sumas > div { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.pos-sumas > div > span:last-child { font-variant-numeric: tabular-nums; }
+.pos-suma-mal { color: var(--adm-danger); }
+.pos-suma-total {
+  border-top: 1px solid var(--adm-line);
+  padding-top: 8px;
+  margin-top: 2px;
+  font-size: 21px !important;
+  font-weight: 700;
+}
+
+.pos-ticket-acciones { display: grid; gap: 8px; }
+.pos-confirma {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px;
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r-sm);
+  background: var(--adm-danger-soft);
+  font-size: 13.5px;
+}
+
+/* ── barra fija de móvil ──────────────────────────────────────────────── */
+
+.pos-barra { display: none; }
+
+/* ── paneles (tallas y cobro) ─────────────────────────────────────────── */
+
+.pos-modal {
+  position: fixed;
+  inset: 0;
+  /* Por encima del sidebar (z 40) y de la barra inferior de móvil (z 50). */
+  z-index: 80;
+  background: rgba(23, 21, 15, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 14px;
+}
+.pos-modal-caja {
+  width: min(100%, 460px);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--adm-surface);
+  border-radius: var(--adm-r-lg);
+  border: 1px solid var(--adm-line);
+  padding: 16px;
+  box-shadow: 0 24px 60px -24px rgba(23, 21, 15, 0.7);
+}
+.pos-modal-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pos-modal-cab h2 { margin: 0; font-size: 19px; }
+.pos-modal-cab .pos-cerrar-hoja { display: block; }
+.pos-modal-texto { margin: 4px 0 14px; color: var(--adm-muted); font-size: 14px; }
+.pos-modal-pie { display: grid; gap: 8px; margin-top: 14px; }
+
+.pos-tallas { display: grid; grid-template-columns: repeat(auto-fill, minmax(126px, 1fr)); gap: 10px; }
+.pos-talla {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 76px;
+  padding: 10px;
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  background: var(--adm-surface-2);
+  color: var(--adm-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pos-talla:active { transform: scale(0.97); }
+.pos-talla:disabled { opacity: 0.42; cursor: not-allowed; }
+.pos-talla-tit { font-size: 17px; font-weight: 600; }
+.pos-talla-precio { font-size: 14px; }
+.pos-talla-stock { font-size: 11.5px; color: var(--adm-muted); }
+
+/* ── cobro ────────────────────────────────────────────────────────────── */
+
+.pos-metodos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
+.pos-metodo {
+  min-height: 56px;
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  background: var(--adm-surface-2);
+  color: var(--adm-text-2);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pos-metodo.is-activo {
+  background: var(--adm-accent);
+  border-color: var(--adm-accent);
+  color: #F6EFE3;
+  font-weight: 600;
+}
+
+.pos-efectivo { display: grid; gap: 10px; margin-bottom: 12px; }
+.pos-efectivo .adm-field { margin: 0; }
+.pos-efectivo input { min-height: 52px; font-size: 18px; }
+
+.pos-billetes { display: flex; gap: 8px; flex-wrap: wrap; }
+.pos-billete {
+  flex: 1 1 78px;
+  min-height: 48px;
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r-sm);
+  background: var(--adm-surface-2);
+  color: var(--adm-text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pos-billete:active { background: var(--adm-accent-soft); }
+
+/* El cambio es EL número de esta pantalla: se lee de un vistazo o no sirve. */
+.pos-cambio {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--adm-r);
+  background: var(--adm-success-soft);
+  color: var(--adm-success);
+  font-size: 14px;
+}
+.pos-cambio strong { font-size: 30px; font-variant-numeric: tabular-nums; }
+.pos-cambio.is-falta { background: var(--adm-danger-soft); color: var(--adm-danger); }
+
+.pos-datos { display: grid; gap: 8px; margin-top: 12px; }
+.pos-datos .adm-field { margin: 0; }
+.pos-datos input { min-height: 48px; }
+
+/* ── cierre de caja ───────────────────────────────────────────────────── */
+
+.pos-cierre { margin-top: 26px; display: grid; gap: 16px; }
+
+/* ── recibo ───────────────────────────────────────────────────────────── */
+
+.pos-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(23, 21, 15, 0.62);
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 12px;
+  padding: 14px;
+  overflow-y: auto;
+}
+.pos-recibo-caja { display: grid; place-items: center; align-content: center; }
+
+.pos-recibo {
+  width: min(100%, 340px);
+  background: var(--adm-surface);
+  border-radius: var(--adm-r);
+  padding: 18px 16px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--adm-text);
+}
+.pos-recibo-cab { display: grid; gap: 2px; text-align: center; margin-bottom: 12px; }
+.pos-recibo-cab strong { font-size: 16px; letter-spacing: 0.04em; }
+.pos-recibo-cab span { color: var(--adm-text-2); font-size: 11.5px; }
+
+.pos-recibo-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px dashed var(--adm-line);
+  border-bottom: 1px dashed var(--adm-line);
+  font-size: 11.5px;
+  color: var(--adm-text-2);
+}
+.pos-recibo-cliente { padding: 6px 0; font-size: 12px; }
+
+.pos-recibo-tabla { width: 100%; border-collapse: collapse; margin: 6px 0; }
+.pos-recibo-tabla td { vertical-align: top; padding: 6px 0; border-bottom: 1px dotted var(--adm-line-soft); }
+.pos-recibo-tit { display: block; font-weight: 600; }
+.pos-recibo-var { display: block; color: var(--adm-text-2); font-size: 11.5px; }
+.pos-al-der { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.pos-recibo-sumas { display: grid; gap: 4px; padding-top: 8px; }
+.pos-recibo-sumas > div { display: flex; justify-content: space-between; gap: 10px; }
+.pos-recibo-sumas > div > span:last-child { font-variant-numeric: tabular-nums; }
+.pos-recibo-total { font-size: 16px; font-weight: 700; border-top: 1px solid var(--adm-line); padding-top: 6px; }
+
+.pos-recibo-aviso {
+  margin: 10px 0 0;
+  padding: 8px;
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  border: 1px dashed var(--adm-danger);
+  color: var(--adm-danger);
+  border-radius: var(--adm-r-sm);
+}
+.pos-recibo-pie {
+  display: grid;
+  gap: 2px;
+  text-align: center;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--adm-line);
+  color: var(--adm-text-2);
+  font-size: 11.5px;
+}
+
+.pos-recibo-acciones {
+  background: var(--adm-surface);
+  border-radius: var(--adm-r-lg);
+  border: 1px solid var(--adm-line);
+  padding: 14px;
+}
+.pos-recibo-ok { margin: 0 0 8px; font-size: 15px; font-weight: 600; color: var(--adm-success); }
+.pos-recibo-nota { margin: 0 0 10px; font-size: 13px; color: var(--adm-warning); }
+.pos-recibo-botones { display: flex; gap: 8px; flex-wrap: wrap; }
+.pos-recibo-botones > * { flex: 1 1 140px; }
+
+/* ── móvil: el ticket se convierte en hoja, y el total en barra fija ──── */
+
+@media (max-width: 1080px) {
+  .pos-cols { grid-template-columns: minmax(0, 1fr) 310px; }
+}
+
+@media (max-width: 900px) {
+  .pos-cols { grid-template-columns: 1fr; }
+
+  /* Hueco para la barra del total + la barra de navegación del panel. */
+  .pos-catalogo { padding-bottom: 8px; }
+
+  .pos-ticket {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--adm-bar-h) + env(safe-area-inset-bottom, 0px));
+    top: auto;
+    z-index: 60;
+    max-height: 76vh;
+    border-radius: var(--adm-r-lg) var(--adm-r-lg) 0 0;
+    border-bottom: 0;
+    /* Fuera de pantalla, no oculto: así se desliza al abrirse y no hay que
+       pelearse nunca con [hidden], que en esta casa es sagrado. */
+    transform: translateY(105%);
+    transition: transform 0.18s ease;
+  }
+  .pos-ticket.is-abierto { transform: translateY(0); }
+  .pos-cerrar-hoja { display: block; }
+
+  .pos-barra {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--adm-bar-h) + env(safe-area-inset-bottom, 0px));
+    z-index: 55;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--adm-surface);
+    border-top: 1px solid var(--adm-line);
+    box-shadow: 0 -8px 24px -18px rgba(28, 26, 21, 0.9);
+  }
+  .pos-barra.is-visible { display: flex; }
+  .pos-barra-txt { display: flex; flex-direction: column; margin-right: auto; }
+  .pos-barra-txt strong { font-size: 19px; font-variant-numeric: tabular-nums; }
+  .pos-barra-txt span { font-size: 11.5px; color: var(--adm-muted); }
+
+  .pos-rejilla { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+}
+
+@media (max-width: 420px) {
+  .pos-metodos { grid-template-columns: 1fr; }
+  .pos-recibo-botones > * { flex: 1 1 100%; }
+}
+
+/* ── impresión ────────────────────────────────────────────────────────── */
+
+/*
+ * Al imprimir solo debe salir el recibo. Se apagan el panel y todo lo marcado
+ * `pos-noprint`; el resto de la página del panel (sidebar, cabecera) se apaga
+ * por su clase, exclusivamente dentro de este @media: fuera de la impresión
+ * este fichero no toca nada de admin.css.
+ */
+@media print {
+  .adm-side,
+  .adm-topbar,
+  .adm-pagehead,
+  .pos-noprint {
+    display: none !important;
+  }
+
+  .adm-shell { display: block; background: #fff; }
+  .adm-content { padding: 0 !important; max-width: none !important; }
+
+  .pos-overlay {
+    position: static;
+    background: none;
+    padding: 0;
+    display: block;
+    overflow: visible;
+  }
+  .pos-recibo-caja { display: block; }
+  .pos-recibo {
+    width: 72mm;
+    padding: 0;
+    background: #fff;
+    color: #000;
+    font-size: 10.5pt;
+  }
+  /* En papel todo va en negro: los grises y el burgundy de pantalla salen
+     lavados en una impresora térmica y gastan tinta en una normal. */
+  .pos-recibo,
+  .pos-recibo * {
+    color: #000 !important;
+    background: transparent !important;
+  }
+
+  @page {
+    size: 80mm auto;
+    margin: 5mm;
+  }
+}

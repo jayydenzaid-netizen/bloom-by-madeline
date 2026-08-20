@@ -1,0 +1,522 @@
+/* ═══════════════════════════════════════════════════════════
+   BLOOM BY MADELINE — catálogo y ficha de producto
+   ───────────────────────────────────────────────────────────
+   globals.css (identidad) y shop.css (piezas de tienda) no se tocan. Aquí solo
+   lo que el catálogo y la ficha necesitan de más: rail de filtros, paginación,
+   galería y ampliación de foto. Todo con los tokens de globals.css.
+
+   Regla heredada del P0: nada con position:fixed que capture clicks cuando está
+   cerrado. La ampliación de foto se apaga con el atributo [hidden] — que en
+   globals.css gana siempre — y no con un display de autor.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ═══════════ CABECERA DE PÁGINA ═══════════ */
+
+.cat-intro {
+  max-width: 620px;
+  color: var(--ink-soft);
+  font-size: 16px;
+}
+
+/* Migas: sitúan la pieza dentro de la tienda sin robarle protagonismo. */
+.pf-migas {
+  font-size: 11px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--stone);
+  margin-bottom: 18px;
+}
+.pf-migas a { border-bottom: 1px solid transparent; transition: border-color .3s; }
+.pf-migas a:hover { border-color: var(--stone); }
+.pf-migas i { font-style: normal; margin: 0 8px; opacity: .5; }
+
+/* ═══════════ CATÁLOGO: RAIL + RESULTADOS ═══════════ */
+
+.cat-layout {
+  display: grid;
+  grid-template-columns: 258px 1fr;
+  gap: clamp(26px, 3.4vw, 58px);
+  align-items: start;
+}
+
+.cat-filtros { position: sticky; top: calc(var(--nav-h) + 24px); }
+
+/* El desplegable solo existe en móvil: en escritorio el rail está siempre abierto. */
+.cat-toggle { display: none; }
+
+.cat-bloque {
+  padding-bottom: 22px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+.cat-bloque:last-child { border-bottom: none; }
+
+.cat-titulo {
+  font-size: 11px;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  color: var(--stone);
+  margin-bottom: 12px;
+}
+.cat-titulo-sep { margin-top: 20px; }
+
+.cat-buscar input,
+.cat-precio input {
+  width: 100%;
+  font-family: var(--sans);
+  font-weight: 300;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid var(--line);
+  padding: 11px 16px;
+  border-radius: 999px;
+  transition: border-color .3s var(--ease);
+}
+.cat-buscar input::placeholder,
+.cat-precio input::placeholder { color: var(--stone); opacity: .7; }
+.cat-buscar input:focus,
+.cat-precio input:focus { outline: none; border-color: var(--ink); }
+
+.cat-precio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cat-precio input { text-align: center; padding-left: 10px; padding-right: 10px; }
+.cat-precio span { color: var(--stone); }
+
+.cat-pista {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--stone);
+}
+
+.cat-aplicar { margin-top: 14px; width: 100%; }
+
+.cat-lista { list-style: none; display: grid; gap: 2px; }
+.cat-op {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--ink-soft);
+  transition: background .3s var(--ease), color .3s var(--ease);
+}
+.cat-op:hover { background: var(--bone-2); color: var(--ink); }
+.cat-op.sel { background: var(--ink); color: var(--bone); }
+.cat-op em {
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: .1em;
+  color: var(--stone);
+}
+.cat-op.sel em { color: rgba(236,225,205,.65); }
+
+.cat-chips { display: flex; flex-wrap: wrap; gap: 9px; }
+/* Los chips vienen redondos de globals; un color ("Oliva & crema") necesita ancho. */
+.cat-chips .talla-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+.cat-chip-ancho {
+  width: auto;
+  min-width: 46px;
+  padding: 0 16px;
+}
+
+.cat-limpiar {
+  display: inline-block;
+  font-size: 12px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--clay);
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 2px;
+}
+
+.cat-conteo {
+  font-size: 12px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--stone);
+  margin-bottom: clamp(20px, 2.6vw, 32px);
+}
+.cat-conteo span { opacity: .75; }
+
+/* Con el rail al lado no caben 4 columnas sin ahogar la foto. */
+.cat-resultados .product-grid { grid-template-columns: repeat(3, 1fr); }
+
+/* ═══════════ ESTADO VACÍO ═══════════ */
+
+/* Una rejilla sin resultados y sin explicación se lee como una web rota. */
+.cat-vacio {
+  text-align: center;
+  padding: clamp(50px, 8vw, 96px) 20px;
+  background: var(--cream);
+  border-radius: var(--petal-card);
+}
+.cat-vacio-lotus {
+  width: 62px;
+  color: var(--clay);
+  opacity: .5;
+  margin: 0 auto 20px;
+}
+.cat-vacio-titulo {
+  font-family: var(--serif);
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+.cat-vacio-sub {
+  color: var(--stone);
+  font-size: 15px;
+  max-width: 420px;
+  margin: 0 auto 24px;
+}
+
+/* ═══════════ PAGINACIÓN ═══════════ */
+
+.cat-pag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin-top: clamp(46px, 5vw, 74px);
+  padding-top: clamp(26px, 3vw, 40px);
+  border-top: 1px solid var(--line);
+}
+.cat-pag-flecha {
+  font-size: 11.5px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--ink);
+  transition: color .3s var(--ease);
+}
+.cat-pag-flecha:hover { color: var(--clay); }
+.cat-pag-flecha.off { color: var(--stone); opacity: .45; cursor: default; }
+
+.cat-pag-nums { list-style: none; display: flex; align-items: center; gap: 4px; }
+.cat-pag-nums li { display: flex; align-items: center; }
+.cat-pag-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  transition: background .3s var(--ease), color .3s var(--ease);
+}
+.cat-pag-num:hover { background: var(--bone-2); color: var(--ink); }
+.cat-pag-num.sel { background: var(--ink); color: var(--bone); }
+.cat-pag-hueco { color: var(--stone); padding: 0 4px; }
+
+/* ═══════════ FICHA: DOS COLUMNAS ═══════════ */
+
+.pf-top {
+  display: grid;
+  grid-template-columns: 1.06fr .94fr;
+  gap: clamp(28px, 4vw, 70px);
+  align-items: start;
+}
+
+/* La columna de compra NO es sticky a propósito: con la descripción y la ficha
+   técnica dentro pasa del alto de la pantalla, y un sticky más alto que el
+   viewport deja su parte de abajo inalcanzable. */
+.pf-info { min-width: 0; }
+
+.pf-tipo { color: var(--clay); }
+
+.pf-titulo {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(32px, 4.2vw, 52px);
+  line-height: 1.12;
+  letter-spacing: .01em;
+  margin-bottom: 14px;
+}
+
+.pf-precio {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.pf-desde {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--stone);
+}
+.pf-precio s {
+  font-size: 19px;
+  color: var(--stone);
+  text-decoration-thickness: 1px;
+}
+.pf-ahorro {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--bone);
+  background: var(--clay);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+/* Sin precio conocido no se inventa una cifra. */
+.pf-precio em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 24px;
+  color: var(--stone);
+}
+
+.pf-sep {
+  height: 1px;
+  background: var(--line);
+  margin: 24px 0;
+  border: none;
+}
+
+.pf-envio {
+  margin-top: 18px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--stone);
+  padding: 12px 16px;
+  background: var(--cream);
+  border-radius: var(--petal-sm);
+}
+.pf-envio strong { color: var(--ink); font-weight: 400; }
+
+.pf-desc {
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.8;
+  white-space: pre-line;
+}
+
+.pf-ficha { margin-top: 26px; display: grid; gap: 10px; }
+.pf-ficha div {
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.pf-ficha dt {
+  font-size: 11px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--stone);
+  padding-top: 3px;
+  flex-shrink: 0;
+}
+.pf-ficha dd { text-align: right; color: var(--ink-soft); }
+
+.pf-cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+}
+.pf-col-tag {
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--stone);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 15px;
+  transition: border-color .3s var(--ease), color .3s var(--ease);
+}
+.pf-col-tag:hover { border-color: var(--ink); color: var(--ink); }
+
+/* ═══════════ FICHA: GALERÍA ═══════════ */
+
+.pf-galeria { display: grid; gap: 14px; }
+
+.pf-foto {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  overflow: hidden;
+  aspect-ratio: 3 / 4.1;
+  background: var(--bone-2);
+  border-radius: var(--petal);
+  margin: 0;
+  cursor: zoom-in;
+}
+.pf-foto:disabled { cursor: default; }
+.pf-foto img { width: 100%; height: 100%; object-fit: cover; }
+.pf-foto-vacia {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--bone-2), var(--cream));
+}
+/* Pista de que la foto se amplía; en táctil no hay hover y no estorba. */
+.pf-lupa {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(22,21,19,.62);
+  color: var(--bone);
+  font-size: 10px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity .4s var(--ease);
+  pointer-events: none;
+}
+.pf-foto:hover .pf-lupa { opacity: 1; }
+
+.pf-thumbs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pf-thumb {
+  width: 74px;
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  border: 1px solid transparent;
+  background: var(--bone-2);
+  border-radius: var(--petal-sm);
+  overflow: hidden;
+  cursor: pointer;
+  opacity: .68;
+  transition: opacity .3s var(--ease), border-color .3s var(--ease);
+}
+.pf-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pf-thumb:hover { opacity: 1; }
+.pf-thumb.sel { opacity: 1; border-color: var(--ink); }
+
+/* ═══════════ FICHA: AMPLIACIÓN ═══════════ */
+
+/* Se apoya en .lightbox de globals.css (que ya respeta [hidden]) y solo cambia
+   la tarjeta: aquí la foto manda y no hay columna de texto. */
+.pf-lb-card {
+  position: relative;
+  max-width: min(1080px, 94vw);
+  max-height: 90vh;
+  overflow: auto;
+}
+.pf-lb-card img {
+  max-width: 100%;
+  max-height: 90vh;
+  margin: 0 auto;
+  border-radius: var(--petal-sm);
+  cursor: zoom-in;
+  transition: transform .45s var(--ease);
+}
+.pf-lb-card img.zoom {
+  transform: scale(2);
+  cursor: zoom-out;
+}
+.pf-lb-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(236,225,205,.9);
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .3s var(--ease);
+}
+.pf-lb-nav:hover { background: var(--bone); }
+.pf-lb-prev { left: 10px; }
+.pf-lb-next { right: 10px; }
+.pf-lb-conteo {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: .2em;
+  color: var(--bone);
+  background: rgba(22,21,19,.55);
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+
+/* ═══════════ FICHA: RELACIONADOS ═══════════ */
+
+.pf-rel { margin-top: clamp(70px, 9vw, 130px); }
+.pf-rel .product-grid { grid-template-columns: repeat(4, 1fr); }
+
+/* ═══════════ RESPONSIVE ═══════════ */
+
+@media (max-width: 1180px) {
+  .cat-resultados .product-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 980px) {
+  .pf-top { grid-template-columns: 1fr; }
+  .pf-info { position: static; }
+  .pf-rel .product-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .cat-layout { grid-template-columns: 1fr; }
+  .cat-filtros { position: static; }
+  .cat-resultados .product-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* En móvil el rail se pliega: abierto de entrada se comería la primera pantalla. */
+  .cat-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 15px 22px;
+    border: 1px solid var(--ink);
+    border-radius: 999px;
+    font-size: 11.5px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+  .cat-toggle i { font-style: normal; font-size: 17px; line-height: 1; }
+  .cat-panel { display: none; }
+  .cat-panel.abierto {
+    display: block;
+    padding: 4px 0 26px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 640px) {
+  .cat-resultados .product-grid { grid-template-columns: repeat(2, 1fr); }
+  .pf-rel .product-grid { grid-template-columns: repeat(2, 1fr); }
+  .pf-thumb { width: 62px; }
+  .cat-pag { gap: 10px 12px; }
+}

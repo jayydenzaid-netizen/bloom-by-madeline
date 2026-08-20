@@ -1,2 +1,10 @@
+node_modules
+.next
+out
 .vercel
 .env*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+prisma/dev.db
+prisma/dev.db-journal

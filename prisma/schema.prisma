@@ -1,0 +1,555 @@
+// Bloom by Madeline — modelo de datos de la tienda.
+//
+// Reglas de la casa:
+//  - TODO el dinero se guarda en CENTAVOS (Int). Nunca float: 0.1+0.2 no da 0.3.
+//  - Nada de enum ni de arrays nativos: SQLite no los soporta y queremos poder
+//    mover esto a Postgres sin reescribir el esquema. Los "enums" son String con
+//    los valores permitidos documentados, y las listas van como JSON en un String.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────── CATÁLOGO ───────────────────────────────
+
+model Product {
+  id          String @id @default(cuid())
+  slug        String @unique
+  title       String
+  description String @default("")
+  // draft | active | archived
+  status      String @default("draft")
+  vendor      String @default("Bloom by Madeline")
+  productType String @default("")
+  tagsJson    String @default("[]") // JSON: string[]
+
+  // Nombres de las opciones de variante, en orden. JSON: ["Talla","Color"]
+  optionNamesJson String @default("[]")
+
+  // Precio de referencia: se recalcula desde la variante más barata al guardar.
+  priceCents     Int  @default(0)
+  compareAtCents Int? // precio tachado
+  costCents      Int? // lo que le cuesta a la tienda (para calcular margen)
+
+  // Trazabilidad del origen cuando el producto vino de un proveedor.
+  sourceProvider  String? // aliexpress | alibaba | manual | csv
+  sourceUrl       String?
+  sourceProductId String?
+  sourceDataJson  String? // volcado crudo de lo importado, por si hay que re-parsear
+
+  seoTitle       String?
+  seoDescription String?
+
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  images      ProductImage[]
+  variants    ProductVariant[]
+  collections CollectionProduct[]
+  orderItems  OrderItem[]
+  cartItems   CartItem[]
+
+  @@index([status])
+  @@index([sourceProvider, sourceProductId])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  url       String
+  alt       String  @default("")
+  position  Int     @default(0)
+  // Si la imagen se descargó a /public, aquí queda la ruta local.
+  localPath String?
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, position])
+}
+
+model ProductVariant {
+  id        String @id @default(cuid())
+  productId String
+
+  title   String // "S / Negro"
+  sku     String  @default("")
+  option1 String? // Talla
+  option2 String? // Color
+  option3 String?
+
+  priceCents     Int
+  compareAtCents Int?
+  costCents      Int?
+
+  stock      Int     @default(0)
+  // Si es false se puede vender sin stock: en dropshipping el inventario real
+  // lo tiene el proveedor, no la boutique.
+  trackStock Boolean @default(true)
+
+  weightGrams Int     @default(0)
+  imageUrl    String?
+  position    Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+
+  @@index([productId, position])
+}
+
+model Collection {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  description String  @default("")
+  imageUrl    String?
+  position    Int     @default(0)
+  isVisible   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products CollectionProduct[]
+}
+
+model CollectionProduct {
+  collectionId String
+  productId    String
+  position     Int    @default(0)
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, productId])
+  @@index([productId])
+}
+
+// ──────────────────────────────── CARRITO ────────────────────────────────
+
+model Cart {
+  id               String    @id @default(cuid())
+  name             String?
+  phone            String?
+  recoveredOrderId String?
+  reminderSentAt   DateTime?
+  // Token que viaja en la cookie del visitante.
+  token            String    @unique
+  email            String?
+  note             String    @default("")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  items CartItem[]
+}
+
+model CartItem {
+  id        String @id @default(cuid())
+  cartId    String
+  productId String
+  variantId String
+  quantity  Int    @default(1)
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, variantId])
+  @@index([cartId])
+}
+
+// ──────────────────────────────── PEDIDOS ────────────────────────────────
+
+model Customer {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String   @default("")
+  phone     String   @default("")
+  note      String   @default("")
+  createdAt DateTime @default(now())
+
+  orders Order[]
+}
+
+model Order {
+  id     String @id @default(cuid())
+  // Número legible para la clienta: BLM-1001
+  number String @unique
+
+  customerId String?
+  email      String
+  phone      String  @default("")
+  name       String
+
+  // pending | paid | refunded | cancelled
+  paymentStatus String @default("pending")
+  // unfulfilled | fulfilled | cancelled
+  fulfillStatus String @default("unfulfilled")
+  // stripe | dm | pickup | cash
+  paymentMethod String @default("dm")
+
+  subtotalCents Int @default(0)
+  shippingCents Int @default(0)
+  taxCents      Int @default(0)
+  discountCents Int @default(0)
+  totalCents    Int @default(0)
+
+  shipName    String @default("")
+  shipLine1   String @default("")
+  shipLine2   String @default("")
+  shipCity    String @default("")
+  shipState   String @default("")
+  shipZip     String @default("")
+  shipCountry String @default("US")
+
+  note            String  @default("")
+  trackingNumber  String?
+  trackingCarrier String?
+
+  stripeSessionId String?
+
+  // online = la tienda web · pos = venta en el mostrador de la boutique
+  channel      String  @default("online")
+  discountCode String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  paidAt    DateTime?
+
+  customer Customer?   @relation(fields: [customerId], references: [id])
+  items    OrderItem[]
+
+  @@index([paymentStatus])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+
+  // Se guardan también los datos "congelados" del producto: si mañana se borra
+  // o cambia de precio, el pedido histórico debe seguir siendo legible.
+  productId String?
+  variantId String?
+
+  title        String
+  variantTitle String  @default("")
+  sku          String  @default("")
+  imageUrl     String?
+  priceCents   Int
+  costCents    Int?
+  quantity     Int     @default(1)
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product?        @relation(fields: [productId], references: [id])
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([orderId])
+}
+
+// ────────────────────────── IMPORTADOR / AJUSTES ──────────────────────────
+
+model ImportJob {
+  id       String @id @default(cuid())
+  // aliexpress | alibaba | manual | csv
+  provider String
+  // url | html | api | bookmarklet | csv
+  method   String
+  // pending | parsing | ready | imported | failed
+  status   String @default("pending")
+
+  sourceUrl String?
+  // Ficha normalizada lista para revisar antes de publicar. JSON: NormalizedProduct
+  draftJson String?
+  rawJson   String?
+  error     String?
+
+  productId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  // owner = Madeline, manda en todo · staff = ayuda con pedidos y productos
+  role         String    @default("owner")
+  isActive     Boolean   @default(true)
+  email        String    @unique
+  name         String    @default("")
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  lastLoginAt  DateTime?
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ═══════════════════════ PANEL PROFESIONAL — v2.1 ═══════════════════════
+// Todo lo que convierte el panel en una herramienta de gestión completa:
+// promociones, inventario con historial, contenido editable, envíos, reseñas
+// y auditoría. Madeline tiene que poder llevar la tienda entera sin tocar código.
+
+// ─────────────────────────── PROMOCIONES ───────────────────────────
+
+model Discount {
+  id   String @id @default(cuid())
+  code String @unique // se compara siempre en MAYÚSCULAS
+
+  title String @default("")
+  // percentage | fixed | free_shipping
+  type  String @default("percentage")
+  // Porcentaje (0-100) o centavos, según el tipo.
+  value Int    @default(0)
+
+  // Condiciones
+  minSubtotalCents Int     @default(0)
+  // all | collection | product
+  appliesTo        String  @default("all")
+  appliesToIdsJson String  @default("[]") // JSON: string[] de ids
+  oncePerCustomer  Boolean @default(false)
+
+  usageLimit Int @default(0) // 0 = sin límite
+  usageCount Int @default(0)
+
+  startsAt DateTime?
+  endsAt   DateTime?
+  isActive Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usages DiscountUsage[]
+
+  @@index([isActive])
+}
+
+model DiscountUsage {
+  id         String   @id @default(cuid())
+  discountId String
+  orderId    String
+  email      String
+  usedAt     DateTime @default(now())
+
+  discount Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+
+  @@index([discountId])
+  @@index([email])
+}
+
+// ─────────────────────────── INVENTARIO ───────────────────────────
+
+// Cada cambio de stock deja rastro. Sin esto es imposible saber por qué faltan
+// tres vestidos, y el descuadre de inventario siempre acaba costando dinero.
+model StockMovement {
+  id        String @id @default(cuid())
+  variantId String
+
+  // sale | return | manual | restock | cancel | import | count
+  reason String
+  delta  Int // negativo = sale del almacén
+  before Int
+  after  Int
+
+  reference String? // número de pedido, id de importación...
+  note      String  @default("")
+  userId    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([variantId, createdAt])
+}
+
+// ─────────────────────────── CONTENIDO ───────────────────────────
+
+// Páginas del sitio (Sobre nosotros, Devoluciones, Envíos, Términos...).
+model Page {
+  id      String @id @default(cuid())
+  slug    String @unique
+  title   String
+  // Markdown ligero: es lo que una persona no técnica puede escribir sin miedo.
+  content String @default("")
+  // draft | published
+  status  String @default("draft")
+
+  seoTitle       String?
+  seoDescription String?
+  showInFooter   Boolean @default(true)
+  position       Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Enlaces de los menús. menu: "main" (nav) | "footer"
+model MenuItem {
+  id        String  @id @default(cuid())
+  menu      String  @default("main")
+  label     String
+  url       String
+  position  Int     @default(0)
+  parentId  String?
+  isVisible Boolean @default(true)
+
+  @@index([menu, position])
+}
+
+// Bloques editables de la portada: permite reordenar y apagar secciones, y
+// cambiar textos y fotos del escaparate sin desplegar nada.
+model HomeBlock {
+  id   String @id @default(cuid())
+  // hero | marquee | coleccion | cita | filosofia | boutique | comoComprar |
+  // visitanos | instagram | banner
+  kind String
+
+  title     String  @default("")
+  subtitle  String  @default("")
+  body      String  @default("")
+  imageUrl  String?
+  linkUrl   String?
+  linkLabel String  @default("")
+  dataJson  String  @default("{}") // ajustes propios del bloque
+
+  position  Int     @default(0)
+  isVisible Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+
+  @@index([position])
+}
+
+// Biblioteca de imágenes: lo subido una vez se reutiliza en productos, portada
+// y páginas sin volver a subirlo.
+model MediaAsset {
+  id        String   @id @default(cuid())
+  url       String
+  filename  String
+  mimeType  String   @default("image/jpeg")
+  bytes     Int      @default(0)
+  width     Int      @default(0)
+  height    Int      @default(0)
+  alt       String   @default("")
+  folder    String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([folder, createdAt])
+}
+
+// ─────────────────────────── RESEÑAS ───────────────────────────
+
+// Madeline ya tiene reseñas reales en su destacado de Instagram. Esto es para
+// pasarlas al sitio; siempre moderadas, nunca autopublicadas.
+model Review {
+  id        String  @id @default(cuid())
+  productId String?
+
+  authorName String
+  rating     Int     @default(5)
+  title      String  @default("")
+  body       String  @default("")
+  // pending | approved | rejected
+  status     String  @default("pending")
+  isVerified Boolean @default(false)
+  source     String  @default("manual") // manual | instagram | web
+
+  createdAt DateTime @default(now())
+
+  @@index([productId, status])
+  @@index([status])
+}
+
+// ─────────────────────────── ENVÍOS E IMPUESTOS ───────────────────────────
+
+model ShippingZone {
+  id          String @id @default(cuid())
+  name        String
+  // Lista de estados/países que cubre. JSON: string[] ("OH", "US", "*")
+  regionsJson String @default("[]")
+  position    Int    @default(0)
+
+  rates ShippingRate[]
+}
+
+model ShippingRate {
+  id     String @id @default(cuid())
+  zoneId String
+
+  name             String
+  priceCents       Int    @default(0)
+  // Condición por subtotal; 0 en max = sin tope
+  minSubtotalCents Int    @default(0)
+  maxSubtotalCents Int    @default(0)
+  // Plazo estimado que se le enseña a la clienta
+  etaLabel         String @default("")
+  position         Int    @default(0)
+
+  zone ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@index([zoneId, position])
+}
+
+// ─────────────────────────── SISTEMA ───────────────────────────
+
+// Quién hizo qué. Imprescindible en cuanto haya más de una persona con acceso.
+model ActivityLog {
+  id        String  @id @default(cuid())
+  userId    String?
+  userEmail String  @default("")
+
+  // create | update | delete | login | import | publish | refund | ...
+  action     String
+  entityType String // product | order | discount | setting | ...
+  entityId   String?
+  summary    String  @default("")
+  metaJson   String  @default("{}")
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}
+
+// Plantillas de los correos que salen de la tienda, editables sin tocar código.
+model EmailTemplate {
+  id       String  @id @default(cuid())
+  key      String  @unique // order_confirmation | order_shipped | abandoned_cart
+  subject  String
+  body     String  @default("")
+  isActive Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+}
+
+// Redirecciones 301: cuando cambia el slug de un producto, el enlace viejo que
+// alguien compartió en Instagram debe seguir llevando al sitio correcto.
+model Redirect {
+  id        String   @id @default(cuid())
+  fromPath  String   @unique
+  toPath    String
+  hits      Int      @default(0)
+  createdAt DateTime @default(now())
+}

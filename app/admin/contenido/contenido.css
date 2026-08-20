@@ -1,0 +1,370 @@
+/* ═══════════════════════════════════════════════════════════
+   CONTENIDO DEL SITIO — portada, páginas y menús
+   ───────────────────────────────────────────────────────────
+   Estilos propios del módulo. No se toca admin.css (lo comparten todas las
+   pantallas del panel): aquí solo hay lo que este módulo necesita y no existe
+   ya como primitiva. Todo va prefijado `cnt-` y usa los tokens --adm-*.
+
+   Regla de la casa que también manda aquí: nada de blanco puro, radios suaves
+   y simétricos, y el burgundy solo cuando es una acción.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── lista de bloques / enlaces ─────────────────────────── */
+
+.cnt-lista {
+  display: flex;
+  flex-direction: column;
+}
+
+.cnt-fila {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--adm-line-soft);
+}
+
+.cnt-fila:last-child {
+  border-bottom: 0;
+}
+
+.cnt-fila.is-oculta {
+  background: var(--adm-surface-2);
+}
+
+/* La miniatura enseña de qué bloque hablamos antes de leer nada. */
+.cnt-thumb {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  border-radius: var(--adm-r-sm);
+  overflow: hidden;
+  background: var(--adm-surface-2);
+  border: 1px solid var(--adm-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--adm-muted);
+  font-size: 19px;
+  line-height: 1;
+}
+
+.cnt-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cnt-fila.is-oculta .cnt-thumb img {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.cnt-cuerpo {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.cnt-titulo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--adm-text);
+}
+
+.cnt-donde {
+  font-size: 12.5px;
+  color: var(--adm-muted);
+  margin-top: 3px;
+  line-height: 1.5;
+}
+
+/* Vista previa del texto del bloque: dos líneas y a otra cosa. */
+.cnt-avance {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--adm-text-2);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cnt-avance:empty {
+  display: none;
+}
+
+.cnt-acciones {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+/* Flechas de reordenar: cuadradas, de 38 px, para el dedo. */
+.cnt-flecha {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--adm-line);
+  background: var(--adm-surface);
+  border-radius: var(--adm-r-sm);
+  color: var(--adm-text-2);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+}
+
+.cnt-flecha:hover:not(:disabled) {
+  background: var(--adm-surface-2);
+  color: var(--adm-text);
+}
+
+.cnt-flecha:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.cnt-flecha:focus-visible {
+  outline: 2px solid var(--adm-accent);
+  outline-offset: 2px;
+}
+
+.cnt-forma {
+  display: inline;
+}
+
+@media (max-width: 640px) {
+  .cnt-fila {
+    flex-wrap: wrap;
+    padding: 14px 16px;
+  }
+  .cnt-acciones {
+    margin-left: 70px;
+    width: 100%;
+  }
+}
+
+/* ── editor de dos columnas: formulario + vista previa ───── */
+
+.cnt-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .cnt-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* En móvil la vista previa va DESPUÉS del formulario: primero se escribe. */
+.cnt-panel {
+  position: sticky;
+  top: 18px;
+}
+
+@media (max-width: 900px) {
+  .cnt-panel {
+    position: static;
+  }
+}
+
+/* ── vista previa del markdown ───────────────────────────── */
+
+.cnt-vista {
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  background: var(--adm-surface);
+  padding: 18px 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+  color: var(--adm-text);
+  font-size: 14.5px;
+  line-height: 1.65;
+}
+
+.cnt-vista > :first-child {
+  margin-top: 0;
+}
+
+.cnt-vista h2 {
+  font-size: 19px;
+  font-weight: 500;
+  margin: 18px 0 8px;
+  color: var(--adm-text);
+}
+
+.cnt-vista h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 16px 0 6px;
+}
+
+.cnt-vista h4 {
+  font-size: 14.5px;
+  font-weight: 500;
+  margin: 14px 0 6px;
+  color: var(--adm-text-2);
+}
+
+.cnt-vista p {
+  margin: 0 0 11px;
+}
+
+.cnt-vista ul,
+.cnt-vista ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+
+.cnt-vista li {
+  margin-bottom: 5px;
+}
+
+.cnt-vista a {
+  color: var(--adm-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.cnt-vista blockquote {
+  margin: 0 0 12px;
+  padding: 2px 0 2px 14px;
+  border-left: 2px solid var(--adm-accent);
+  color: var(--adm-text-2);
+}
+
+.cnt-vista hr {
+  border: 0;
+  border-top: 1px solid var(--adm-line);
+  margin: 16px 0;
+}
+
+.cnt-vista code {
+  background: var(--adm-surface-2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.92em;
+}
+
+.cnt-vista-vacia {
+  color: var(--adm-muted);
+  font-style: italic;
+}
+
+/* El área de escritura del markdown pide sitio: es donde se pasa el rato. */
+.cnt-md {
+  min-height: 320px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+/* Chuleta del markdown, siempre a la vista mientras se escribe. */
+.cnt-chuleta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12.5px;
+  color: var(--adm-muted);
+  margin-top: -6px;
+  margin-bottom: 14px;
+}
+
+.cnt-chuleta code {
+  background: var(--adm-surface-2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--adm-text-2);
+}
+
+/* ── avisos ─────────────────────────────────────────────── */
+
+.cnt-aviso {
+  border-radius: var(--adm-r);
+  padding: 11px 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  border: 1px solid transparent;
+}
+
+.cnt-aviso-ok {
+  background: var(--adm-success-soft);
+  color: var(--adm-success);
+  border-color: rgba(46, 107, 79, 0.25);
+}
+
+.cnt-aviso-error {
+  background: var(--adm-danger-soft);
+  color: var(--adm-danger);
+  border-color: rgba(160, 48, 42, 0.25);
+}
+
+.cnt-aviso-info {
+  background: var(--adm-info-soft);
+  color: var(--adm-info);
+  border-color: rgba(43, 84, 112, 0.22);
+}
+
+/* ── zona de peligro: nada destructivo a un solo clic ───── */
+
+.cnt-peligro {
+  border: 1px solid rgba(160, 48, 42, 0.3);
+  border-radius: var(--adm-r);
+  background: var(--adm-danger-soft);
+  padding: 16px 18px;
+}
+
+.cnt-peligro h3 {
+  font-size: 14.5px;
+  font-weight: 500;
+  margin: 0 0 6px;
+  color: var(--adm-danger);
+}
+
+.cnt-peligro p {
+  font-size: 13px;
+  color: var(--adm-text-2);
+  line-height: 1.55;
+  margin: 0 0 12px;
+}
+
+/* ── varios ─────────────────────────────────────────────── */
+
+.cnt-barra {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.cnt-barra-fin {
+  margin-left: auto;
+}
+
+.cnt-pista {
+  font-size: 12.5px;
+  color: var(--adm-muted);
+  line-height: 1.55;
+  margin: 0 0 14px;
+}
+
+.cnt-url {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--adm-muted);
+  word-break: break-all;
+}

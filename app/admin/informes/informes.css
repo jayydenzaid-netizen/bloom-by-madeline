@@ -1,0 +1,251 @@
+/* ═══════════════════════════════════════════════════════════
+   INFORMES — estilos propios de /admin/informes
+   ───────────────────────────────────────────────────────────
+   Solo lo que el sistema del panel no cubre: el selector de rango, la gráfica
+   SVG, su tooltip y las barras de reparto. Todo lo demás (tarjetas, tablas,
+   botones, badges) sale de admin.css sin tocarlo, y todos los colores vienen de
+   los tokens --adm-*: aquí no se define ni un color a pelo.
+
+   Prefijo `inf-` para no chocar con `adm-` ni con el escaparate.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── selector de rango ───────────────────────────────────── */
+
+.inf-rango {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inf-atajos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.inf-atajo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 14px;
+  border: 1px solid var(--adm-line);
+  border-radius: 999px;
+  background: var(--adm-surface);
+  color: var(--adm-text-2);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+.inf-atajo:hover { background: var(--adm-surface-2); color: var(--adm-text); }
+.inf-atajo.is-activo {
+  background: var(--adm-accent);
+  border-color: var(--adm-accent);
+  color: #FBF5EC;
+}
+.inf-atajo:focus-visible { outline: 2px solid var(--adm-accent); outline-offset: 2px; }
+
+/* El disclosure nativo evita cargar JavaScript solo para abrir dos campos. */
+.inf-custom { align-self: flex-start; }
+.inf-atajo-custom { list-style: none; }
+.inf-atajo-custom::-webkit-details-marker { display: none; }
+.inf-custom[open] .inf-atajo-custom { background: var(--adm-surface-2); color: var(--adm-text); }
+
+.inf-custom-form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  background: var(--adm-surface);
+}
+.inf-custom-form .adm-field { margin-bottom: 0; flex: 1 1 165px; min-width: 150px; }
+.inf-custom-ok { flex: 0 0 auto; height: 40px; }
+
+/* ── variación frente al periodo anterior ────────────────── */
+
+.inf-var {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.inf-var-sube { color: var(--adm-success); }
+.inf-var-baja { color: var(--adm-danger); }
+.inf-var-igual,
+.inf-var-nuevo { color: var(--adm-muted); }
+.inf-var-flecha { font-size: 11px; line-height: 1; }
+
+/* ── gráfica ─────────────────────────────────────────────── */
+
+.inf-graf {
+  position: relative;
+  padding: 4px 2px 0;
+}
+
+.inf-graf-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* El puntero selecciona un día, pero en el móvil el dedo tiene que poder
+     seguir haciendo scroll vertical sobre la gráfica. */
+  touch-action: pan-y;
+}
+.inf-graf-svg:focus-visible { outline: 2px solid var(--adm-accent); outline-offset: 3px; border-radius: var(--adm-r-sm); }
+
+.inf-graf-rejilla { stroke: var(--adm-line-soft); stroke-width: 1; }
+.inf-graf-base { stroke: var(--adm-line); stroke-width: 1; }
+.inf-graf-guia { stroke: var(--adm-accent); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.55; }
+
+.inf-graf-tick {
+  fill: var(--adm-muted);
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.inf-graf-area { fill: url(#inf-relleno); }
+.inf-graf-stop-alto { stop-color: var(--adm-accent); stop-opacity: 0.22; }
+.inf-graf-stop-bajo { stop-color: var(--adm-accent); stop-opacity: 0.02; }
+
+.inf-graf-linea {
+  stroke: var(--adm-accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.inf-graf-punto { fill: var(--adm-surface); stroke: var(--adm-accent); stroke-width: 1.5; }
+.inf-graf-activo { fill: var(--adm-accent); stroke: var(--adm-surface); stroke-width: 2; }
+
+/* ── tooltip ─────────────────────────────────────────────── */
+
+.inf-tip {
+  position: absolute;
+  top: 4px;
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 132px;
+  padding: 9px 12px;
+  border-radius: var(--adm-r-sm);
+  border: 1px solid var(--adm-line);
+  background: var(--adm-surface);
+  box-shadow: var(--adm-shadow);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+/* Cerca de los bordes el globo se ancla al lado que le queda sitio, en vez de
+   desbordar la tarjeta. */
+.inf-tip-centro { transform: translateX(-50%); }
+.inf-tip-der { transform: translateX(-100%); }
+.inf-tip-izq { transform: translateX(0); }
+
+.inf-tip b {
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--adm-muted);
+}
+.inf-tip-dinero {
+  font-size: 19px;
+  font-weight: 300;
+  color: var(--adm-accent);
+  font-variant-numeric: tabular-nums;
+}
+.inf-tip-sub { color: var(--adm-muted); }
+
+/* ── barras horizontales (canal y método de pago) ────────── */
+
+.inf-barras { display: flex; flex-direction: column; gap: 15px; }
+
+.inf-barra-cab {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.inf-barra-nombre { color: var(--adm-text); }
+.inf-barra-cifra { display: flex; align-items: baseline; gap: 9px; }
+.inf-barra-pct { color: var(--adm-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+.inf-barra-pista {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--adm-surface-2);
+  overflow: hidden;
+}
+.inf-barra-valor {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--adm-accent);
+  /* Un canal con ventas nunca debe verse como una barra vacía. */
+  min-width: 3px;
+}
+.inf-barra-valor.is-cero { background: var(--adm-line); }
+.inf-barra-nota { font-size: 12.5px; color: var(--adm-muted); margin-top: 5px; }
+
+/* ── avisos del informe ──────────────────────────────────── */
+
+.inf-aviso {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 11px 13px;
+  border-radius: var(--adm-r-sm);
+  background: var(--adm-warning-soft);
+  color: var(--adm-warning);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.inf-aviso svg { width: 17px; height: 17px; flex: 0 0 auto; margin-top: 1px; }
+.inf-aviso a { color: inherit; text-decoration: underline; }
+
+.inf-nota { font-size: 12.5px; color: var(--adm-muted); line-height: 1.55; }
+
+/* ── cifras del bloque de beneficio ──────────────────────── */
+
+.inf-cifras { display: flex; flex-direction: column; gap: 11px; }
+.inf-cifra {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 14px;
+}
+.inf-cifra-etq { color: var(--adm-text-2); }
+.inf-cifra.is-total {
+  padding-top: 11px;
+  border-top: 1px solid var(--adm-line);
+  font-size: 16px;
+}
+.inf-cifra.is-total .inf-cifra-etq { color: var(--adm-text); }
+
+/* ── separaciones y cifras (sustituyen a los estilos en línea) ───────────
+   Van aquí y no como `style={{...}}` en el TSX porque el sistema del panel
+   manda: los números de la maqueta se tocan en un sitio, no repartidos por
+   media pantalla. */
+
+.inf-sep { margin-top: 12px; }
+.inf-sep-abajo { margin-bottom: 16px; }
+.inf-par { gap: 8px; }
+
+/* Cifras alineadas en columna: sin esto, un 9 y un 4 ocupan distinto y las
+   columnas de unidades bailan al comparar filas. */
+.inf-num { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 760px) {
+  .inf-tip { min-width: 118px; font-size: 12px; padding: 8px 10px; }
+  .inf-tip-dinero { font-size: 17px; }
+  .inf-custom-form { padding: 12px; }
+  .inf-custom { align-self: stretch; }
+}

@@ -1,0 +1,543 @@
+/* ═══════════════════════════════════════════════════════════
+   BLOOM BY MADELINE — carrito, checkout y pedido
+   ───────────────────────────────────────────────────────────
+   globals.css es la identidad y no se toca; shop.css es del catálogo. Aquí solo
+   van las piezas del embudo de compra: líneas del carrito a página completa,
+   formulario de datos, métodos de pago y confirmación.
+
+   Reglas heredadas que aquí también mandan:
+     · ni un position:fixed nuevo — el P0 del overlay invisible no se repite;
+     · nada de blanco: todo sale de --bone / --cream / --ink;
+     · los marcos pétalo alternan dirección, igual que las tarjetas de producto.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ═══════════ cabecera común de las tres páginas ═══════════ */
+
+.cp-head {
+  margin-bottom: clamp(28px, 4vw, 46px);
+}
+.cp-title {
+  font-family: var(--sans);
+  font-weight: 300;
+  font-size: clamp(30px, 4.4vw, 52px);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  line-height: 1.08;
+}
+.cp-title .serif-it {
+  text-transform: none;
+  font-size: 1.12em;
+  letter-spacing: 0;
+}
+.cp-count {
+  margin-top: 10px;
+  font-size: 13px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--stone);
+}
+
+/* ═══════════ estado vacío ═══════════ */
+
+.cp-empty {
+  text-align: center;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: clamp(40px, 8vw, 90px) 20px;
+}
+.cp-empty svg {
+  width: 68px;
+  color: var(--clay);
+  opacity: .55;
+  margin: 0 auto 22px;
+}
+.cp-empty p {
+  color: var(--stone);
+  margin: 14px 0 30px;
+}
+
+/* ═══════════ carrito a página completa ═══════════ */
+
+.cp-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: clamp(28px, 4vw, 60px);
+  align-items: start;
+  padding-bottom: clamp(60px, 8vw, 110px);
+}
+
+.cp-lines { list-style: none; }
+
+.cp-line {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: start;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--line);
+}
+.cp-line:first-child { border-top: 1px solid var(--line); }
+
+.cp-foto {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--petal-sm);
+  background: var(--cream);
+}
+/* mismo latido que las tarjetas de producto: el pétalo alterna de esquina */
+.cp-line:nth-child(even) .cp-foto {
+  border-radius: 8px clamp(26px, 4vw, 46px) 8px clamp(26px, 4vw, 46px);
+}
+.cp-foto img {
+  width: 100%;
+  aspect-ratio: 3/4;
+  object-fit: cover;
+}
+.cp-foto .cd-noimg {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3/4;
+  border-radius: 0;
+}
+
+.cp-info { min-width: 0; }
+.cp-info h2 {
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+.cp-info h2 a {
+  border-bottom: 1px solid transparent;
+  transition: border-color .3s var(--ease);
+}
+.cp-info h2 a:hover { border-color: var(--ink); }
+
+.cp-unit {
+  margin-top: 6px;
+  font-size: 13px;
+  letter-spacing: .06em;
+  color: var(--stone);
+}
+
+.cp-controls {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+/* Cada botón es su propio <form> contra una Server Action: la fila tiene que
+   seguir leyéndose como un solo control aunque sean tres formularios. */
+.cp-controls form { display: contents; }
+.cp-controls .ci-qty form {
+  display: block;
+  line-height: 0;
+}
+
+.cp-del {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--sans);
+  font-size: 12px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--stone);
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: color .3s var(--ease), border-color .3s var(--ease);
+}
+.cp-del:hover { color: var(--clay); border-color: var(--clay); }
+
+.cp-tope {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--clay);
+}
+
+.cp-total {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ═══════════ resumen lateral (carrito) ═══════════ */
+
+.cp-resumen,
+.co-summary,
+.op-resumen {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: clamp(22px, 3vw, 32px);
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: var(--petal-card);
+  position: sticky;
+  top: calc(var(--nav-h) + 18px);
+}
+
+.co-h {
+  font-family: var(--sans);
+  font-weight: 300;
+  font-size: 15px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.co-h .serif-it {
+  text-transform: none;
+  font-size: 1.3em;
+  letter-spacing: 0;
+}
+
+.cp-cta { width: 100%; }
+.cp-seguir {
+  font-size: 12.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--stone);
+  text-align: center;
+  transition: color .3s var(--ease);
+}
+.cp-seguir:hover { color: var(--clay); }
+
+/* ═══════════ checkout ═══════════ */
+
+.co-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: clamp(28px, 4vw, 60px);
+  align-items: start;
+  padding-bottom: clamp(60px, 8vw, 110px);
+}
+
+.co-form { display: grid; gap: clamp(26px, 3.4vw, 40px); }
+.co-block { display: grid; gap: 16px; }
+
+.co-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.co-row-3 { grid-template-columns: 1.4fr .8fr .8fr; }
+
+/* ── campos ── */
+
+.co-field { display: grid; gap: 7px; }
+.co-label {
+  font-size: 11px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--stone);
+}
+.co-field input,
+.co-field textarea {
+  font-family: var(--sans);
+  font-weight: 300;
+  font-size: 16px;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 13px 15px;
+  width: 100%;
+  transition: border-color .3s var(--ease), background .3s var(--ease);
+}
+.co-field textarea { resize: vertical; line-height: 1.6; }
+.co-field input:focus,
+.co-field textarea:focus {
+  outline: none;
+  border-color: var(--ink);
+  background: var(--bone);
+}
+.co-field-bad input,
+.co-field-bad textarea { border-color: var(--clay); }
+
+.co-err {
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--clay);
+}
+.co-hint {
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--stone);
+}
+
+.co-alert {
+  padding: 14px 18px;
+  border-radius: var(--petal-sm);
+  border: 1px solid var(--clay);
+  background: rgba(119, 48, 62, .07);
+  color: var(--clay);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── métodos de pago ── */
+
+.co-methods { display: grid; gap: 12px; }
+
+.co-method {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--petal-sm);
+  background: var(--cream);
+  cursor: pointer;
+  transition: border-color .3s var(--ease), background .3s var(--ease);
+}
+.co-method:hover { border-color: var(--ink); }
+.co-method.sel { border-color: var(--ink); background: var(--bone); }
+
+.co-method input {
+  margin-top: 5px;
+  accent-color: var(--clay);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.co-method-body { display: grid; gap: 4px; }
+.co-method-body strong {
+  font-weight: 400;
+  font-size: 15px;
+  letter-spacing: .06em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.co-method-body span {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--stone);
+}
+
+/* "Próximamente": la tarjeta se ve, pero se ve apagada. Prometer un cobro que no
+   existe sería mentirle a la clienta. */
+.co-method-off {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.co-method-off:hover { border-color: var(--line); }
+
+.co-badge {
+  font-style: normal;
+  font-size: 9.5px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bone);
+}
+
+.co-pickup {
+  padding: 16px 18px;
+  border-radius: var(--petal-sm);
+  border: 1px solid var(--line);
+  background: var(--bone);
+}
+.co-pickup-line {
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
+.co-note {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--stone);
+}
+.co-note strong { color: var(--clay); font-weight: 400; }
+.co-legal { text-align: center; }
+
+.co-submit { width: 100%; }
+.co-submit:disabled { opacity: .5; cursor: wait; }
+
+/* ── resumen del checkout ── */
+
+.co-lines {
+  list-style: none;
+  display: grid;
+  gap: 14px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.co-lines li {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+.co-lines img {
+  width: 52px;
+  height: 66px;
+  object-fit: cover;
+  border-radius: var(--petal-sm);
+}
+.co-lines li:nth-child(even) img {
+  border-radius: 6px clamp(20px, 3vw, 34px) 6px clamp(20px, 3vw, 34px);
+}
+.co-lines .cd-noimg {
+  width: 52px;
+  height: 66px;
+}
+.co-line-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.co-line-info strong {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+.co-line-info em {
+  font-style: normal;
+  font-size: 12px;
+  letter-spacing: .06em;
+  color: var(--stone);
+}
+.co-line-price {
+  font-family: var(--serif);
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+/* ═══════════ confirmación del pedido ═══════════ */
+
+.op-head {
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto clamp(30px, 4vw, 54px);
+}
+.op-lotus {
+  width: 62px;
+  color: var(--clay);
+  opacity: .6;
+  margin: 0 auto 20px;
+}
+.op-sub {
+  margin-top: 16px;
+  color: var(--stone);
+  font-size: 15px;
+  line-height: 1.8;
+}
+.op-sub strong { color: var(--ink); font-weight: 400; letter-spacing: .06em; }
+
+.op-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: clamp(28px, 4vw, 60px);
+  align-items: start;
+  padding-bottom: clamp(60px, 8vw, 110px);
+}
+.op-main { display: grid; gap: clamp(22px, 3vw, 34px); }
+
+.op-next {
+  display: grid;
+  gap: 14px;
+  padding: clamp(22px, 3vw, 32px);
+  border: 1px solid var(--line);
+  border-radius: var(--petal-card);
+  background: var(--cream);
+}
+.op-next p { font-size: 15.5px; line-height: 1.8; color: var(--ink-soft); }
+.op-next strong { color: var(--ink); font-weight: 400; }
+.op-cta { justify-self: start; }
+
+.op-estados {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.op-estados > div {
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--petal-sm);
+}
+.op-estado-k {
+  font-size: 10.5px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--stone);
+}
+.op-estado-v {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+}
+.op-estado-m { font-size: 12.5px; color: var(--stone); }
+
+.op-dir address {
+  font-style: normal;
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--ink-soft);
+  margin-top: 12px;
+}
+.op-dir .co-note { margin-top: 12px; }
+
+.op-track { font-size: 14px; }
+.op-track a {
+  color: var(--clay);
+  border-bottom: 1px solid var(--clay);
+}
+
+/* ── puerta de acceso ── */
+
+.op-candado {
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: center;
+  padding: clamp(30px, 6vw, 70px) 0;
+}
+.op-candado > p {
+  margin: 16px 0 28px;
+  color: var(--stone);
+  line-height: 1.8;
+}
+.op-form {
+  display: grid;
+  gap: 16px;
+  text-align: left;
+  padding: clamp(22px, 3vw, 30px);
+  border: 1px solid var(--line);
+  border-radius: var(--petal-card);
+  background: var(--cream);
+}
+
+/* ═══════════ responsive ═══════════ */
+
+@media (max-width: 980px) {
+  .cp-grid,
+  .co-grid,
+  .op-grid { grid-template-columns: minmax(0, 1fr); }
+
+  /* Sticky en una columna deja el resumen pegado tapando contenido al hacer scroll. */
+  .cp-resumen,
+  .co-summary,
+  .op-resumen { position: static; }
+}
+
+@media (max-width: 640px) {
+  .cp-line {
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 16px;
+  }
+  .cp-total {
+    grid-column: 2;
+    font-size: 18px;
+  }
+  .co-row,
+  .co-row-3,
+  .op-estados { grid-template-columns: minmax(0, 1fr); }
+}

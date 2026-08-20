@@ -1,0 +1,305 @@
+/* ═══════════════════════════════════════════════════════════
+   RESEÑAS Y CARRITOS ABANDONADOS — estilos propios del módulo
+   ───────────────────────────────────────────────────────────
+   Solo lo que admin.css no cubre: el selector de estrellas, la barra de
+   acciones en lote, la caja del mensaje de recuperación y la zona de limpieza.
+   Todo con prefijo `rev-` y usando los tokens --adm-* del panel: aquí no se
+   inventa paleta, y admin.css no se toca (lo comparten varias pantallas).
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── avisos ─────────────────────────────────────────────── */
+
+.rev-aviso {
+  display: block;
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border-radius: var(--adm-r-sm);
+  font-size: 13.5px;
+  line-height: 1.45;
+  border: 1px solid transparent;
+}
+.rev-aviso.is-ok {
+  background: var(--adm-success-soft);
+  border-color: rgba(46, 107, 79, 0.28);
+  color: var(--adm-success);
+}
+.rev-aviso.is-error {
+  background: var(--adm-danger-soft);
+  border-color: rgba(160, 48, 42, 0.28);
+  color: var(--adm-danger);
+}
+/* Dentro de una fila de botones el aviso va en línea, no como bloque. */
+.rev-aviso-inline {
+  margin: 0;
+  padding: 5px 9px;
+  font-size: 12.5px;
+  flex: 1 1 100%;
+}
+
+/* ── alta de reseña ─────────────────────────────────────── */
+
+.rev-alta {
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r-lg);
+  box-shadow: var(--adm-shadow);
+  overflow: hidden;
+}
+.rev-alta > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 14px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  /* Área de toque cómoda en el teléfono. */
+  min-height: 48px;
+}
+.rev-alta > summary::-webkit-details-marker {
+  display: none;
+}
+.rev-alta > summary::before {
+  content: "+";
+  font-size: 18px;
+  line-height: 1;
+  color: var(--adm-accent);
+  margin-right: 2px;
+}
+.rev-alta[open] > summary::before {
+  content: "−";
+}
+.rev-alta > summary:hover {
+  background: var(--adm-accent-soft);
+}
+.rev-alta-titulo {
+  font-weight: 500;
+  color: var(--adm-text);
+}
+
+.rev-form {
+  padding: 4px 18px 18px;
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--adm-line-soft);
+}
+.rev-form-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+.rev-crece {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.rev-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  flex: 0 0 auto;
+}
+.rev-nota {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--adm-accent);
+  background: var(--adm-accent-soft);
+  border-radius: 0 var(--adm-r-sm) var(--adm-r-sm) 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--adm-text-2);
+}
+
+.rev-check-lbl {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--adm-text-2);
+  cursor: pointer;
+}
+.rev-check-lbl input {
+  margin-top: 3px;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  accent-color: var(--adm-accent);
+}
+
+/* ── selector de estrellas ──────────────────────────────── */
+
+/* El orden del DOM es 5→1 y aquí se invierte: así `input:checked ~ label`
+   colorea la elegida y todas las de menor valor, sin una línea de JS. */
+.rev-stars {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.rev-star input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.rev-star label {
+  display: block;
+  padding: 4px 1px;
+  cursor: pointer;
+  color: rgba(119, 48, 62, 0.22);
+  transition: color 0.12s ease;
+}
+.rev-stars .rev-star input:checked ~ label,
+.rev-stars .rev-star:hover label,
+.rev-stars .rev-star:hover ~ .rev-star label {
+  color: var(--adm-accent);
+}
+/* Teclado: el foco tiene que verse o el campo es inusable sin ratón. */
+.rev-star input:focus-visible + label {
+  outline: 2px solid var(--adm-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── acciones en lote y por fila ────────────────────────── */
+
+.rev-lote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: var(--adm-surface-2);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+}
+.rev-lote-info {
+  font-size: 13px;
+  color: var(--adm-muted);
+}
+
+.rev-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.rev-check {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--adm-accent);
+  cursor: pointer;
+}
+
+/* Texto de la reseña dentro de la tabla: se recorta a 3 líneas para que una
+   reseña larga no empuje al resto de la fila fuera de la pantalla. */
+.rev-texto {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--adm-text-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+  max-width: 46ch;
+}
+.rev-autora {
+  font-weight: 500;
+}
+
+/* ── carritos ───────────────────────────────────────────── */
+
+.rev-carrito-cab {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.rev-carrito-items {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.rev-carrito-items li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--adm-line-soft);
+  font-size: 14px;
+}
+.rev-carrito-items li:last-child {
+  border-bottom: 0;
+}
+.rev-carrito-contacto {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+  color: var(--adm-text-2);
+}
+
+.rev-msg-caja {
+  border-top: 1px solid var(--adm-line-soft);
+  padding-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+.rev-msg {
+  font-family: var(--sans);
+  line-height: 1.5;
+  min-height: 110px;
+  resize: vertical;
+}
+.rev-msg-decision {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding-top: 4px;
+  border-top: 1px dashed var(--adm-line-soft);
+}
+.rev-input-pedido {
+  max-width: 190px;
+}
+
+.rev-limpieza {
+  display: grid;
+  gap: 12px;
+}
+/* El desplegable de días no aplica al modo «vacíos» y se deshabilita. Sin esto
+   se veía idéntico a uno normal: alguien lo intenta cambiar, no pasa nada, y
+   piensa que la pantalla está rota. */
+.rev-limpieza select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--adm-canvas);
+}
+
+/* ── móvil ──────────────────────────────────────────────── */
+
+@media (max-width: 760px) {
+  .rev-acciones {
+    justify-content: flex-start;
+  }
+  .rev-lote {
+    position: sticky;
+    /* Se queda a la vista mientras se marcan casillas hacia abajo. */
+    top: 8px;
+    z-index: 5;
+  }
+  .rev-texto {
+    max-width: none;
+  }
+}

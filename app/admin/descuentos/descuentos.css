@@ -1,0 +1,276 @@
+/*
+ * Estilos propios de las pantallas de descuentos y promociones.
+ * Vive aquí y no en admin.css porque admin.css lo comparten todas las pantallas
+ * del panel y tocarlo para un caso concreto rompería las demás. Todo va
+ * prefijado `desc-`. Los colores salen siempre de los tokens --adm-*: ni un
+ * color a pelo, ni blanco puro.
+ */
+
+/* ── avisos de cabecera ─────────────────────────────────────────────────── */
+
+.desc-aviso {
+  border-radius: var(--adm-r);
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  margin-bottom: 18px;
+  border: 1px solid transparent;
+}
+.desc-aviso-ok {
+  background: var(--adm-success-soft);
+  color: var(--adm-success);
+  border-color: rgba(46, 107, 79, 0.28);
+}
+.desc-aviso-error {
+  background: var(--adm-danger-soft);
+  color: var(--adm-danger);
+  border-color: rgba(160, 48, 42, 0.28);
+}
+.desc-aviso-warn {
+  background: var(--adm-warning-soft);
+  color: var(--adm-warning);
+  border-color: rgba(138, 87, 19, 0.28);
+}
+.desc-aviso-info {
+  background: var(--adm-info-soft);
+  color: var(--adm-info);
+  border-color: rgba(43, 84, 112, 0.26);
+}
+
+/* ── una línea que explica la pantalla, debajo del título ───────────────── */
+
+.desc-intro {
+  color: var(--adm-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 18px;
+  max-width: 68ch;
+}
+
+/* ── filtros del listado ────────────────────────────────────────────────── */
+
+.desc-filtros {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.desc-filtros .adm-field { margin: 0; min-width: 150px; }
+.desc-filtros-busca { flex: 1 1 220px; }
+
+/* ── el código, en monoespaciada y con botón de copiar ──────────────────── */
+
+.desc-codigo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.desc-codigo-txt {
+  font-family: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+  font-size: 13.5px;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  background: var(--adm-surface-2);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r-sm);
+  padding: 3px 8px;
+  color: var(--adm-text);
+}
+
+/* Botón de copiar: cuadrado, a un dedo de distancia (36 px) y sin texto para
+   que no reviente el ancho de la tabla en el móvil. */
+.desc-copiar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--adm-r-sm);
+  border: 1px solid var(--adm-line);
+  background: var(--adm-surface);
+  color: var(--adm-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.desc-copiar:hover { color: var(--adm-accent); border-color: var(--adm-accent); }
+.desc-copiar svg { width: 16px; height: 16px; }
+.desc-copiar.is-hecho { color: var(--adm-success); border-color: var(--adm-success); }
+.desc-copiado {
+  font-size: 12px;
+  color: var(--adm-success);
+}
+
+/* ── celdas del listado ─────────────────────────────────────────────────── */
+
+.desc-celda {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.desc-celda small { color: var(--adm-muted); font-size: 12.5px; }
+
+.desc-usos-barra {
+  position: relative;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--adm-line-soft);
+  overflow: hidden;
+  margin-top: 4px;
+  width: 100%;
+  max-width: 120px;
+}
+.desc-usos-barra span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--adm-accent);
+  border-radius: 4px;
+}
+.desc-usos-barra.is-lleno span { background: var(--adm-danger); }
+
+/* ── formulario: contenido ancho + columna lateral ──────────────────────── */
+
+.desc-cols {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  align-items: start;
+}
+.desc-cols > * { min-width: 0; }
+
+@media (max-width: 1040px) {
+  .desc-cols { grid-template-columns: minmax(0, 1fr); }
+}
+
+.desc-stack { display: flex; flex-direction: column; gap: 20px; }
+
+/* Dos campos en una fila cuando caben (fechas, valor + mínimo). */
+.desc-par {
+  display: grid;
+  gap: 0 14px;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 560px) {
+  .desc-par { grid-template-columns: 1fr; }
+}
+
+/* ── casillas: activo, una vez por clienta… ─────────────────────────────── */
+
+.desc-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.desc-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  accent-color: var(--adm-accent);
+  flex: none;
+  cursor: pointer;
+}
+.desc-check-txt { display: flex; flex-direction: column; gap: 2px; }
+.desc-check-txt small { color: var(--adm-muted); font-size: 12.5px; }
+
+/* ── selector de colecciones / productos con buscador ───────────────────── */
+
+.desc-picker { display: flex; flex-direction: column; gap: 10px; }
+
+.desc-picker-lista {
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  background: var(--adm-surface-2);
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.desc-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--adm-r-sm);
+  cursor: pointer;
+  font-size: 14px;
+}
+.desc-picker-item:hover { background: var(--adm-accent-soft); }
+.desc-picker-item input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--adm-accent);
+  flex: none;
+  cursor: pointer;
+}
+.desc-picker-vacio {
+  padding: 14px;
+  color: var(--adm-muted);
+  font-size: 13.5px;
+  text-align: center;
+}
+.desc-picker-cuenta { font-size: 12.5px; color: var(--adm-muted); }
+
+/* ── vista previa en vivo ───────────────────────────────────────────────── */
+
+.desc-preview { display: flex; flex-direction: column; gap: 12px; }
+
+.desc-preview-cuentas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: var(--adm-r);
+  background: var(--adm-surface-2);
+  border: 1px solid var(--adm-line);
+}
+.desc-preview-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 14px;
+}
+.desc-preview-fila span:first-child { color: var(--adm-text-2); }
+.desc-preview-ahorro span:last-child { color: var(--adm-success); font-weight: 600; }
+.desc-preview-total {
+  border-top: 1px solid var(--adm-line);
+  padding-top: 10px;
+  margin-top: 2px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.desc-preview-total span:first-child { color: var(--adm-text); }
+.desc-preview-nota { font-size: 13px; color: var(--adm-muted); line-height: 1.55; }
+
+/* Botones rápidos de subtotal de ejemplo: $25 · $50 · $100. */
+.desc-preview-atajos { display: flex; gap: 6px; flex-wrap: wrap; }
+.desc-atajo {
+  border: 1px solid var(--adm-line);
+  background: var(--adm-surface);
+  color: var(--adm-text-2);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.desc-atajo:hover { border-color: var(--adm-accent); color: var(--adm-accent); }
+
+/* ── historial de usos y zona peligrosa ─────────────────────────────────── */
+
+.desc-lista-confirmar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.desc-peligro { margin-top: 20px; }

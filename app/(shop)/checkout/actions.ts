@@ -1,0 +1,232 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { readCartToken } from "@/lib/cart";
+import { getSettings } from "@/lib/settings";
+import {
+  createOrderFromCart,
+  emailMatchesOrder,
+  grantOrderAccess,
+  normalizeOrderNumber,
+  type OrderPaymentMethod,
+} from "@/lib/orders";
+
+/**
+ * Server Actions del checkout.
+ *
+ * Nada de lo que llega aquí se cree: el método de pago se contrasta con los ajustes
+ * de la tienda y los importes se recalculan en `createOrderFromCart` leyendo la BD.
+ * Del formulario solo se aceptan datos de contacto y de envío.
+ */
+
+export type CheckoutField =
+  | "name"
+  | "email"
+  | "phone"
+  | "line1"
+  | "line2"
+  | "city"
+  | "state"
+  | "zip"
+  | "note"
+  | "paymentMethod";
+
+export type CheckoutState = {
+  /** Error general (carrito vacío, método no disponible, fallo al guardar). */
+  formError?: string;
+  /** Mensajes por campo, para pintarlos al lado del input. */
+  fieldErrors: Partial<Record<CheckoutField, string>>;
+  /** Lo que escribió: si algo falla, no se le borra el formulario. */
+  values: Record<CheckoutField, string>;
+};
+
+/**
+ * Un fichero "use server" solo puede exportar funciones asíncronas, así que el estado
+ * inicial del formulario no se puede compartir desde aquí: vive en CheckoutForm.tsx.
+ */
+const ESTADO_VACIO: CheckoutState = {
+  fieldErrors: {},
+  values: {
+    name: "",
+    email: "",
+    phone: "",
+    line1: "",
+    line2: "",
+    city: "",
+    state: "",
+    zip: "",
+    note: "",
+    paymentMethod: "",
+  },
+};
+
+const CAMPOS: CheckoutField[] = [
+  "name",
+  "email",
+  "phone",
+  "line1",
+  "line2",
+  "city",
+  "state",
+  "zip",
+  "note",
+  "paymentMethod",
+];
+
+function readValues(formData: FormData): Record<CheckoutField, string> {
+  const values = { ...ESTADO_VACIO.values };
+  for (const campo of CAMPOS) {
+    const raw = formData.get(campo);
+    values[campo] = typeof raw === "string" ? raw : "";
+  }
+  return values;
+}
+
+/**
+ * Esquema de validación. El envío solo se exige cuando hay envío: en "recoger en la
+ * boutique" pedir una dirección es fricción por gusto.
+ */
+const checkoutSchema = z
+  .object({
+    name: z.string().trim().min(2, "Escribe tu nombre completo.").max(80, "Nombre demasiado largo."),
+    email: z.string().trim().toLowerCase().email("Ese correo no parece válido."),
+    phone: z
+      .string()
+      .trim()
+      .max(30, "Teléfono demasiado largo.")
+      .refine(
+        (v) => v === "" || v.replace(/\D/g, "").length >= 7,
+        "Ese teléfono parece incompleto. Puedes dejarlo vacío.",
+      ),
+    line1: z.string().trim().max(120, "Dirección demasiado larga."),
+    line2: z.string().trim().max(120, "Dirección demasiado larga."),
+    city: z.string().trim().max(60, "Ciudad demasiado larga."),
+    state: z.string().trim().max(40, "Estado demasiado largo."),
+    zip: z.string().trim().max(12, "Código postal demasiado largo."),
+    note: z.string().trim().max(500, "La nota es demasiado larga."),
+    paymentMethod: z.enum(["dm", "pickup", "stripe"], {
+      errorMap: () => ({ message: "Elige cómo quieres pagar." }),
+    }),
+  })
+  .superRefine((data, ctx) => {
+    if (data.paymentMethod === "pickup") return;
+
+    if (data.line1.length < 4) {
+      ctx.addIssue({ code: "custom", path: ["line1"], message: "Escribe tu dirección." });
+    }
+    if (data.city.length < 2) {
+      ctx.addIssue({ code: "custom", path: ["city"], message: "Escribe tu ciudad." });
+    }
+    if (data.state.length < 2) {
+      ctx.addIssue({ code: "custom", path: ["state"], message: "Escribe tu estado (ej. OH)." });
+    }
+    if (!/^\d{5}(-\d{4})?$/.test(data.zip)) {
+      ctx.addIssue({ code: "custom", path: ["zip"], message: "El ZIP son 5 dígitos (ej. 45011)." });
+    }
+  });
+
+export async function submitCheckout(
+  _prev: CheckoutState,
+  formData: FormData,
+): Promise<CheckoutState> {
+  const values = readValues(formData);
+
+  const parsed = checkoutSchema.safeParse(values);
+  if (!parsed.success) {
+    const fieldErrors: Partial<Record<CheckoutField, string>> = {};
+    for (const issue of parsed.error.issues) {
+      const campo = issue.path[0] as CheckoutField | undefined;
+      if (campo && !fieldErrors[campo]) fieldErrors[campo] = issue.message;
+    }
+    return { fieldErrors, values, formError: "Revisa los datos marcados." };
+  }
+
+  const data = parsed.data;
+  const settings = await getSettings();
+
+  // El método de pago se comprueba contra los ajustes: que el <input> exista en el HTML
+  // no significa que Madeline lo tenga activo.
+  const habilitado: Record<OrderPaymentMethod, boolean> = {
+    dm: settings.payDm,
+    pickup: settings.payPickup,
+    stripe: settings.payStripe,
+    cash: false,
+  };
+  if (!habilitado[data.paymentMethod]) {
+    return {
+      fieldErrors: { paymentMethod: "Ese método de pago no está disponible ahora mismo." },
+      values,
+      formError: "Elige otra forma de pago.",
+    };
+  }
+
+  /*
+   * PAGO CON TARJETA — infraestructura lista, cobro DESHABILITADO.
+   *
+   * Aquí es donde entraría Stripe cuando Madeline tenga su cuenta. Lo que falta,
+   * para que el que lo active no tenga que adivinarlo:
+   *
+   *   1. `STRIPE_SECRET_KEY` (y `STRIPE_WEBHOOK_SECRET`) en el entorno.
+   *   2. Crear el pedido igual que ahora (queda en `paymentStatus: "pending"`), y con
+   *      su id crear la sesión de Checkout de Stripe con las líneas ya congeladas en
+   *      OrderItem — nunca con precios del navegador.
+   *   3. Guardar `session.id` en `Order.stripeSessionId` y redirigir a `session.url`.
+   *   4. Un webhook `checkout.session.completed` marca `paymentStatus: "paid"` y
+   *      `paidAt`. El pedido NO se da por pagado al volver de Stripe: la vuelta del
+   *      navegador se puede falsificar, el webhook no.
+   *
+   * Mientras `settings.payStripe` sea false esta rama ni se ofrece en la interfaz.
+   * Fingir un cobro que no ocurre sería mentirle a una clienta que ya pagó de verdad.
+   */
+
+  const cartToken = await readCartToken();
+  const result = await createOrderFromCart(cartToken, {
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+    line1: data.line1,
+    line2: data.line2,
+    city: data.city,
+    state: data.state,
+    zip: data.zip,
+    country: "US",
+    note: data.note,
+    paymentMethod: data.paymentMethod,
+  });
+
+  if (!result.ok) {
+    return { fieldErrors: {}, values, formError: result.error };
+  }
+
+  // La compradora acaba de crear el pedido: se le da la llave de su confirmación.
+  await grantOrderAccess(result.number);
+  // El carrito quedó vacío dentro de la transacción; el badge del nav vive en el layout.
+  revalidatePath("/", "layout");
+
+  // Fuera de cualquier try: redirect() funciona lanzando y un catch se lo tragaría.
+  redirect(`/pedido/${result.number}`);
+}
+
+/**
+ * Desbloquea la confirmación de un pedido demostrando que se conoce el email.
+ *
+ * Es un `<form action>` normal: funciona sin JavaScript. El resultado viaja como
+ * bandera en la URL (`?acceso=fallo`), nunca el email — un dato personal no se pone
+ * en una query string que acaba en logs e historial.
+ */
+export async function verifyOrderAccess(formData: FormData): Promise<void> {
+  const number = normalizeOrderNumber(String(formData.get("number") ?? ""));
+  const email = String(formData.get("email") ?? "").trim();
+
+  if (!number) redirect("/tienda");
+
+  const ok = email.length > 3 && (await emailMatchesOrder(number, email));
+  if (!ok) {
+    redirect(`/pedido/${encodeURIComponent(number)}?acceso=fallo`);
+  }
+
+  await grantOrderAccess(number);
+  redirect(`/pedido/${encodeURIComponent(number)}`);
+}

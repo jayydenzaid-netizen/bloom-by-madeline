@@ -1,0 +1,461 @@
+/* ═══════════════════════════════════════════════════════════
+   HERRAMIENTAS Y PLANTILLAS — copias, SEO, redirecciones, mensajes
+   ───────────────────────────────────────────────────────────
+   Estilos propios del módulo. admin.css no se toca (lo comparten todas las
+   pantallas del panel): aquí solo está lo que estas dos pantallas necesitan y
+   no existe ya como primitiva. Todo va prefijado `hrr-` y usa los tokens
+   --adm-* para no inventar ni un color nuevo.
+
+   Reglas de la casa que también mandan aquí: nada de blanco puro, radios
+   suaves y simétricos, y el burgundy solo cuando es una acción.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── avisos de resultado ─────────────────────────────────── */
+
+.hrr-aviso {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  border-radius: var(--adm-r);
+  border: 1px solid var(--adm-line);
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+
+.hrr-aviso-ok {
+  background: var(--adm-success-soft);
+  border-color: rgba(46, 107, 79, 0.28);
+  color: var(--adm-success);
+}
+
+.hrr-aviso-mal {
+  background: var(--adm-danger-soft);
+  border-color: rgba(160, 48, 42, 0.28);
+  color: var(--adm-danger);
+}
+
+.hrr-aviso-pista {
+  color: var(--adm-text-2);
+  font-size: 12.5px;
+}
+
+/* ── textos de la pantalla ───────────────────────────────── */
+
+/* La línea que explica para qué sirve cada bloque. Va SIEMPRE: Madeline no
+   tiene manual, la pantalla es el manual. */
+.hrr-pista {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--adm-text-2);
+  max-width: 68ch;
+}
+
+/* La letra pequeña de lo que puede doler: datos personales, borrados. */
+.hrr-nota {
+  margin: 14px 0 0;
+  padding: 10px 13px;
+  border-left: 3px solid var(--adm-warning);
+  background: var(--adm-warning-soft);
+  border-radius: 0 var(--adm-r-sm) var(--adm-r-sm) 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--adm-text-2);
+  max-width: 72ch;
+}
+
+.hrr-pie {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--adm-muted);
+}
+
+.hrr-cuerpo {
+  padding: 18px 20px 4px;
+}
+
+/* ── acciones y formularios ──────────────────────────────── */
+
+.hrr-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.hrr-descarga {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hrr-ok-inline {
+  font-size: 12.5px;
+  color: var(--adm-success);
+}
+
+.hrr-err-inline {
+  font-size: 12.5px;
+  color: var(--adm-danger);
+  margin: 6px 0 0;
+}
+
+.hrr-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 560px;
+}
+
+/* Alta de redirección: dos campos y el botón en fila cuando cabe. */
+.hrr-form-linea {
+  max-width: none;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.hrr-form-linea .adm-field {
+  flex: 1 1 240px;
+  margin: 0;
+}
+
+.hrr-linea {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hrr-ruta {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 12.5px;
+  color: var(--adm-text);
+  word-break: break-all;
+}
+
+/* ── SEO ─────────────────────────────────────────────────── */
+
+.hrr-seo {
+  margin-top: 18px;
+}
+
+.hrr-seo-barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--adm-line-soft);
+}
+
+.hrr-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--adm-text-2);
+  cursor: pointer;
+}
+
+.hrr-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--adm-accent);
+}
+
+.hrr-seo-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hrr-seo-fila {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--adm-line-soft);
+}
+
+.hrr-seo-fila:last-child {
+  border-bottom: 0;
+}
+
+.hrr-seo-cab {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hrr-seo-quien {
+  min-width: 0;
+}
+
+.hrr-seo-titulo {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--adm-text);
+}
+
+.hrr-seo-ruta {
+  display: block;
+  font-size: 12px;
+  color: var(--adm-muted);
+  word-break: break-all;
+}
+
+.hrr-seo-marcas {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+/* Vista previa del resultado de Google. No copia su marca: imita su JERARQUÍA
+   (dirección arriba, titular azul, resumen gris) que es lo que hace que
+   Madeline entienda de un vistazo qué está editando. */
+.hrr-google {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  background: var(--adm-surface-2);
+  border: 1px solid var(--adm-line-soft);
+  border-radius: var(--adm-r-sm);
+  max-width: 620px;
+}
+
+.hrr-google-url {
+  font-size: 12px;
+  color: var(--adm-muted);
+  word-break: break-all;
+}
+
+.hrr-google-url span {
+  color: var(--adm-text-2);
+}
+
+.hrr-google-tit {
+  font-size: 16px;
+  line-height: 1.35;
+  color: #1a4d80;
+  margin-top: 2px;
+}
+
+.hrr-google-desc {
+  font-size: 12.8px;
+  line-height: 1.5;
+  color: var(--adm-text-2);
+  margin-top: 3px;
+}
+
+.hrr-seo-editor {
+  margin-top: 12px;
+  padding: 14px;
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r-sm);
+  max-width: 620px;
+}
+
+.hrr-seo-editor input,
+.hrr-seo-editor textarea {
+  width: 100%;
+}
+
+.hrr-seo-editor .adm-field-lbl {
+  margin-top: 10px;
+}
+
+.hrr-seo-editor .adm-field-lbl:first-child {
+  margin-top: 0;
+}
+
+/* El contador cambia de color solo: el número por sí solo no dice si está bien. */
+.hrr-contador {
+  font-size: 12px;
+  margin: 4px 0 8px;
+  color: var(--adm-muted);
+}
+
+.hrr-contador.is-ok {
+  color: var(--adm-success);
+}
+
+.hrr-contador.is-corto,
+.hrr-contador.is-largo {
+  color: var(--adm-warning);
+}
+
+.hrr-contador.is-falta {
+  color: var(--adm-danger);
+}
+
+/* ── limpieza ────────────────────────────────────────────── */
+
+.hrr-limpieza {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hrr-limpia-fila {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--adm-line-soft);
+  flex-wrap: wrap;
+}
+
+.hrr-limpia-fila:last-child {
+  border-bottom: 0;
+}
+
+.hrr-limpia-fila p {
+  margin: 4px 0 0;
+  max-width: 56ch;
+}
+
+.hrr-limpia-accion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── plantillas de mensajes ──────────────────────────────── */
+
+/* El aviso honesto de que hoy no se envían solos. Va arriba del todo y en
+   ámbar: no es un error, pero no puede pasar desapercibido. */
+.hrr-honesto {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(138, 87, 19, 0.3);
+  background: var(--adm-warning-soft);
+  border-radius: var(--adm-r);
+  margin-bottom: 18px;
+}
+
+.hrr-honesto b {
+  color: var(--adm-warning);
+  font-size: 14px;
+}
+
+.hrr-honesto p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--adm-text-2);
+  max-width: 76ch;
+}
+
+.hrr-plantilla-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .hrr-plantilla-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.hrr-plantilla-form textarea {
+  width: 100%;
+  min-height: 220px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 12.8px;
+  line-height: 1.6;
+}
+
+.hrr-plantilla-form input[type="text"] {
+  width: 100%;
+}
+
+/* Vista previa del mensaje ya relleno con datos de ejemplo. */
+.hrr-vista {
+  background: var(--adm-surface-2);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r-sm);
+  padding: 14px 16px;
+}
+
+.hrr-vista-asunto {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--adm-text);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--adm-line-soft);
+}
+
+.hrr-vista-cuerpo {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--sans, inherit);
+  font-size: 13.2px;
+  line-height: 1.65;
+  color: var(--adm-text-2);
+}
+
+.hrr-copiar {
+  margin-top: 12px;
+}
+
+/* Tabla de variables disponibles. */
+.hrr-vars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.hrr-var {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r-sm);
+  background: var(--adm-surface);
+  font-size: 12px;
+  color: var(--adm-text-2);
+}
+
+.hrr-var code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 11.8px;
+  color: var(--adm-accent);
+}
+
+/* ── móvil ───────────────────────────────────────────────── */
+
+@media (max-width: 620px) {
+  .hrr-seo-cab,
+  .hrr-limpia-fila {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hrr-seo-marcas,
+  .hrr-limpia-accion {
+    justify-content: flex-start;
+  }
+
+  .hrr-acciones .adm-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
