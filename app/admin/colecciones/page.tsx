@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { buscar as filtroTexto } from "@/lib/search";
 import {
   Badge,
   Button,
@@ -139,7 +140,7 @@ export default async function ColeccionesPage({ searchParams }: { searchParams: 
       ? await db.product.findMany({
           where: {
             id: { notIn: idsDentro },
-            OR: [{ title: { contains: buscar } }, { slug: { contains: buscar } }, { tagsJson: { contains: buscar } }],
+            OR: [{ title: filtroTexto(buscar) }, { slug: filtroTexto(buscar) }, { tagsJson: filtroTexto(buscar) }],
           },
           orderBy: { title: "asc" },
           take: 12,

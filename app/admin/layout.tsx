@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ensureSeedAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { buscar } from "@/lib/search";
 import { formatCents } from "@/lib/money";
 import { getAdminConRol } from "@/lib/permissions";
 import { getSettings } from "@/lib/settings";
@@ -223,19 +224,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     try {
       const [productos, pedidos, clientas] = await Promise.all([
         db.product.findMany({
-          where: { title: { contains: q } },
+          where: { title: buscar(q) },
           orderBy: { updatedAt: "desc" },
           take: 5,
           select: { id: true, title: true, status: true, priceCents: true },
         }),
         db.order.findMany({
-          where: { OR: [{ number: { contains: q } }, { name: { contains: q } }, { email: { contains: q } }] },
+          where: { OR: [{ number: buscar(q) }, { name: buscar(q) }, { email: buscar(q) }] },
           orderBy: { createdAt: "desc" },
           take: 5,
           select: { id: true, number: true, name: true, email: true, totalCents: true, paymentStatus: true },
         }),
         db.customer.findMany({
-          where: { OR: [{ name: { contains: q } }, { email: { contains: q } }] },
+          where: { OR: [{ name: buscar(q) }, { email: buscar(q) }] },
           orderBy: { createdAt: "desc" },
           take: 5,
           select: { id: true, name: true, email: true },

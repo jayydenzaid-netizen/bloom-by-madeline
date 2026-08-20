@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { buscar } from "@/lib/search";
 import { formatCents } from "@/lib/money";
 import { Button, Card, DataTable, EmptyState, Money, PageHeader, type Column } from "../_components/ui";
 
@@ -51,7 +52,7 @@ export default async function ClientesPage({
 
   const [clientas, totalesPorEmail, cobradoPorEmail] = await Promise.all([
     db.customer.findMany({
-      where: q ? { OR: [{ name: { contains: q } }, { email: { contains: q } }, { phone: { contains: q } }] } : undefined,
+      where: q ? { OR: [{ name: buscar(q) }, { email: buscar(q) }, { phone: buscar(q) }] } : undefined,
       select: { id: true, name: true, email: true, phone: true, createdAt: true },
       // Tope defensivo: una boutique no tiene 2000 clientas, y si algún día las
       // tiene esta pantalla se rehace con paginación en base de datos.

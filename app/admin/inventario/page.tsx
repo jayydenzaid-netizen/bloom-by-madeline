@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { buscar } from "@/lib/search";
 import { stockValue } from "@/lib/inventory";
 import { formatCents } from "@/lib/money";
 import { Button, Card, PageHeader, StatCard } from "../_components/ui";
@@ -301,9 +302,9 @@ function construirFiltro(f: {
     // SQLite compara LIKE sin distinguir mayúsculas para ASCII, así que no hace
     // falta (ni existe) el `mode: "insensitive"` de Postgres.
     where.OR = [
-      { title: { contains: f.q } },
-      { sku: { contains: f.q } },
-      { product: { title: { contains: f.q } } },
+      { title: buscar(f.q) },
+      { sku: buscar(f.q) },
+      { product: { title: buscar(f.q) } },
     ];
   }
 

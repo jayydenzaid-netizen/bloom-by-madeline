@@ -17,3 +17,5 @@ prisma/dev.db-journal
 qa/shots
 qa/informe.json
 public/uploads
+
+.env.production.local

@@ -5,23 +5,26 @@
   "description": "Bloom by Madeline - tienda online con importador de proveedores",
   "scripts": {
     "dev": "next dev -p 4590",
-    "build": "prisma generate && next build",
+    "build": "node scripts/db-provider.mjs && prisma generate && node scripts/preparar-bd.mjs && next build",
     "start": "next start -p 4590",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:push": "prisma db push",
-    "db:generate": "prisma generate",
+    "db:push": "node scripts/db-provider.mjs && prisma db push",
+    "db:generate": "node scripts/db-provider.mjs && prisma generate",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma db push --force-reset && npm run db:seed",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "db:deploy": "node scripts/db-provider.mjs && prisma db push --accept-data-loss",
+    "desplegar": "node scripts/desplegar.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
     "next": "^15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",
@@ -29,7 +32,6 @@
     "@types/react-dom": "^19.0.3",
     "prisma": "^6.2.1",
     "puppeteer-core": "^25.8.0",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   },
   "allowScripts": {

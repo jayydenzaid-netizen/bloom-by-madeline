@@ -59,6 +59,39 @@ en silencio:
 Todas terminan en la misma vista previa, donde se ven **coste, precio de venta y margen**
 antes de publicar nada. Ningún producto se publica sin revisión.
 
+## Desplegar
+
+En desarrollo la tienda usa SQLite, que es un fichero. En Vercel eso no sirve: el
+disco se borra en cada despliegue y hay varias instancias a la vez. Producción
+necesita Postgres.
+
+El esquema está escrito para funcionar en los dos motores, y `scripts/db-provider.mjs`
+cambia el motor según la `DATABASE_URL` que encuentre. Nadie tiene que acordarse.
+
+**La primera vez** — crear la base de datos (3 clics, es lo único manual):
+
+1. Abrir el proyecto en Vercel → pestaña **Storage** → **Create Database** → **Neon**
+2. Plan gratuito
+3. Vercel enchufa `DATABASE_URL` al proyecto por su cuenta
+
+A partir de ahí el propio build crea las tablas y siembra la tienda si está vacía
+(`scripts/preparar-bd.mjs`), así que desplegar es:
+
+```bash
+npx vercel deploy --prod --yes
+```
+
+Y desde el portátil, con la cadena de conexión en `.env.production.local`:
+
+```bash
+npm run desplegar
+```
+
+que además comprueba tipos y pasa las pruebas antes de publicar nada.
+
+Las demás variables (`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SESSION_SECRET`,
+`NEXT_PUBLIC_SITE_URL`) ya están configuradas en el proyecto de Vercel.
+
 ## Verificar que funciona
 
 ```bash

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { buscar } from "@/lib/search";
 import {
   Badge,
   Button,
@@ -132,10 +133,10 @@ export default async function PedidosPage({
     where.AND = [
       {
         OR: [
-          { number: { contains: busqueda.q } },
-          { email: { contains: busqueda.q } },
-          { name: { contains: busqueda.q } },
-          { trackingNumber: { contains: busqueda.q } },
+          { number: buscar(busqueda.q) },
+          { email: buscar(busqueda.q) },
+          { name: buscar(busqueda.q) },
+          { trackingNumber: buscar(busqueda.q) },
         ],
       },
     ];

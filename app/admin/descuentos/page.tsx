@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { buscar } from "@/lib/search";
 import { describirValor, describirVigencia, estadoDescuento, type ClaveEstado } from "@/lib/discounts";
 import {
   Badge,
@@ -139,7 +140,7 @@ export default async function DescuentosPage({ searchParams }: { searchParams: P
   const where: Prisma.DiscountWhereInput = q
     ? // SQLite compara LIKE sin distinguir mayúsculas para ASCII: no hace falta
       // (ni existe) el `mode: "insensitive"` de Postgres.
-      { OR: [{ code: { contains: q } }, { title: { contains: q } }] }
+      { OR: [{ code: buscar(q) }, { title: buscar(q) }] }
     : {};
 
   const [encontrados, total, resumen] = await Promise.all([

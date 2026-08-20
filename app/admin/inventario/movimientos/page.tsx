@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { buscar } from "@/lib/search";
 import { isStockReason, REASON_LABELS, STOCK_REASONS, type StockReason } from "@/lib/inventory";
 import {
   Badge,
@@ -343,7 +344,7 @@ async function construirFiltro(f: {
   if (f.q) {
     const encajan = await db.productVariant.findMany({
       where: {
-        OR: [{ title: { contains: f.q } }, { sku: { contains: f.q } }, { product: { title: { contains: f.q } } }],
+        OR: [{ title: buscar(f.q) }, { sku: buscar(f.q) }, { product: { title: buscar(f.q) } }],
       },
       select: { id: true },
       take: 500,
