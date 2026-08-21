@@ -23,7 +23,7 @@ import {
   findProductBySource,
   getOrCreateImportToken,
 } from "@/lib/importers/pipeline";
-import type { ImportMethod, ProviderId } from "@/lib/importers/types";
+import type { ImportMethod, NormalizedProduct, ProviderId } from "@/lib/importers/types";
 
 // Prisma y node:crypto: runtime de Node, no edge. Y nada de caché: cada envío es
 // un producto distinto.
@@ -252,7 +252,15 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   let job: { id: string; provider: string; method: string };
   try {
-    job = await createImportJob(product, { raw: { url: sourceUrl } });
+    // El volcado crudo del proveedor va a `rawJson`, NUNCA dentro del borrador.
+    // `draftJson` es lo que se lee y se edita en cada pantalla —y lo que
+    // /admin/importar carga entero de los 25 últimos jobs solo para sacar el
+    // título—, mientras que `rawJson` existe justo para poder re-parsear y tiene
+    // tope (MAX_RAW_CHARS). Guardarlos al revés metía cientos de KB de
+    // `runParams` en cada fila del historial. Es lo mismo que hace la vía HTML en
+    // `app/admin/importar/actions.ts` (`guardarComoJob`).
+    const { raw, ...limpio } = product;
+    job = await createImportJob(limpio as NormalizedProduct, { raw: raw ?? { url: sourceUrl } });
   } catch (error) {
     return json({ ok: false, error: `No se pudo guardar la importación: ${message(error)}` }, 500, origin);
   }
