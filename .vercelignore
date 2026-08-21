@@ -1,0 +1,19 @@
+# Lo que NO tiene que viajar a producción.
+#
+# Vercel sube el directorio de trabajo, no el último commit: cualquier cosa que
+# esté en el disco acaba en el despliegue si no se excluye aquí.
+
+# Arneses de prueba y capturas: solo sirven en el portátil y pesan.
+qa/
+
+# El one-page original. Se conserva como punto de retorno, pero no se sirve.
+legacy/
+
+# Herramientas de línea de comandos para una eventual mudanza a Shopify. No las
+# importa nadie de app/ ni de lib/ — son scripts sueltos, así que no pintan nada
+# en el servidor y solo añadirían peso al despliegue.
+shopify/
+
+# Base de datos de desarrollo.
+prisma/dev.db
+prisma/dev.db-journal

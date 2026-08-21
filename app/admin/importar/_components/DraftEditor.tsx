@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { applyPricing, formatCents, margin, parseToCents, type PricingRule } from "@/lib/money";
 import { Badge, Button, Card, DataTable, Field, Money, type Column } from "../../_components/ui";
@@ -10,6 +10,7 @@ import {
   actualizarProductoExistente,
   guardarBorrador,
   publicarBorrador,
+  revisionDelBorrador,
   type EdicionBorrador,
   type ResultadoPublicacion,
 } from "../actions";
@@ -41,6 +42,9 @@ export type VarianteVista = {
   priceCents: number | null;
 };
 
+/** Lo que contesta el servidor al intentar poner un producto a la venta. */
+export type ResultadoActivacion = { ok: boolean; error?: string };
+
 export type BorradorVista = {
   jobId: string;
   proveedorLabel: string;
@@ -65,7 +69,10 @@ type FilaVariante = {
   costeTexto: string;
   /** Solo se usa cuando `manual` está activo. */
   precioTexto: string;
+  /** El precio manda sobre la regla: o vino escrito en el origen, o lo escribió ella. */
   manual: boolean;
+  /** De los manuales, el que venía escrito en el fichero (CSV). Solo para decirlo. */
+  origen: boolean;
   incluida: boolean;
 };
 
@@ -152,12 +159,15 @@ export default function DraftEditor({
   reglaInicial,
   colecciones,
   existente,
+  alActivar,
 }: {
   borrador: BorradorVista;
   reglaInicial: PricingRule;
   colecciones: { id: string; title: string }[];
   /** El mismo producto de proveedor ya está en el catálogo. */
   existente: { productId: string; slug: string; title: string; status: string } | null;
+  /** Server Action de la pantalla: pasa el producto recién creado a «a la venta». */
+  alActivar: (productId: string) => Promise<ResultadoActivacion>;
 }) {
   const router = useRouter();
 
@@ -177,7 +187,14 @@ export default function DraftEditor({
       // Sin coste propio hereda el del producto, igual que hace el pipeline.
       costeTexto: centavosATexto(variante.costCents ?? borrador.costeMin),
       precioTexto: centavosATexto(variante.priceCents),
-      manual: false,
+      // UN PRECIO QUE VIENE ESCRITO EN EL BORRADOR MANDA SOBRE LA REGLA. La regla
+      // solo rellena las filas que llegan sin precio. Antes toda fila nacía
+      // «no manual» y el input pintaba el precio calculado: un CSV con precio
+      // 39.99 y coste 12.00 se publicaba a 36.99 (×2.6 + $5) sin decir nada, y
+      // los precios revisados en Excel no llegaban nunca a la tienda.
+      // El efecto de abajo afina esto con lo que hay guardado en el job.
+      manual: typeof variante.priceCents === "number" && variante.priceCents > 0,
+      origen: typeof variante.priceCents === "number" && variante.priceCents > 0,
       incluida: true,
     })),
   );
@@ -191,6 +208,58 @@ export default function DraftEditor({
   const [resultado, setResultado] = useState<ResultadoPublicacion | null>(null);
   const [duplicado, setDuplicado] = useState(existente);
   const [guardado, setGuardado] = useState(false);
+
+  // Estado del paso 3: se publicó como borrador y desde aquí mismo se puede
+  // poner a la venta sin dar la vuelta por la ficha del producto.
+  const [activando, setActivando] = useState(false);
+  const [activado, setActivado] = useState(false);
+  const [errorActivacion, setErrorActivacion] = useState<string | null>(null);
+
+  /* ── recuperar las decisiones de la última vez ── */
+
+  // Si ella ya tocó algo, lo guardado NO la pisa: la carrera dura milisegundos
+  // pero perder un clic por eso sería exactamente el fallo que venimos a arreglar.
+  const tocado = useRef(false);
+
+  // Las fotos excluidas y las variantes descartadas se piden aparte porque
+  // `BorradorVista` —que arma la página— solo trae la ficha del proveedor, no las
+  // decisiones. Sin esto, «Guardar y seguir luego» prometía una cosa y hacía otra:
+  // al volver, la foto quitada había desaparecido del borrador y la variante
+  // descartada estaba otra vez marcada.
+  useEffect(() => {
+    let vivo = true;
+    void revisionDelBorrador(borrador.jobId)
+      .then((revision) => {
+        if (!vivo || !revision || tocado.current) return;
+
+        const fuera = new Set(revision.imagenesExcluidas ?? []);
+        if (fuera.size > 0) {
+          setImagenes((prev) => prev.map((imagen, i) => (fuera.has(i) ? { ...imagen, incluida: false } : imagen)));
+        }
+
+        const descartadas = new Set(revision.variantesDescartadas ?? []);
+        const decididos = revision.preciosDecididos ? new Set(revision.preciosDecididos) : null;
+        const delOrigen = revision.preciosDelOrigen ? new Set(revision.preciosDelOrigen) : null;
+        setFilas((prev) =>
+          prev.map((fila) => ({
+            ...fila,
+            incluida: descartadas.has(fila.indice) ? false : fila.incluida,
+            // El job sabe mejor que la heurística de arriba qué precios se
+            // decidieron: Alibaba, por ejemplo, trae `priceCents` ya calculado
+            // con la regla por defecto, y eso no es un precio propio.
+            manual: decididos ? decididos.has(fila.indice) && fila.precioTexto !== "" : fila.manual,
+            origen: delOrigen ? delOrigen.has(fila.indice) : fila.origen,
+          })),
+        );
+      })
+      .catch(() => {
+        // Sin decisiones guardadas se sigue con lo que trajo el borrador: es peor
+        // dejar la pantalla en blanco que empezar la revisión desde cero.
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [borrador.jobId]);
 
   /* ── cálculo de precios, en vivo ── */
 
@@ -210,6 +279,8 @@ export default function DraftEditor({
   );
 
   const incluidas = filas.filter((fila) => fila.incluida);
+  /** Filas cuyo precio manda sobre la regla: las que la tienda NO ha calculado. */
+  const conPrecioPropio = filas.filter((fila) => fila.incluida && fila.manual).length;
 
   const totales = useMemo(() => {
     let coste = 0;
@@ -233,6 +304,7 @@ export default function DraftEditor({
   /* ── acciones sobre el borrador ── */
 
   function moverImagen(desde: number, salto: number) {
+    tocado.current = true;
     setImagenes((prev) => {
       const hasta = desde + salto;
       if (hasta < 0 || hasta >= prev.length) return prev;
@@ -244,6 +316,7 @@ export default function DraftEditor({
   }
 
   function cambiarFila(indice: number, cambio: Partial<FilaVariante>) {
+    tocado.current = true;
     setFilas((prev) => prev.map((fila) => (fila.indice === indice ? { ...fila, ...cambio } : fila)));
   }
 
@@ -251,11 +324,15 @@ export default function DraftEditor({
     return {
       titulo: titulo.trim(),
       descripcion,
-      imagenes: imagenes.filter((imagen) => imagen.incluida).map(({ url, alt }) => ({ url, alt })),
+      // Van TODAS, con su marca: el borrador tiene que conservar el material del
+      // proveedor aunque ella deje fotos fuera. Quitar no es borrar.
+      imagenes: imagenes.map(({ url, alt, incluida }) => ({ url, alt, incluida })),
       precios: filas.map((fila, i) => ({
         indice: fila.indice,
         priceCents: calculadas[i].precioCents,
         costCents: calculadas[i].costeCents,
+        manual: fila.manual,
+        origen: fila.manual && fila.origen,
       })),
       descartadas: filas.filter((fila) => !fila.incluida).map((fila) => fila.indice),
       etiquetas: etiquetas
@@ -290,7 +367,7 @@ export default function DraftEditor({
       const respuesta = await publicarBorrador(borrador.jobId, edicionActual(), permitirDuplicado);
       setResultado(respuesta);
       if (!respuesta.ok && respuesta.duplicado) {
-        setDuplicado({ ...respuesta.duplicado, status: "" });
+        setDuplicado(respuesta.duplicado);
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
       if (respuesta.ok) router.refresh();
@@ -317,6 +394,26 @@ export default function DraftEditor({
   /* ── PASO 3: ya está publicado ── */
 
   if (resultado?.ok) {
+    // Lo que se acaba de publicar está a la venta si así se pidió, o si desde
+    // esta misma pantalla se acaba de activar. Al ACTUALIZAR es distinto: el
+    // selector «Cómo se publica» no pinta nada ahí, porque el estado es el que
+    // ya tenía el producto — decir «está en borrador» mirando el selector era
+    // mentirle a la dueña sobre una ficha que sus clientas están viendo.
+    const actualizado = resultado.accion === "actualizado";
+    const aLaVenta = actualizado ? duplicado?.status === "active" || activado : estado === "active" || activado;
+
+    // Requisitos para poder venderlo, calculados con lo que hay en pantalla:
+    // es exactamente lo que se acaba de mandar al servidor. El servidor los
+    // vuelve a comprobar de todas formas.
+    const conFoto = imagenes.some((imagen) => imagen.incluida);
+    const conPrecio = totales.precio > 0 && totales.sinPrecio === 0;
+    const faltaParaVender = [
+      conPrecio ? null : "ponerle precio a todas sus variantes",
+      conFoto ? null : "dejarle al menos una foto",
+    ]
+      .filter(Boolean)
+      .join(" y ");
+
     return (
       <Card title="Publicado">
         <div className="imp-resultado">
@@ -324,9 +421,13 @@ export default function DraftEditor({
             {resultado.accion === "creado" ? "Producto creado" : "Producto actualizado"}: «{resultado.titulo}»
           </h3>
           <p>
-            {estado === "active"
-              ? "Está activo: ya se ve en la tienda."
-              : "Está en borrador: nadie lo ve todavía. Cuando lo tengas listo, actívalo desde su ficha."}
+            {actualizado && aLaVenta
+              ? "Sigue a la venta con los datos nuevos: actualizar no le cambia el estado ni la dirección."
+              : actualizado
+                ? "Sigue en borrador, como estaba: actualizar trae datos y precios, pero no lo pone a la venta."
+                : aLaVenta
+                  ? "Está activo: ya se ve en la tienda."
+                  : "Está en borrador: nadie lo ve todavía. Míralo en vista previa y actívalo cuando esté a tu gusto."}
           </p>
 
           {resultado.avisos.length > 0 ? (
@@ -339,18 +440,66 @@ export default function DraftEditor({
             </div>
           ) : null}
 
+          {errorActivacion ? (
+            <div className="imp-aviso imp-aviso-danger" style={{ textAlign: "left" }}>
+              <div className="imp-aviso-cuerpo">{errorActivacion}</div>
+            </div>
+          ) : null}
+
           <div className="imp-resultado-acciones">
-            <Button href={`/admin/productos/${resultado.productId}`}>Abrir la ficha en el panel</Button>
+            {/* Una sola acción principal: mientras se pueda poner a la venta,
+                esa es la que manda y la ficha pasa a secundaria. */}
+            <Button
+              variant={!aLaVenta && !faltaParaVender ? "ghost" : "primary"}
+              href={`/admin/productos/${resultado.productId}`}
+            >
+              Abrir la ficha en el panel
+            </Button>
+
             {/* Se abre en otra pestaña para no perder esta pantalla; <Button href>
-                no admite target, así que va como ancla con la clase del panel. */}
+                no admite target, así que va como ancla con la clase del panel.
+                Y apunta a la vista previa mientras siga en borrador: el
+                escaparate solo enseña productos activos, así que «ver en la
+                tienda» de un borrador era un 404 garantizado. */}
             <a
               className="adm-btn adm-btn-ghost adm-btn-md"
-              href={`/producto/${resultado.slug}`}
+              href={aLaVenta ? `/producto/${resultado.slug}` : `/producto/${resultado.slug}?vista=previa`}
               target="_blank"
               rel="noreferrer"
             >
-              Ver en la tienda
+              {aLaVenta ? "Ver en la tienda" : "Ver la vista previa"}
             </a>
+
+            {!aLaVenta && faltaParaVender ? (
+              <span className="adm-small adm-muted">
+                Para ponerlo a la venta falta {faltaParaVender}: hazlo en su ficha.
+              </span>
+            ) : null}
+
+            {!aLaVenta && !faltaParaVender ? (
+              <Button
+                type="button"
+                disabled={activando}
+                onClick={() => {
+                  setErrorActivacion(null);
+                  setActivando(true);
+                  void alActivar(resultado.productId)
+                    .then((respuesta) => {
+                      if (respuesta.ok) {
+                        setActivado(true);
+                        router.refresh();
+                      } else {
+                        setErrorActivacion(respuesta.error ?? "No se pudo poner a la venta.");
+                      }
+                    })
+                    .catch((error: unknown) => setErrorActivacion(mensaje(error)))
+                    .finally(() => setActivando(false));
+                }}
+              >
+                {activando ? "Poniéndolo a la venta…" : "Ponerlo a la venta"}
+              </Button>
+            ) : null}
+
             <Button
               variant="ghost"
               type="button"
@@ -427,13 +576,23 @@ export default function DraftEditor({
             disabled={!fila.incluida}
             // Escribir aquí desengancha la fila de la regla: es una decisión
             // deliberada de la usuaria y cambiar el multiplicador no debe pisarla.
-            onChange={(e) => cambiarFila(fila.indice, { manual: true, precioTexto: e.target.value })}
+            // Y deja de ser «el precio del fichero»: ahora es el suyo.
+            onChange={(e) => cambiarFila(fila.indice, { manual: true, origen: false, precioTexto: e.target.value })}
           />
+          {/* De dónde sale este número, dicho en la propia fila: sin esto, un
+              precio traído del CSV y uno calculado por la tienda se ven igual. */}
           {fila.manual ? (
-            <button type="button" className="imp-manual" onClick={() => cambiarFila(fila.indice, { manual: false })}>
-              a mano · volver a la regla
+            <button
+              type="button"
+              className="imp-manual"
+              title="Vuelve a calcularlo con la regla de la tienda"
+              onClick={() => cambiarFila(fila.indice, { manual: false })}
+            >
+              {fila.origen ? "precio del fichero" : "precio a mano"} · recalcular
             </button>
-          ) : null}
+          ) : (
+            <span className="adm-small adm-muted">calculado</span>
+          )}
         </>
       ),
     },
@@ -461,10 +620,24 @@ export default function DraftEditor({
       {duplicado ? (
         <div className="imp-aviso imp-aviso-warning">
           <div className="imp-aviso-cuerpo">
-            <b>Este producto ya está en tu catálogo como «{duplicado.title}».</b>
+            {/* En qué estado está lo que se va a actualizar. No es lo mismo tocar
+                un borrador que una ficha que las clientas están viendo ahora. */}
+            <b>
+              {duplicado.status === "active"
+                ? `Ya lo tienes y está a la venta: «${duplicado.title}».`
+                : duplicado.status === "archived"
+                  ? `Ya lo tienes, archivado: «${duplicado.title}».`
+                  : `Ya lo tienes, en borrador: «${duplicado.title}».`}
+            </b>
             <p>
               Publicarlo otra vez crearía una segunda ficha del mismo artículo: dos precios distintos y clientas
               comprando la barata. Lo normal es traer los datos nuevos al que ya tienes.
+            </p>
+            <p className="adm-small">
+              Actualizar refresca datos, fotos y precios.{" "}
+              {duplicado.status === "active"
+                ? "Sigue a la venta: no lo devuelve a borrador ni le cambia la dirección."
+                : "No lo pone a la venta: sigue como está hasta que tú lo actives."}
             </p>
             <div className="imp-aviso-acciones">
               <Button size="sm" type="button" disabled={trabajando !== ""} onClick={() => alActualizar(duplicado.productId)}>
@@ -588,7 +761,8 @@ export default function DraftEditor({
             footer={
               <span className="adm-small adm-muted">
                 Pulsa una foto para quitarla o volver a ponerla. La primera incluida es la portada; con las flechas
-                cambias el orden.
+                cambias el orden. Las que quites se quedan aquí guardadas —no se borran—, así que puedes recuperarlas
+                mañana sin volver a importar el producto.
               </span>
             }
           >
@@ -604,11 +778,12 @@ export default function DraftEditor({
                         type="button"
                         aria-label={imagen.incluida ? `Quitar la foto ${i + 1}` : `Incluir la foto ${i + 1}`}
                         aria-pressed={imagen.incluida}
-                        onClick={() =>
+                        onClick={() => {
+                          tocado.current = true;
                           setImagenes((prev) =>
                             prev.map((otra, j) => (j === i ? { ...otra, incluida: !otra.incluida } : otra)),
-                          )
-                        }
+                          );
+                        }}
                         style={{ display: "block", width: "100%", height: "100%", padding: 0, border: 0, background: "none" }}
                       >
                         {/* <img> a pelo: las fotos viven en el CDN del proveedor y
@@ -743,6 +918,30 @@ export default function DraftEditor({
               Un coste de {formatCents(2000)} se vendería a <Money cents={applyPricing(2000, regla)} tone="strong" />.
               La regla por defecto se cambia para toda la tienda en <Link className="adm-link" href="/admin/ajustes">Ajustes</Link>.
             </p>
+
+            {/* Que se vea de un vistazo qué precios NO ha puesto la tienda: si el
+                fichero traía los suyos, la regla no los toca y hay que decirlo. */}
+            {conPrecioPropio > 0 ? (
+              <p className="adm-small">
+                <b>
+                  {conPrecioPropio}{" "}
+                  {conPrecioPropio === 1
+                    ? "variante trae su propio precio y la regla no la toca"
+                    : "variantes traen su propio precio y la regla no las toca"}
+                  .
+                </b>{" "}
+                <button
+                  type="button"
+                  className="imp-manual"
+                  onClick={() => {
+                    tocado.current = true;
+                    setFilas((prev) => prev.map((fila) => ({ ...fila, manual: false })));
+                  }}
+                >
+                  Recalcularlas todas con la regla
+                </button>
+              </p>
+            ) : null}
           </Card>
 
           <Card title="Cómo se publica">

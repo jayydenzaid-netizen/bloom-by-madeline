@@ -40,6 +40,7 @@ const METODO: Record<string, string> = {
   api: "API oficial",
   bookmarklet: "Marcador",
   csv: "Fichero CSV",
+  migracion: "Mudanza",
 };
 
 const ESTADO: Record<string, { texto: string; tono: BadgeTone }> = {

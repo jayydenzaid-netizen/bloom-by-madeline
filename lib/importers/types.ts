@@ -6,7 +6,7 @@
 export type ProviderId = "aliexpress" | "alibaba" | "manual" | "csv";
 
 /** Cómo se consiguieron los datos crudos. Importa para diagnosticar fallos. */
-export type ImportMethod = "url" | "html" | "api" | "bookmarklet" | "csv";
+export type ImportMethod = "url" | "html" | "api" | "bookmarklet" | "csv" | "migracion";
 
 export type NormalizedImage = {
   url: string;

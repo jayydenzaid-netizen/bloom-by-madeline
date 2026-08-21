@@ -1,14 +1,17 @@
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 
+import { logActivity } from "@/lib/activity";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getBookmarklet } from "@/lib/importers/bookmarklet";
-import { findProductBySource, getImportJob, readDraft } from "@/lib/importers/pipeline";
+import { findProductBySource, getImportJob, readDraft, readRevision } from "@/lib/importers/pipeline";
 import { getSettings } from "@/lib/settings";
 
 import { Button, Card, PageHeader } from "../_components/ui";
-import DraftEditor, { type BorradorVista } from "./_components/DraftEditor";
+import DraftEditor, { type BorradorVista, type ResultadoActivacion } from "./_components/DraftEditor";
 import ImportForm, { type PaqueteMarcador } from "./_components/ImportForm";
 import JobList, { type JobVista } from "./_components/JobList";
 import "./importar.css";
@@ -78,6 +81,7 @@ const METODOS: Record<string, string> = {
   api: "API oficial",
   bookmarklet: "Marcador",
   csv: "Fichero CSV",
+  migracion: "Mudanza a Shopify",
 };
 
 /** El marcador tiene que apuntar al dominio que la usuaria está usando ahora mismo. */
@@ -91,7 +95,96 @@ async function origenPublico(): Promise<string> {
 const AVISOS: Record<string, string> = {
   "sin-enlace": "Esa importación no guardó ningún enlace (entró por HTML pegado o por CSV), así que no se puede repetir sola: vuelve a traer el producto desde arriba.",
   "reintento-fallido": "El reintento tampoco funcionó. Mira el historial para ver qué contestó el proveedor y prueba con el marcador o con el HTML pegado.",
+  "no-activable": "No se pudo poner a la venta: entre que se pintó la pantalla y pulsaste, al producto le falta el precio o la foto. Ábrelo en su ficha, complétalo y actívalo desde allí.",
 };
+
+/* ─────────────────── poner a la venta desde el importador ─────────────────── */
+
+/**
+ * Lo que le falta a un producto para poder venderse, o `null` si no le falta nada.
+ *
+ * Es la misma barrera que el resto del panel: una pieza a $0.00 se puede comprar
+ * gratis, y una sin foto no la compra nadie. Publicar en borrador es reversible;
+ * un pedido de un vestido a cero dólares, no. El texto se devuelve tal cual se
+ * enseña, para que la pantalla no tenga que traducir códigos de error.
+ */
+function faltaParaVender(producto: {
+  priceCents: number;
+  fotos: number;
+  variantesSinPrecio: number;
+}): string | null {
+  const faltas: string[] = [];
+  if (producto.priceCents <= 0 || producto.variantesSinPrecio > 0) faltas.push("ponerle precio");
+  if (producto.fotos === 0) faltas.push("subirle al menos una foto");
+  return faltas.length ? faltas.join(" y ") : null;
+}
+
+const EsquemaActivacion = z.object({ productId: z.string().min(1).max(60) });
+
+/**
+ * Pasa un producto recién importado de borrador a activo sin salir de aquí.
+ *
+ * Vive en esta pantalla y no en `actions.ts` a propósito: es el último paso del
+ * recorrido del importador, no una operación general del catálogo (esa está en
+ * la ficha del producto). Vuelve a comprobar sesión y requisitos aunque la
+ * pantalla ya los haya comprobado — lo que llega del navegador nunca es prueba.
+ */
+async function activarProductoImportado(productId: string): Promise<ResultadoActivacion> {
+  "use server";
+
+  const admin = await getAdmin();
+  if (!admin) return { ok: false, error: "Tu sesión caducó. Vuelve a entrar." };
+
+  const datos = EsquemaActivacion.safeParse({ productId });
+  if (!datos.success) return { ok: false, error: "Ese producto no es válido." };
+
+  const producto = await db.product.findUnique({
+    where: { id: datos.data.productId },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      status: true,
+      priceCents: true,
+      publishedAt: true,
+      images: { select: { id: true } },
+      variants: { select: { priceCents: true } },
+    },
+  });
+  if (!producto) return { ok: false, error: "Ese producto ya no existe." };
+  if (producto.status === "active") return { ok: true };
+
+  const falta = faltaParaVender({
+    priceCents: producto.priceCents,
+    fotos: producto.images.length,
+    variantesSinPrecio: producto.variants.filter((v) => v.priceCents <= 0).length,
+  });
+  if (falta) return { ok: false, error: `Antes de ponerlo a la venta hay que ${falta}.` };
+
+  await db.product.update({
+    where: { id: producto.id },
+    // La fecha de publicación es la primera vez que se puso a la venta; si el
+    // producto ya la tenía (estaba archivado y vuelve), no se reescribe.
+    data: { status: "active", publishedAt: producto.publishedAt ?? new Date() },
+  });
+
+  await logActivity({
+    action: "publish",
+    entityType: "product",
+    entityId: producto.id,
+    summary: `Puso a la venta «${producto.title}» desde el importador`,
+    userId: admin.id,
+    userEmail: admin.email,
+  });
+
+  revalidatePath("/admin/importar");
+  revalidatePath("/admin/productos");
+  revalidatePath("/");
+  revalidatePath("/tienda");
+  revalidatePath(`/producto/${producto.slug}`);
+
+  return { ok: true };
+}
 
 /* ─────────────────────────────── la página ─────────────────────────────── */
 
@@ -161,10 +254,23 @@ export default async function ImportarPage({
   /* ── ¿estamos revisando una importación? ── */
   const job = jobId ? await getImportJob(jobId) : null;
   const borradorCrudo = job ? readDraft(job.draftJson) : null;
+  // Avisos que dejó el momento de publicar, guardados en el propio trabajo.
+  const avisosDelJob = job ? readRevision(job.draftJson)?.avisosPublicacion ?? [] : [];
 
+  // Estado, precio y fotos además del nombre: sin ellos no se puede saber si el
+  // enlace a la tienda lleva a una ficha real o a un 404, ni si tiene sentido
+  // ofrecer el botón de ponerlo a la venta.
   const productoDelJob = job?.productId ? await db.product.findUnique({
     where: { id: job.productId },
-    select: { id: true, slug: true, title: true },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      status: true,
+      priceCents: true,
+      images: { select: { id: true } },
+      variants: { select: { priceCents: true } },
+    },
   }) : null;
 
   const existente =
@@ -196,6 +302,15 @@ export default async function ImportarPage({
           costeMin: borradorCrudo.costCentsMin,
         }
       : null;
+
+  // Qué le falta al producto ya publicado para poder venderse (null = nada).
+  const faltaDelPublicado = productoDelJob
+    ? faltaParaVender({
+        priceCents: productoDelJob.priceCents,
+        fotos: productoDelJob.images.length,
+        variantesSinPrecio: productoDelJob.variants.filter((v) => v.priceCents <= 0).length,
+      })
+    : null;
 
   const revisando = Boolean(borrador) && job?.status !== "imported";
   const yaPublicado = Boolean(job) && job?.status === "imported";
@@ -270,17 +385,76 @@ export default async function ImportarPage({
         <Card title="Esta importación ya está publicada">
           <div className="imp-resultado">
             <h3>«{productoDelJob.title}»</h3>
-            <p>Ya se creó el producto a partir de esta importación. Para cambiar algo, edítalo en su ficha.</p>
+            <p>
+              {productoDelJob.status === "active"
+                ? "Ya se creó el producto y está a la venta. Para cambiar algo, edítalo en su ficha."
+                : "Ya se creó el producto, pero sigue en borrador: nadie lo ve en la tienda todavía. Míralo en vista previa y actívalo cuando esté a tu gusto."}
+            </p>
+
+            {/* Los avisos del momento de publicar (el importante: «quedó a precio 0
+                y se venderá gratis») se guardan en el propio trabajo de importación
+                y se pintan AQUÍ. La pantalla de éxito del editor donde se veían
+                antes dura un parpadeo: al refrescarse el servidor la sustituye por
+                esta tarjeta, y el aviso se perdía sin que nadie lo llegara a leer. */}
+            {avisosDelJob.length > 0 ? (
+              <div style={{ textAlign: "left" }}>
+                {avisosDelJob.map((aviso, i) => (
+                  <div className="imp-aviso imp-aviso-warning" key={i}>
+                    <div className="imp-aviso-cuerpo">{aviso}</div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <div className="imp-resultado-acciones">
-              <Button href={`/admin/productos/${productoDelJob.id}`}>Abrir la ficha</Button>
+              {/* Una sola acción principal por pantalla: cuando se puede poner a
+                  la venta, esa es la que manda y la ficha pasa a secundaria. */}
+              <Button
+                variant={productoDelJob.status !== "active" && !faltaDelPublicado ? "ghost" : "primary"}
+                href={`/admin/productos/${productoDelJob.id}`}
+              >
+                Abrir la ficha
+              </Button>
+
+              {/* El enlace a la tienda solo es un enlace a la tienda cuando el
+                  producto está activo. Con un borrador, `/producto/[slug]` es un
+                  404 seguro — que es justo el fallo que se está arreglando — así
+                  que se manda a la vista previa, que sí existe para Madeline. */}
               <a
                 className="adm-btn adm-btn-ghost adm-btn-md"
-                href={`/producto/${productoDelJob.slug}`}
+                href={
+                  productoDelJob.status === "active"
+                    ? `/producto/${productoDelJob.slug}`
+                    : `/producto/${productoDelJob.slug}?vista=previa`
+                }
                 target="_blank"
                 rel="noreferrer"
               >
-                Ver en la tienda
+                {productoDelJob.status === "active" ? "Ver en la tienda" : "Ver la vista previa"}
               </a>
+
+              {productoDelJob.status !== "active" && faltaDelPublicado ? (
+                <span className="adm-small adm-muted">
+                  Para ponerlo a la venta falta {faltaDelPublicado}: hazlo en su ficha.
+                </span>
+              ) : null}
+
+              {productoDelJob.status !== "active" && !faltaDelPublicado ? (
+                // `display: contents` deja que el botón sea el que se coloca en la
+                // fila de acciones; un <form> de por medio rompería la alineación.
+                <form
+                  style={{ display: "contents" }}
+                  action={async () => {
+                    "use server";
+                    const respuesta = await activarProductoImportado(productoDelJob.id);
+                    if (!respuesta.ok) redirect(`/admin/importar?job=${jobId}&aviso=no-activable`);
+                  }}
+                >
+                  <button className="adm-btn adm-btn-primary adm-btn-md" type="submit">
+                    Ponerlo a la venta
+                  </button>
+                </form>
+              ) : null}
+
               <Button variant="ghost" href="/admin/importar">
                 Importar otro
               </Button>
@@ -296,6 +470,7 @@ export default async function ImportarPage({
           borrador={borrador}
           reglaInicial={ajustes.pricing}
           colecciones={colecciones}
+          alActivar={activarProductoImportado}
           existente={
             existente
               ? { productId: existente.id, slug: existente.slug, title: existente.title, status: existente.status }

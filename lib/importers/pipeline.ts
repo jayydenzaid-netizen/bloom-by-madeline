@@ -22,6 +22,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { db } from "@/lib/db";
+import { leerExtrasDeProducto } from "@/lib/importers/csv";
 import { applyPricing, type PricingRule } from "@/lib/money";
 import { getSettings } from "@/lib/settings";
 import { uniqueProductSlug } from "@/lib/slug";
@@ -53,6 +54,8 @@ export type VariantOverride = {
 export type PublishOverrides = {
   title?: string;
   description?: string;
+  /** Solo lo mira `publishImportJob` (crear). `updateFromImport` lo IGNORA a
+   *  propósito: actualizar nunca decide si un producto se ve en la tienda. */
   status?: ProductStatus;
   vendor?: string;
   productType?: string;
@@ -87,10 +90,48 @@ export type PublishOutcome =
       productId: string;
       slug: string;
       title: string;
+      /** Estado del producto que YA existe (`draft` | `active` | `archived`). La
+       *  pantalla lo necesita para decir «ya lo tienes y está a la venta» en vez
+       *  de un aviso genérico: no es lo mismo actualizar un borrador que tocar
+       *  una ficha que las clientas están viendo. */
+      existingStatus: string;
       error: string;
       hint: string;
     }
   | { ok: false; status: "error"; error: string; hint?: string };
+
+/**
+ * Las DECISIONES de la revisión, que no son datos del proveedor: qué fotos se
+ * dejan fuera, qué variantes se descartan, qué precios mandan sobre la regla y
+ * qué avisos dejó la publicación.
+ *
+ * Viven DENTRO de `ImportJob.draftJson`, como una clave `revision` al lado del
+ * NormalizedProduct, y no en `rawJson`. El porqué: `rawJson` es el volcado del
+ * proveedor, se trunca a MAX_RAW_CHARS y el endpoint del bookmarklet lo
+ * sobrescribe con lo suyo, así que una decisión guardada ahí se perdería sin
+ * avisar. `draftJson` es además lo único que se lee para reabrir un borrador,
+ * que es justo el momento en que estas decisiones tienen que estar.
+ */
+export type RevisionBorrador = {
+  /** Índices de `images` que la usuaria dejó fuera. Excluir NO es borrar: la foto
+   *  sigue en el borrador y se puede volver a incluir sin reimportar. */
+  imagenesExcluidas?: number[];
+  /** Índices de `variants` que no se publican. */
+  variantesDescartadas?: number[];
+  /** Índices cuyo `priceCents` del borrador manda sobre la regla automática:
+   *  o vino escrito en el origen, o lo escribió ella a mano. */
+  preciosDecididos?: number[];
+  /** De los anteriores, los que vinieron escritos en el fichero de origen. Solo
+   *  sirve para poder decirlo en pantalla («precio del fichero»). */
+  preciosDelOrigen?: number[];
+  /** Avisos que dejó la publicación. Se guardan porque la pantalla que los
+   *  calcula (el editor) se desmonta justo después de publicar; sin esto, el
+   *  aviso «quedó a precio 0» no lo llega a leer nadie. */
+  avisosPublicacion?: string[];
+};
+
+/** Lo que hay de verdad dentro de `draftJson`: la ficha del proveedor + las decisiones. */
+export type DraftGuardado = NormalizedProduct & { revision?: RevisionBorrador };
 
 // ────────────────────────────────── el job ──────────────────────────────────
 
@@ -117,18 +158,42 @@ export async function createImportJob(
   normalized: NormalizedProduct,
   options: { raw?: unknown } = {},
 ): Promise<{ id: string; provider: string; method: string; status: string }> {
+  const draft: DraftGuardado = { ...normalized, revision: revisionInicial(normalized) };
   const job = await db.importJob.create({
     data: {
       provider: normalized.provider,
       method: normalized.method,
       status: "ready",
       sourceUrl: normalized.sourceUrl,
-      draftJson: JSON.stringify(normalized),
+      draftJson: JSON.stringify(draft),
       rawJson: safeStringify(options.raw ?? normalized.raw),
     },
     select: { id: true, provider: true, method: true, status: true },
   });
   return job;
+}
+
+/**
+ * Orígenes que traen un PRECIO DE VENTA de verdad, decidido fuera de la tienda.
+ *
+ * Hoy solo el CSV: es el catálogo que la usuaria ya revisó en Excel, con sus
+ * precios puestos a mano, y pisárselo con la regla automática es tirar ese
+ * trabajo. Ojo con confundirlo con Alibaba: su adaptador también rellena
+ * `priceCents`, pero ahí no es un precio del proveedor sino el resultado de
+ * aplicarle la regla POR DEFECTO al coste — si se tratara como precio propio, la
+ * regla de la tienda no volvería a tocarlo nunca. Si algún día otra vía trae
+ * precio de venta escrito (una API oficial, por ejemplo), se añade aquí.
+ */
+const ORIGENES_CON_PRECIO_PROPIO: ImportMethod[] = ["csv", "migracion"];
+
+function revisionInicial(normalized: NormalizedProduct): RevisionBorrador {
+  if (!ORIGENES_CON_PRECIO_PROPIO.includes(normalized.method)) return {};
+  const conPrecio = normalized.variants
+    .map((variant, index) => (typeof variant.priceCents === "number" && variant.priceCents > 0 ? index : -1))
+    .filter((index) => index >= 0);
+  if (conPrecio.length === 0) return {};
+  // Un precio escrito en el origen manda sobre la regla: nace "decidido".
+  return { preciosDecididos: conPrecio, preciosDelOrigen: conPrecio };
 }
 
 /**
@@ -159,10 +224,10 @@ export async function getImportJob(jobId: string) {
 }
 
 /** Lee el borrador guardado en un job. Devuelve null si el JSON se corrompió. */
-export function readDraft(draftJson: string | null): NormalizedProduct | null {
+export function readDraft(draftJson: string | null): DraftGuardado | null {
   if (!draftJson) return null;
   try {
-    const parsed = JSON.parse(draftJson) as NormalizedProduct;
+    const parsed = JSON.parse(draftJson) as DraftGuardado;
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.variants)) return null;
     return parsed;
   } catch {
@@ -170,11 +235,39 @@ export function readDraft(draftJson: string | null): NormalizedProduct | null {
   }
 }
 
-export async function saveDraft(jobId: string, draft: NormalizedProduct): Promise<void> {
+/**
+ * Las decisiones de la revisión, sin el resto del borrador.
+ *
+ * Cualquier pantalla puede llamarla para pintar lo que quedó guardado — en
+ * particular `avisosPublicacion`, que es donde vive el «quedó a precio 0».
+ */
+export function readRevision(draftJson: string | null): RevisionBorrador | null {
+  const draft = readDraft(draftJson);
+  if (!draft) return null;
+  const revision = draft.revision;
+  return revision && typeof revision === "object" ? revision : null;
+}
+
+export async function saveDraft(jobId: string, draft: DraftGuardado): Promise<void> {
   await db.importJob.update({
     where: { id: jobId },
     data: { draftJson: JSON.stringify(draft), status: "ready", error: null },
   });
+}
+
+/**
+ * Escribe unas cuantas decisiones sobre el borrador guardado, sin tocar nada más.
+ *
+ * A diferencia de `saveDraft`, NO devuelve el job a 'ready': se usa después de
+ * publicar, cuando el job ya está en 'imported' y devolverlo a 'ready' haría
+ * reaparecer el editor sobre un producto que ya existe.
+ */
+export async function saveRevision(jobId: string, patch: RevisionBorrador): Promise<void> {
+  const job = await db.importJob.findUnique({ where: { id: jobId }, select: { draftJson: true } });
+  const draft = readDraft(job?.draftJson ?? null);
+  if (!draft) return;
+  const actualizado: DraftGuardado = { ...draft, revision: { ...(draft.revision ?? {}), ...patch } };
+  await db.importJob.update({ where: { id: jobId }, data: { draftJson: JSON.stringify(actualizado) } });
 }
 
 // ─────────────────────────────────── precios ───────────────────────────────────
@@ -382,6 +475,7 @@ export async function publishImportJob(jobId: string, overrides: PublishOverride
         productId: existing.id,
         slug: existing.slug,
         title: existing.title,
+        existingStatus: existing.status,
         error: "Esta importación ya se publicó.",
         hint: "Ve al producto para editarlo, o vuelve a importar el enlace si quieres traer datos nuevos.",
       };
@@ -414,6 +508,7 @@ export async function publishImportJob(jobId: string, overrides: PublishOverride
       productId: existing.id,
       slug: existing.slug,
       title: existing.title,
+      existingStatus: existing.status,
       error: dup.error,
       hint: dup.hint,
     };
@@ -432,14 +527,20 @@ export async function publishImportJob(jobId: string, overrides: PublishOverride
 
   const cheapest = variants.reduce((min, row) => (row.priceCents < min ? row.priceCents : min), Number.MAX_SAFE_INTEGER);
   const costs = variants.map((row) => row.costCents).filter((value): value is number => typeof value === "number");
+  // Campos de producto que trae el borrador (hoy solo el CSV los rellena).
+  const extras = leerExtrasDeProducto(draft);
 
   const productData = {
     title,
     description: overrides.description ?? draft.description ?? "",
     status,
     vendor: overrides.vendor ?? draft.vendor ?? "Bloom by Madeline",
-    productType: overrides.productType ?? "",
-    tagsJson: JSON.stringify(overrides.tags ?? []),
+    // Etiquetas y tipo del propio borrador cuando la pantalla no los trae. Un CSV
+    // con `tags=blusas|qa` acababa publicado con `tagsJson = "[]"` porque el
+    // editor arranca ese campo vacío y su array vacío pisaba lo del fichero: aquí
+    // «vacío» se lee como «no se tocó», no como «bórralas todas».
+    productType: overrides.productType || extras.productType,
+    tagsJson: JSON.stringify(overrides.tags?.length ? overrides.tags : extras.tags),
     optionNamesJson: JSON.stringify(draft.optionNames ?? []),
     priceCents: cheapest === Number.MAX_SAFE_INTEGER ? 0 : cheapest,
     costCents: costs.length ? Math.min(...costs) : null,
@@ -504,6 +605,12 @@ export async function publishImportJob(jobId: string, overrides: PublishOverride
   if (variants.every((row) => row.priceCents === 0)) {
     warnings.push("El producto quedó a precio 0: ponle precio antes de activarlo o se venderá gratis.");
   }
+
+  // Los avisos se guardan en el job (draftJson → revision.avisosPublicacion).
+  // Devolverlos y ya no basta: quien los pinta es el editor, y el editor se
+  // desmonta en cuanto la pantalla se entera de que este job ya está publicado.
+  // Guardados aquí, los puede leer con readRevision() la pantalla que quede.
+  await saveRevision(jobId, { avisosPublicacion: warnings }).catch(() => {});
 
   return { ok: true, status: "created", productId: created.id, slug: created.slug, title: created.title, warnings };
 }
@@ -596,7 +703,13 @@ export async function updateFromImport(
           priceCents: cheapest === Number.MAX_SAFE_INTEGER ? undefined : cheapest,
           sourceUrl: draft.sourceUrl ?? undefined,
           sourceDataJson: JSON.stringify({ attributes: draft.attributes, warnings: draft.warnings }),
-          ...(overrides.status ? { status: overrides.status } : {}),
+          // ACTUALIZAR NO TOCA EL ESTADO DE PUBLICACIÓN. Nunca. Reimportar es
+          // refrescar datos y precios de un producto que ya existe; decidir si se
+          // ve en la tienda es otra cosa y se hace en su ficha. Cuando esto
+          // mandaba el estado del selector del editor (que arranca en borrador),
+          // actualizar un producto ACTIVO lo devolvía a borrador: el escaparate
+          // dejaba de enseñarlo y su URL —la que la dueña manda por Instagram—
+          // pasaba a dar 404.
         },
       });
 
@@ -617,6 +730,9 @@ export async function updateFromImport(
         .join(", ")}). Se han dejado como estaban: revísalas por si conviene archivarlas.`,
     );
   }
+
+  // Mismo motivo que al publicar: que el aviso sobreviva a la pantalla.
+  await saveRevision(jobId, { avisosPublicacion: warnings }).catch(() => {});
 
   return { ok: true, status: "updated", productId, slug: product.slug, title: product.title, warnings };
 }

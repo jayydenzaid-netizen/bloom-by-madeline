@@ -1,0 +1,120 @@
+/* ═══════════ BANDA DE VISTA PREVIA ═══════════
+
+   Esta hoja solo se carga en la ficha de producto y solo pinta algo cuando
+   Madeline está mirando un producto que las clientas todavía no pueden ver.
+
+   Va en burgundy sobre arena — los colores de la casa — a propósito: un aviso
+   con el aspecto de un error de sistema (amarillo chillón, rojo de alerta)
+   asusta a quien no es técnico y le hace pensar que rompió algo. Aquí no se ha
+   roto nada: es el flujo normal de revisar antes de publicar.
+
+   Sticky bajo el nav fijo (misma cuenta que usan los filtros del catálogo,
+   `--nav-h`) porque una ficha es larga: si la banda se quedara arriba del todo,
+   a mitad de página ya no se sabría que lo que se está viendo no es público.  */
+
+.vp-banda {
+  position: sticky;
+  top: calc(var(--nav-h) + 10px);
+  /* Por debajo del nav (900) y del cajón del carrito: avisa, no tapa. */
+  z-index: 800;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px clamp(16px, 2.4vw, 30px);
+  margin-bottom: clamp(26px, 3.4vw, 44px);
+  padding: clamp(14px, 1.8vw, 20px) clamp(18px, 2.6vw, 30px);
+  border: 1.5px solid var(--clay);
+  border-radius: var(--petal-card);
+  background: var(--bone-2);
+  box-shadow: 0 14px 34px rgba(22, 21, 19, 0.12);
+}
+
+.vp-etq {
+  flex-shrink: 0;
+  align-self: flex-start;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--clay);
+  color: var(--bone);
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vp-texto {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.vp-titulo {
+  margin: 0 0 4px;
+  font-family: var(--serif);
+  font-size: clamp(19px, 2.2vw, 24px);
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.vp-titulo em {
+  font-style: italic;
+  color: var(--clay);
+}
+
+.vp-sub {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+}
+
+.vp-sub + .vp-sub {
+  margin-top: 3px;
+  color: var(--stone);
+}
+
+.vp-volver {
+  flex-shrink: 0;
+  padding: 11px 20px;
+  border: 1px solid var(--clay);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--clay);
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  transition: background 0.35s var(--ease), color 0.35s var(--ease);
+}
+
+.vp-volver:hover {
+  background: var(--clay);
+  color: var(--bone);
+}
+
+/* En el teléfono la banda se apila: Madeline revisa las importaciones desde el
+   móvil y ahí el enlace tiene que quedar a un dedo, no en una esquina. */
+@media (max-width: 720px) {
+  .vp-banda {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* En columna, `flex-basis` pasa a ser ALTO: con el 260px de escritorio la
+     banda se estiraba y dejaba un hueco muerto antes del enlace. */
+  .vp-texto {
+    flex: 0 1 auto;
+  }
+
+  /* Madeline revisa desde el teléfono: el enlace se pulsa con el pulgar. */
+  .vp-volver {
+    padding: 15px 20px;
+    text-align: center;
+  }
+
+}

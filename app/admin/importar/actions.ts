@@ -15,10 +15,14 @@ import {
   getImportJob,
   publishImportJob,
   readDraft,
+  readRevision,
   saveDraft,
   updateFromImport,
+  type DraftGuardado,
   type ProductStatus,
   type PublishOverrides,
+  type RevisionBorrador,
+  type VariantOverride,
 } from "@/lib/importers/pipeline";
 import type { NormalizedProduct, ProviderId } from "@/lib/importers/types";
 
@@ -86,7 +90,9 @@ export type ResultadoPublicacion =
       ok: false;
       error: string;
       pista: string | null;
-      duplicado: { productId: string; slug: string; title: string } | null;
+      /** `status` es el estado del producto que YA existe: la pantalla dice «ya lo
+       *  tienes y está a la venta» o «ya lo tienes, en borrador» según eso. */
+      duplicado: { productId: string; slug: string; title: string; status: string } | null;
     };
 
 /** Lo que la usuaria dejó tocado en la vista previa antes de publicar. */
@@ -95,6 +101,9 @@ export type EdicionBorrador = z.infer<typeof EsquemaEdicion>;
 const EsquemaImagen = z.object({
   url: z.string().min(1).max(2000),
   alt: z.string().max(200).default(""),
+  /** Excluir NO es borrar: la foto se queda en el borrador, marcada como fuera,
+   *  para poder recuperarla mañana sin volver a importar el producto. */
+  incluida: z.boolean().default(true),
 });
 
 const EsquemaPrecio = z.object({
@@ -102,12 +111,17 @@ const EsquemaPrecio = z.object({
   /** null = variante sin precio: se publica a 0 y se avisa, nunca se inventa. */
   priceCents: z.number().int().min(0).max(100_000_00).nullable(),
   costCents: z.number().int().min(0).max(100_000_00).nullable(),
+  /** El precio manda sobre la regla (vino del origen o lo escribió ella). */
+  manual: z.boolean().default(false),
+  /** De los manuales, los que venían escritos en el fichero de origen. */
+  origen: z.boolean().default(false),
 });
 
 const EsquemaEdicion = z.object({
   titulo: z.string().max(300).default(""),
   descripcion: z.string().max(20_000).default(""),
-  /** Ya vienen filtradas y en el orden final; la primera es la portada. */
+  /** TODAS las del borrador, en el orden final y con su marca de incluida; la
+   *  primera incluida es la portada. */
   imagenes: z.array(EsquemaImagen).max(60).default([]),
   precios: z.array(EsquemaPrecio).max(999).default([]),
   descartadas: z.array(z.number().int().min(0).max(999)).max(999).default([]),
@@ -307,35 +321,105 @@ export async function importarDesdeCsv(texto: string, nombre = "catálogo"): Pro
  * de la ficha, id de proveedor) y una petición manipulada no puede reescribir el
  * origen del producto.
  */
-function aplicarEdicion(base: NormalizedProduct, edicion: EdicionBorrador): NormalizedProduct {
+function aplicarEdicion(base: DraftGuardado, edicion: EdicionBorrador): DraftGuardado {
   const porIndice = new Map(edicion.precios.map((fila) => [fila.indice, fila]));
+
+  // El borrador conserva TODAS las fotos que trajo el proveedor. Antes se
+  // guardaban solo las incluidas y «quitar una foto y guardar» la borraba para
+  // siempre: al reabrir ya no existía y solo volvía reimportando el producto.
+  // Ahora lo que se guarda aparte es la DECISIÓN (`revision.imagenesExcluidas`).
+  // Si por lo que sea llegara una lista vacía, se respeta la del borrador: es
+  // preferible publicar una foto de más que perder el material del proveedor.
+  const imagenes = edicion.imagenes.length > 0 ? edicion.imagenes : null;
+
+  const revision: RevisionBorrador = {
+    ...(base.revision ?? {}),
+    imagenesExcluidas: imagenes
+      ? imagenes.map((imagen, indice) => (imagen.incluida ? -1 : indice)).filter((indice) => indice >= 0)
+      : (base.revision?.imagenesExcluidas ?? []),
+    // Las variantes descartadas también son una decisión y también tienen que
+    // sobrevivir a la recarga: antes solo se usaban al publicar y al volver
+    // aparecían marcadas otra vez, como si nadie hubiera decidido nada.
+    variantesDescartadas: edicion.descartadas,
+    preciosDecididos: edicion.precios.filter((fila) => fila.manual).map((fila) => fila.indice),
+    preciosDelOrigen: edicion.precios.filter((fila) => fila.origen).map((fila) => fila.indice),
+  };
 
   return {
     ...base,
     title: edicion.titulo.trim() || base.title,
     description: edicion.descripcion,
-    images: edicion.imagenes.map((imagen) => ({ url: imagen.url, alt: imagen.alt })),
+    images: imagenes
+      ? imagenes.map((imagen) => ({ url: imagen.url, alt: imagen.alt }))
+      : base.images,
     variants: base.variants.map((variante, indice) => {
       const fila = porIndice.get(indice);
       if (!fila) return variante;
-      return { ...variante, priceCents: fila.priceCents, costCents: fila.costCents };
+      // En el borrador solo se guarda el precio DECIDIDO (el del fichero o el que
+      // escribió ella). El que sale de la regla se deja en null a propósito: si se
+      // guardara, al reabrir no habría forma de distinguir «precio del fichero» de
+      // «precio calculado» y la regla no podría volver a recalcularlo.
+      return { ...variante, priceCents: fila.manual ? fila.priceCents : null, costCents: fila.costCents };
     }),
+    revision,
   };
 }
 
-function overridesDe(edicion: EdicionBorrador, permitirDuplicado = false): PublishOverrides {
+/**
+ * Traduce la edición a overrides de publicación.
+ *
+ * `incluirEstado` distingue los dos caminos, y no es un detalle: al PUBLICAR, el
+ * estado lo elige la usuaria en el selector «Cómo se publica»; al ACTUALIZAR un
+ * producto que ya existe, el estado ya está decidido desde hace tiempo y no se
+ * está preguntando por él. Mandarlo igualmente devolvía a borrador productos que
+ * estaban a la venta (y su URL pública, a 404).
+ */
+function overridesDe(
+  edicion: EdicionBorrador,
+  { permitirDuplicado = false, incluirEstado = true } = {},
+): PublishOverrides {
+  // Los precios de la pantalla se mandan variante a variante. El borrador solo
+  // guarda los decididos a mano, así que sin esto las filas calculadas por la
+  // regla se publicarían a 0.
+  const variantOverrides: Record<number, VariantOverride> = {};
+  for (const fila of edicion.precios) {
+    variantOverrides[fila.indice] = { priceCents: fila.priceCents ?? 0, costCents: fila.costCents };
+  }
+
   return {
     title: edicion.titulo.trim() || undefined,
     description: edicion.descripcion,
-    status: edicion.estado as ProductStatus,
+    ...(incluirEstado ? { status: edicion.estado as ProductStatus } : {}),
     tags: edicion.etiquetas,
     collectionIds: edicion.colecciones,
     dropVariantIndexes: edicion.descartadas,
+    // El borrador guarda todas las fotos; las que se publican son las incluidas.
+    // Sin lista (payload vacío) se publican todas, que es lo que hace `aplicarEdicion`.
+    keepImageIndexes:
+      edicion.imagenes.length > 0
+        ? edicion.imagenes.map((imagen, indice) => (imagen.incluida ? indice : -1)).filter((indice) => indice >= 0)
+        : undefined,
+    variantOverrides,
     // Los precios ya vienen decididos por la usuaria (regla aplicada en vivo o
     // escritos a mano). Recalcularlos aquí pisaría justo lo que vino a decidir.
     skipPricing: true,
     allowDuplicate: permitirDuplicado,
   };
+}
+
+/**
+ * Las decisiones guardadas de un borrador, para que el editor las recupere al
+ * abrirse: qué fotos quedaron fuera, qué variantes descartadas y qué precios
+ * mandan sobre la regla.
+ *
+ * Es una acción aparte y no un dato más de la pantalla porque `BorradorVista` la
+ * arma la página (que es de otro agente) y solo lleva la ficha del proveedor.
+ */
+export async function revisionDelBorrador(jobId: string): Promise<RevisionBorrador | null> {
+  await exigirSesion();
+  const job = await getImportJob(jobId);
+  if (!job) return null;
+  return readRevision(job.draftJson);
 }
 
 /** Guarda sin publicar: para dejar un producto a medio revisar y volver mañana. */
@@ -387,7 +471,7 @@ export async function publicarBorrador(
   // sin las correcciones (y el orden original de las fotos).
   await saveDraft(jobId, aplicarEdicion(base, datos.data));
 
-  const resultado = await publishImportJob(jobId, overridesDe(datos.data, permitirDuplicado));
+  const resultado = await publishImportJob(jobId, overridesDe(datos.data, { permitirDuplicado }));
 
   revalidatePath("/admin/importar");
   revalidatePath("/admin/productos");
@@ -408,7 +492,12 @@ export async function publicarBorrador(
       ok: false,
       error: resultado.error,
       pista: resultado.hint,
-      duplicado: { productId: resultado.productId, slug: resultado.slug, title: resultado.title },
+      duplicado: {
+        productId: resultado.productId,
+        slug: resultado.slug,
+        title: resultado.title,
+        status: resultado.existingStatus,
+      },
     };
   }
 
@@ -442,8 +531,10 @@ export async function actualizarProductoExistente(
 
   await saveDraft(jobId, aplicarEdicion(base, datos.data));
 
+  // Sin `status`: actualizar refresca datos y precios, nunca decide si el producto
+  // se ve o no en la tienda. Ese estado ya lo eligió ella en su día.
   const resultado = await updateFromImport(jobId, productId, {
-    ...overridesDe(datos.data, true),
+    ...overridesDe(datos.data, { permitirDuplicado: true, incluirEstado: false }),
     replaceImages: reemplazarImagenes,
   });
 

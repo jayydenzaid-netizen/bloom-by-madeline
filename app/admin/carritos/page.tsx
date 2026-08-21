@@ -121,7 +121,11 @@ export default async function CarritosPage({
           select: {
             id: true,
             quantity: true,
-            product: { select: { title: true, slug: true } },
+            // `status` no es decorativo: el mensaje de recuperación acaba en un DM
+            // de Instagram y el escaparate solo sirve los productos `active`, así
+            // que enlazar a una pieza en borrador o archivada le manda a la clienta
+            // un 404. Ver `enlaceDelCarrito()`.
+            product: { select: { id: true, title: true, slug: true, status: true } },
             variant: { select: { title: true, priceCents: true } },
           },
         },
@@ -251,6 +255,13 @@ export default async function CarritosPage({
           const recuperado = Boolean(carrito.recoveredOrderId);
           const pedidoId =
             carrito.recoveredOrderId && carrito.recoveredOrderId !== "manual" ? carrito.recoveredOrderId : null;
+          // Piezas que ya no se pueden vender: el mensaje no las enlaza (ver
+          // `enlaceDelCarrito`) y Madeline tiene que saberlo ANTES de escribir, o
+          // le ofrecerá a la clienta algo que no le puede despachar.
+          const fueraDeVenta = carrito.items.filter((i) => i.product.status !== "active");
+          const slugsALaVenta = new Set(
+            carrito.items.filter((i) => i.product.status === "active").map((i) => i.product.slug),
+          );
 
           return (
             <Card
@@ -284,6 +295,12 @@ export default async function CarritosPage({
                     <span>
                       {item.quantity} × {item.product.title}
                       {item.variant?.title ? <span className="adm-muted"> · {item.variant.title}</span> : null}
+                      {item.product.status !== "active" ? (
+                        <>
+                          {" "}
+                          <Badge tone="warning">No está a la venta</Badge>
+                        </>
+                      ) : null}
                     </span>
                     <Money cents={(item.variant?.priceCents ?? 0) * item.quantity} />
                   </li>
@@ -306,6 +323,26 @@ export default async function CarritosPage({
                 ) : null}
               </div>
 
+              {fueraDeVenta.length > 0 ? (
+                <div className="rev-carrito-contacto">
+                  <span>
+                    <Badge tone="warning">Ojo</Badge>{" "}
+                    {fueraDeVenta.length === 1
+                      ? `«${fueraDeVenta[0].product.title}» está ${etiquetaEstado(fueraDeVenta[0].product.status)}: esa pieza no se puede comprar ahora mismo.`
+                      : `${fueraDeVenta.length} de estas piezas no están a la venta y no se pueden comprar ahora mismo.`}{" "}
+                    {slugsALaVenta.size === 1
+                      ? "El mensaje enlaza solo a la pieza que sigue disponible."
+                      : "El mensaje enlaza a la tienda, no a la ficha."}{" "}
+                    Vuelve a ponerla a la venta antes de escribirle, o quita esa línea del mensaje.
+                  </span>
+                  {fueraDeVenta.map((item) => (
+                    <Link key={item.id} className="adm-link" href={`/admin/productos/${item.product.id}`}>
+                      Revisar «{item.product.title}»
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+
               <MensajeRecuperacion
                 carrito={{
                   id: carrito.id,
@@ -317,8 +354,8 @@ export default async function CarritosPage({
                     instagram: ajustes.instagram ? `@${ajustes.instagram.replace(/^@/, "")}` : "",
                     // No hay forma honesta de "restaurar" el carrito de otra
                     // persona: su token vive en la cookie de SU navegador. Así
-                    // que el enlace lleva a la ficha si todo era un solo
-                    // producto, y al catálogo si eran varios.
+                    // que el enlace lleva a la ficha si solo queda una pieza a
+                    // la venta, y al catálogo si son varias (o ninguna).
                     enlace: enlaceDelCarrito(carrito.items),
                     articulos: carrito.items.map((i) => ({
                       cantidad: i.quantity,
@@ -348,14 +385,28 @@ export default async function CarritosPage({
 /* ───────────────────────── mensaje de recuperación ───────────────────────── */
 
 /**
- * Adónde mandar a la clienta: a la ficha si era una sola pieza, al catálogo si
- * eran varias. La base se lee del entorno aquí mismo y no de `lib/seo`, para no
- * atar esta pantalla a un módulo que ahora mismo está en construcción.
+ * Adónde mandar a la clienta: a la ficha si queda una sola pieza a la venta, al
+ * catálogo si son varias. La base se lee del entorno aquí mismo y no de `lib/seo`,
+ * para no atar esta pantalla a un módulo que ahora mismo está en construcción.
+ *
+ * SOLO se enlaza a productos `active`. El escaparate no sirve borradores ni
+ * archivados (`/producto/[slug]` responde 404 si no está activo), y este enlace no
+ * se queda en el panel: se copia en un DM a una compradora. Si Madeline archiva o
+ * despublica una pieza que quedó en un carrito, la clienta recibiría una página de
+ * error firmada por la boutique. Un enlace a la tienda es peor que la ficha exacta,
+ * pero infinitamente mejor que un 404.
  */
-function enlaceDelCarrito(items: { product: { slug: string } }[]): string {
+function enlaceDelCarrito(items: { product: { slug: string; status: string } }[]): string {
   const base = (process.env.NEXT_PUBLIC_SITE_URL || "https://bloom-by-madeline.vercel.app").replace(/\/+$/, "");
-  const slugs = [...new Set(items.map((i) => i.product.slug))];
+  const slugs = [...new Set(items.filter((i) => i.product.status === "active").map((i) => i.product.slug))];
   return `${base}${slugs.length === 1 ? `/producto/${slugs[0]}` : "/tienda"}`;
+}
+
+/** Cómo se dice en español que una pieza no está a la venta. */
+function etiquetaEstado(status: string): string {
+  if (status === "draft") return "en borrador";
+  if (status === "archived") return "archivada";
+  return status;
 }
 
 /**

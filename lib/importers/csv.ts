@@ -16,6 +16,8 @@
 //   title               título                     ("Title")
 //   description         descripción HTML o texto   ("Body (HTML)")
 //   status              draft | active | archived  ("Status", "Published")
+//                       Se lee, pero NO publica solo: deja preseleccionado el
+//                       estado en la revisión y lo confirma una persona.
 //   vendor              proveedor visible          ("Vendor")
 //   type                tipo de producto           ("Type", "Product Category")
 //   tags                etiquetas separadas por coma o por | ("Tags")
@@ -247,6 +249,73 @@ export type CsvImportResult = {
   warnings: string[];
 };
 
+/* ───────────── campos de producto que el CSV trae y el contrato no ───────────── */
+
+/**
+ * `status`, `tags` y `type` son de PRODUCTO, no de variante, y `NormalizedProduct`
+ * —el contrato común de todos los proveedores, en `lib/importers/types.ts`— todavía
+ * no tiene dónde ponerlos. Se cuelgan del producto normalizado como campos extra:
+ * el borrador se guarda con `JSON.stringify`, así que viajan enteros hasta la
+ * publicación, que los recoge con `leerExtrasDeProducto()`.
+ *
+ * Antes de esto el parser ni siquiera los leía: la plantilla de ejemplo ofrecía las
+ * tres columnas, quien las rellenaba creía que servían, y el producto acababa
+ * publicado con `tagsJson = "[]"` y sin tipo. Ofrecer una columna y tirarla en
+ * silencio es peor que no ofrecerla.
+ */
+export type ExtrasDeProducto = {
+  /** Etiquetas del fichero, ya partidas por coma o por «|». */
+  tags: string[];
+  /** Tipo/categoría de producto ("Vestidos"). */
+  productType: string;
+  /** Lo que el fichero pide, o null si no dijo nada. NO se aplica solo: ver abajo. */
+  status: "draft" | "active" | "archived" | null;
+};
+
+/** Un producto de CSV es un `NormalizedProduct` con esos tres campos de más. */
+export type CsvProduct = NormalizedProduct & ExtrasDeProducto;
+
+const EXTRAS_VACIOS: ExtrasDeProducto = { tags: [], productType: "", status: null };
+
+/**
+ * Lee los extras de un borrador guardado. Tolerante a propósito: los borradores
+ * anteriores a este cambio no los llevan, y un borrador manipulado podría traer
+ * cualquier cosa en esos campos.
+ */
+export function leerExtrasDeProducto(product: NormalizedProduct | null | undefined): ExtrasDeProducto {
+  if (!product) return { ...EXTRAS_VACIOS };
+  const bruto = product as Partial<ExtrasDeProducto>;
+  const tags = Array.isArray(bruto.tags)
+    ? bruto.tags.filter((tag): tag is string => typeof tag === "string" && tag.trim() !== "").map((tag) => tag.trim())
+    : [];
+  const productType = typeof bruto.productType === "string" ? bruto.productType.trim() : "";
+  const status =
+    bruto.status === "draft" || bruto.status === "active" || bruto.status === "archived" ? bruto.status : null;
+  return { tags, productType, status };
+}
+
+/**
+ * `status` / `published` → estado del catálogo.
+ *
+ * Se lee, pero **no activa nada solo**: el contrato dice que nada se publica sin
+ * revisión, y un fichero de Excel con `status=active` no es una persona decidiendo
+ * poner una pieza en el escaparate. Lo que hace es quedar en el borrador para que
+ * la pantalla de revisión preseleccione «a la venta» y Madeline lo confirme con un
+ * clic (ese cableado vive en el editor de borradores, ver el informe).
+ */
+function parseStatus(status: string | undefined, published: string | undefined): ExtrasDeProducto["status"] {
+  const texto = (status ?? "").trim().toLowerCase();
+  if (texto) {
+    if (["draft", "borrador", "sin publicar"].includes(texto)) return "draft";
+    if (["active", "activo", "activa", "publicado", "publicada", "published"].includes(texto)) return "active";
+    if (["archived", "archivado", "archivada"].includes(texto)) return "archived";
+  }
+  const publicado = parseBoolean(published);
+  if (publicado === true) return "active";
+  if (publicado === false) return "draft";
+  return null;
+}
+
 function parseBoolean(value: string | undefined): boolean | null {
   if (value === undefined) return null;
   const text = value.trim().toLowerCase();
@@ -302,7 +371,7 @@ export function parseProductCsv(text: string): CsvImportResult {
     warnings.push(`Columnas ignoradas por no reconocerlas: ${desconocidas.join(", ")}.`);
   }
 
-  const porHandle = new Map<string, NormalizedProduct>();
+  const porHandle = new Map<string, CsvProduct>();
   const orden: string[] = [];
   const nombresOpcion = new Map<string, string[]>();
   let ultimoHandle = "";
@@ -332,12 +401,15 @@ export function parseProductCsv(text: string): CsvImportResult {
         errors.push(`Fila ${r + 1}: no hay ningún producto anterior al que añadir esta fila.`);
         continue;
       }
-      product = emptyProduct("csv", "csv");
+      product = { ...emptyProduct("csv", "csv"), ...EXTRAS_VACIOS };
       product.title = title || handleRaw;
       product.vendor = get("vendor") || undefined;
       product.description = get("description") ?? "";
       product.sourceUrl = get("source_url") ?? null;
       product.sourceProductId = get("source_product_id") ?? handle;
+      product.tags = splitTags(get("tags"));
+      product.productType = get("type") ?? "";
+      product.status = parseStatus(get("status"), get("published"));
       const provider = get("source_provider");
       if (provider === "aliexpress" || provider === "alibaba" || provider === "manual") {
         product.provider = provider;
@@ -345,8 +417,14 @@ export function parseProductCsv(text: string): CsvImportResult {
       porHandle.set(handle, product);
       orden.push(handle);
       nombresOpcion.set(handle, []);
-    } else if (title && !product.title) {
-      product.title = title;
+    } else {
+      if (title && !product.title) product.title = title;
+      // Shopify escribe estos tres solo en la primera fila del producto, pero un
+      // fichero hecho a mano puede traerlos en cualquiera. Se queda el primero que
+      // llegue: exigir un orden concreto sería tirar el dato otra vez.
+      if (product.tags.length === 0) product.tags = splitTags(get("tags"));
+      if (!product.productType) product.productType = get("type") ?? "";
+      if (!product.status) product.status = parseStatus(get("status"), get("published"));
     }
 
     // Nombres de opción: en Shopify solo vienen en la primera fila del producto.
@@ -413,6 +491,16 @@ export function parseProductCsv(text: string): CsvImportResult {
     product.costCentsMin = costs.length ? Math.min(...costs) : null;
     product.costCentsMax = costs.length ? Math.max(...costs) : null;
 
+    if (product.status === "active") {
+      // Se dice en voz alta: el fichero pide venderlo ya, pero activar una pieza
+      // sigue siendo una decisión de una persona, no de una columna de Excel.
+      product.warnings.push(
+        "El fichero pide publicarlo como «a la venta»: elígelo en «Cómo se publica» antes de publicar, la tienda no activa nada sola.",
+      );
+    }
+    if (product.status === "archived") {
+      product.warnings.push("El fichero lo trae como archivado: se importará como borrador y podrás archivarlo después.");
+    }
     if (product.variants.length === 0) {
       product.warnings.push("Este producto llegó sin ninguna fila de variante: se creará una única sin precio.");
     }
