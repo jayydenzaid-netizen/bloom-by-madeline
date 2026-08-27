@@ -87,6 +87,8 @@ export default async function PedidoPage({
     })),
     subtotalCents: order.subtotalCents,
     shippingCents: order.shippingCents,
+    discountCents: order.discountCents,
+    taxCents: order.taxCents,
     totalCents: order.totalCents,
     orderNumber: order.number,
   });
@@ -255,16 +257,22 @@ export default async function PedidoPage({
             <span>Subtotal</span>
             <span>{formatCents(order.subtotalCents)}</span>
           </div>
+          {order.discountCents > 0 ? (
+            <div className="cd-row">
+              <span>Descuento</span>
+              <span>−{formatCents(order.discountCents)}</span>
+            </div>
+          ) : null}
           <div className="cd-row">
             <span>{esRecogida ? "Recogida en boutique" : "Envío"}</span>
             <span>
               {order.shippingCents === 0 ? "Gratis" : formatCents(order.shippingCents)}
             </span>
           </div>
-          {order.discountCents > 0 ? (
+          {order.taxCents > 0 ? (
             <div className="cd-row">
-              <span>Descuento</span>
-              <span>−{formatCents(order.discountCents)}</span>
+              <span>Impuesto</span>
+              <span>{formatCents(order.taxCents)}</span>
             </div>
           ) : null}
           <div className="cart-total">

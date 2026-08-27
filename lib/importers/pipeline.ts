@@ -829,6 +829,26 @@ const DOWNLOAD_DEFAULTS = {
  * sin avisar tampoco vale. De ahí los topes y el que sea la usuaria quien lo pida.
  * `url` no se toca: si la descarga falla, la ficha sigue mostrando la del CDN.
  */
+/**
+ * ¿La URL apunta a la propia máquina o a la red interna? Mismo criterio que
+ * `anfitrionProhibido` de lib/media.ts, replicado aquí a propósito: un guardia de
+ * seguridad duplicado es más seguro que un módulo acoplado al otro. Ante una URL
+ * ilegible, se trata como interna (rechazar por defecto).
+ */
+function esHostInterno(url: string): boolean {
+  let h: string;
+  try {
+    h = new URL(url).hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  } catch {
+    return true;
+  }
+  if (h === "localhost" || h.endsWith(".localhost") || h === "::1" || h === "0.0.0.0") return true;
+  if (/^127\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+  if (h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe80")) return true;
+  return false;
+}
+
 export async function downloadImages(
   productId: string,
   options: DownloadImagesOptions = {},
@@ -866,6 +886,10 @@ export async function downloadImages(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), config.timeoutMs);
     try {
+      // SSRF: una imagen de un import manipulado (bookmarklet o HTML pegado)
+      // podría apuntar a la red interna (169.254.169.254, 10.x, localhost). Se
+      // rechaza ANTES de pedirla, igual que hace lib/media.ts en importFromUrl.
+      if (esHostInterno(image.url)) throw new Error("host interno bloqueado");
       const response = await fetch(image.url, {
         signal: controller.signal,
         headers: { "User-Agent": "Mozilla/5.0", Accept: "image/avif,image/webp,image/*,*/*;q=0.8" },

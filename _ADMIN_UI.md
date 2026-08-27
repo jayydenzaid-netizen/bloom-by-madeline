@@ -228,10 +228,15 @@ Recuerda: en Next 15 `searchParams` es una **promesa**, hay que `await`.
 ## 7. Sesión, login y logout
 
 - El login vive en `/admin/login` y usa el Server Action `loginAction` de
-  `app/admin/login/actions.ts`. Mensaje de error único ("Correo o contraseña
-  incorrectos") para no revelar cuál de los dos falló, y freno tras 8 intentos.
+  `app/admin/login/actions.ts`. Se entra con **usuario**, no con correo (el
+  correo se queda como contacto y para la bitácora). Mensaje de error único
+  ("Usuario o contraseña incorrectos") para no revelar cuál de los dos falló, y
+  freno tras 8 intentos.
+- El usuario se compara sin distinguir mayúsculas y se guarda tal cual se
+  escribió (`lib/usuario.ts`, probado en `tests/usuario.test.ts`).
 - La cuenta se crea sola en el primer arranque con `ensureSeedAdmin()`
-  (`ADMIN_EMAIL` / `ADMIN_PASSWORD` del `.env`).
+  (`ADMIN_USERNAME` / `ADMIN_PASSWORD` del `.env`), y `ensureUsernames()` le
+  pone usuario a las cuentas que venían de la época del correo.
 - Salir es `POST /admin/logout` (nunca GET: una precarga del navegador cerraría
   la sesión sola). Ya está en el sidebar; no hace falta repetirlo.
 - `middleware.ts` inyecta `x-pathname` porque un layout de Next 15 no sabe en

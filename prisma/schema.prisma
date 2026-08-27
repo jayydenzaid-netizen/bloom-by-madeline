@@ -149,6 +149,9 @@ model Cart {
   updatedAt        DateTime  @updatedAt
 
   items CartItem[]
+
+  // El panel de carritos abandonados ordena y filtra por updatedAt en cada carga.
+  @@index([updatedAt])
 }
 
 model CartItem {
@@ -228,6 +231,12 @@ model Order {
   items    OrderItem[]
 
   @@index([paymentStatus])
+  // La cola diaria «por enviar» del panel filtra por AMBOS estados a la vez
+  // (paid + unfulfilled): es la consulta más caliente del dashboard.
+  @@index([paymentStatus, fulfillStatus])
+  // Postgres NO indexa las claves foráneas solo (SQLite sí): la ficha de clienta
+  // lista sus pedidos por customerId.
+  @@index([customerId])
   @@index([createdAt])
 }
 
@@ -292,6 +301,15 @@ model AdminUser {
   // owner = Madeline, manda en todo · staff = ayuda con pedidos y productos
   role         String    @default("owner")
   isActive     Boolean   @default(true)
+  // Con esto se entra al panel: usuario y contraseña, no correo.
+  //
+  // Opcional en el esquema, obligatorio en la práctica. El motivo: la columna se
+  // añadió sobre una base que ya tenía cuentas creadas, y `prisma db push` no
+  // puede rellenar una columna obligatoria en filas que ya existen — el
+  // despliegue se caería. Las cuentas antiguas la rellenan solas
+  // (ensureUsernames, en lib/auth.ts) y el panel nunca crea una cuenta sin usuario.
+  username     String?   @unique
+  // Ya no sirve para entrar: se queda como contacto y para la bitácora.
   email        String    @unique
   name         String    @default("")
   passwordHash String
@@ -359,6 +377,8 @@ model DiscountUsage {
 
   @@index([discountId])
   @@index([email])
+  // La comprobación «una vez por clienta» filtra por discountId + email a la vez.
+  @@index([discountId, email])
 }
 
 // ─────────────────────────── INVENTARIO ───────────────────────────

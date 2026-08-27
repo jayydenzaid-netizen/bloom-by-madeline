@@ -2,7 +2,13 @@
 
 import { useEffect, useState, useActionState } from "react";
 import { formatCents } from "@/lib/money";
-import { submitCheckout, type CheckoutField, type CheckoutState } from "./actions";
+import {
+  cotizarCheckout,
+  submitCheckout,
+  type CheckoutField,
+  type CheckoutState,
+  type CotizacionCheckout,
+} from "./actions";
 
 /**
  * Capa cliente del checkout.
@@ -36,6 +42,7 @@ const ESTADO_INICIAL: CheckoutState = {
     zip: "",
     note: "",
     paymentMethod: "",
+    discountCode: "",
   },
 };
 
@@ -114,9 +121,52 @@ export default function CheckoutForm({
     setCampos((prev) => ({ ...prev, [campo]: ev.target.value }));
 
   const recogida = metodo === "pickup";
-  const envio = recogida ? 0 : shippingCents;
-  const total = subtotalCents + envio;
-  const faltaEnvioGratis = !recogida && freeShippingMissingCents > 0;
+
+  /* Resumen EN VIVO. Cada vez que cambia el destino, el método, el código o el
+     correo, se le pide al servidor el desglose real (descuento, envío por zona,
+     impuesto) con la misma función que usa el pedido: así lo que ve aquí es
+     exactamente lo que se va a registrar, sin sorpresas al confirmar. Con debounce
+     para no consultar en cada tecla. */
+  const [cotizacion, setCotizacion] = useState<CotizacionCheckout | null>(null);
+  useEffect(() => {
+    let vigente = true;
+    const t = setTimeout(() => {
+      cotizarCheckout({
+        state: campos.state,
+        country: "US",
+        pickup: recogida,
+        code: campos.discountCode,
+        email: campos.email,
+      })
+        .then((q) => {
+          if (vigente) setCotizacion(q);
+        })
+        .catch(() => {
+          // Si la cotización falla (red, sesión), se cae al cálculo local de props:
+          // nunca se deja el resumen en blanco.
+          if (vigente) setCotizacion(null);
+        });
+    }, 450);
+    return () => {
+      vigente = false;
+      clearTimeout(t);
+    };
+  }, [campos.state, campos.discountCode, campos.email, recogida]);
+
+  // Lo que se pinta: la cotización del servidor cuando la hay; si no, el cálculo
+  // local con lo que mandó la página (envío plano, sin descuento ni impuesto).
+  const subtotalMostrado = cotizacion?.subtotalCents ?? subtotalCents;
+  const descuento = cotizacion?.discountCents ?? 0;
+  const envio = recogida ? 0 : cotizacion?.shippingCents ?? shippingCents;
+  const impuesto = cotizacion?.taxCents ?? 0;
+  const total = cotizacion
+    ? cotizacion.totalCents
+    : Math.max(0, subtotalMostrado - descuento) + envio + impuesto;
+  const codigoEscrito = campos.discountCode.trim().length > 0;
+  const descuentoAplicado = descuento > 0 || (cotizacion?.freeShipping ?? false);
+  const errorCodigo = codigoEscrito ? cotizacion?.discountError ?? state.fieldErrors.discountCode : undefined;
+  const faltaEnvioGratis =
+    !recogida && !descuentoAplicado && freeShippingMissingCents > 0 && !cotizacion?.freeShipping;
 
   const err = (campo: CheckoutField) => state.fieldErrors[campo];
 
@@ -268,6 +318,27 @@ export default function CheckoutForm({
         ) : null}
 
         <section className="co-block">
+          <label className={errorCodigo ? "co-field co-field-bad" : "co-field"}>
+            <span className="co-label">Código de descuento (opcional)</span>
+            <input
+              name="discountCode"
+              value={campos.discountCode}
+              onChange={set("discountCode")}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              placeholder="Ej. BLOOM-4K2P"
+              aria-invalid={errorCodigo ? true : undefined}
+            />
+            {errorCodigo ? (
+              <em className="co-err">{errorCodigo}</em>
+            ) : descuentoAplicado ? (
+              <em className="co-hint">
+                ✓ Código aplicado{cotizacion?.discountLabel ? ` · ${cotizacion.discountLabel}` : ""}
+              </em>
+            ) : null}
+          </label>
+
           <label className="co-field">
             <span className="co-label">Nota para Madeline (opcional)</span>
             <textarea
@@ -318,12 +389,24 @@ export default function CheckoutForm({
 
         <div className="cd-row">
           <span>Subtotal</span>
-          <span>{formatCents(subtotalCents)}</span>
+          <span>{formatCents(subtotalMostrado)}</span>
         </div>
+        {descuento > 0 ? (
+          <div className="cd-row co-row-desc">
+            <span>Descuento{cotizacion?.discountLabel ? ` · ${cotizacion.discountLabel}` : ""}</span>
+            <span>−{formatCents(descuento)}</span>
+          </div>
+        ) : null}
         <div className="cd-row">
           <span>{recogida ? "Recogida en boutique" : "Envío"}</span>
           <span>{envio === 0 ? "Gratis" : formatCents(envio)}</span>
         </div>
+        {impuesto > 0 ? (
+          <div className="cd-row">
+            <span>{cotizacion?.taxLabel || "Impuesto"}</span>
+            <span>{formatCents(impuesto)}</span>
+          </div>
+        ) : null}
         {faltaEnvioGratis ? (
           <p className="co-note">
             Te faltan <strong>{formatCents(freeShippingMissingCents)}</strong> para el envío

@@ -21,3 +21,9 @@ public/uploads
 .env.production.local
 
 .env*
+
+# Shopify: secretos y cachés locales de la integración
+shopify/.puente-token
+shopify/.capacidades.json
+shopify/tema-bloom.zip
+shopify/resenas-para-importar.csv

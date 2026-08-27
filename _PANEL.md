@@ -3,7 +3,8 @@
 Esto es un mapa del panel de tu tienda: qué hay en cada sitio, para qué sirve y
 por dónde empezar. Está escrito para leerse una vez y no volver a necesitarlo.
 
-El panel está en **tu-tienda.com/admin**. Entras con tu correo y tu contraseña.
+El panel está en **tu-tienda.com/admin**. Entras con **tu usuario y tu contraseña**
+(el usuario, no el correo). Da igual si escribes el usuario con mayúscula o sin ella.
 Funciona igual en el ordenador y en el teléfono.
 
 ---

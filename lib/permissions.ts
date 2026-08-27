@@ -160,6 +160,7 @@ export function permiteCambioDeCuenta(cuentas: CuentaBasica[], cambio: CambioCue
 
 export type AdminConRol = {
   id: string;
+  username: string | null;
   email: string;
   name: string;
   role: Rol;
@@ -169,7 +170,7 @@ export type AdminConRol = {
 /**
  * Como `getAdmin()`, pero trayendo además rol y estado.
  *
- * `getAdmin()` (lib/auth.ts) solo selecciona id, correo y nombre, y no se toca
+ * `getAdmin()` (lib/auth.ts) solo selecciona id, usuario, correo y nombre, y no se toca
  * porque lo usan todas las pantallas del panel. Aquí se completa con una
  * segunda consulta; es una lectura por índice primario, no duele.
  *
@@ -182,11 +183,18 @@ export async function getAdminConRol(): Promise<AdminConRol | null> {
 
   const fila = await db.adminUser.findUnique({
     where: { id: admin.id },
-    select: { id: true, email: true, name: true, role: true, isActive: true },
+    select: { id: true, username: true, email: true, name: true, role: true, isActive: true },
   });
   if (!fila || !fila.isActive) return null;
 
-  return { id: fila.id, email: fila.email, name: fila.name, role: normalizarRol(fila.role), isActive: true };
+  return {
+    id: fila.id,
+    username: fila.username,
+    email: fila.email,
+    name: fila.name,
+    role: normalizarRol(fila.role),
+    isActive: true,
+  };
 }
 
 /** Secciones que se pueden nombrar en el aviso de "esto no es para ti". */
@@ -197,6 +205,7 @@ export const ETIQUETA_SECCION: Record<string, string> = {
   descuentos: "Descuentos",
   informes: "Informes",
   contenido: "Contenido",
+  envios: "Envíos e impuestos",
 };
 
 /** Sesión obligatoria. Sin ella, al login. */

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { menuPorDefecto } from "@/lib/navegacion";
 
 /**
  * Mutaciones de los menús: los enlaces del nav de arriba y los del pie.
@@ -189,47 +190,47 @@ export async function eliminarItemMenu(fd: FormData): Promise<void> {
 /* ─────────────────────────── siembra ─────────────────────────── */
 
 /**
- * Crea los menús con lo que hoy tiene la web: el nav del sitio en producción
- * (`legacy/index.html`) y, en el pie, las páginas que ya existan y estén
- * marcadas para salir ahí. Si un menú ya tiene enlaces, no se toca.
+ * Copia a la base los enlaces que la web enseña HOY, para que Madeline no parta
+ * de una lista en blanco y no tenga que reescribir lo que ya tiene.
+ *
+ * Los textos y destinos NO se escriben aquí: se leen de `lib/navegacion.ts`, que
+ * es la misma fuente que usa el escaparate cuando la tabla está vacía. Es
+ * deliberado — cuando estaban duplicados, sembrar cambiaba "Nuevas Llegadas" por
+ * "Nuevas llegadas" sin que nadie lo hubiera pedido.
+ *
+ * El pie se siembra con los enlaces de su columna "Tienda". Las páginas legales
+ * NO se copian aquí: el pie ya las lista solo, en su propio bloque, en cuanto
+ * están publicadas y marcadas "sale en el pie". Meterlas también en el menú las
+ * enseñaría dos veces.
+ *
+ * Se siembra menú por menú y solo si está vacío: un menú con enlaces es trabajo
+ * de ella y no se pisa.
  */
-export async function sembrarMenus(): Promise<void> {
+export async function sembrarMenus(fd?: FormData): Promise<void> {
   const admin = await getAdmin();
   if (!admin) redirect("/admin/login");
 
-  const cuantos = await db.menuItem.count();
-  if (cuantos > 0) redirect("/admin/menus");
+  const pedido = String(fd?.get("menu") ?? "");
+  const objetivo = MENUS.filter((m) => (pedido === "main" || pedido === "footer" ? m === pedido : true));
 
-  const principal = [
-    { label: "Nuevas llegadas", url: "/tienda" },
-    { label: "Filosofía", url: "/#filosofia" },
-    { label: "La boutique", url: "/#boutique" },
-    { label: "Visítanos", url: "/#visitanos" },
-  ];
+  const existentes = await db.menuItem.findMany({ select: { menu: true } });
+  const resumen: string[] = [];
 
-  await db.$transaction(
-    principal.map((item, i) =>
-      db.menuItem.create({ data: { menu: "main", label: item.label, url: item.url, position: i } }),
-    ),
-  );
+  for (const menu of objetivo) {
+    if (existentes.some((e) => e.menu === menu)) continue;
 
-  // El pie se llena con las páginas que ya existan: si aún no hay ninguna, se
-  // queda vacío en vez de inventar enlaces rotos.
-  const paginas = await db.page.findMany({
-    where: { showInFooter: true },
-    orderBy: [{ position: "asc" }, { title: "asc" }],
-    select: { title: true, slug: true },
-  });
-
-  if (paginas.length > 0) {
+    const enlaces = menuPorDefecto(menu);
     await db.$transaction(
-      paginas.map((p, i) =>
-        db.menuItem.create({ data: { menu: "footer", label: p.title, url: `/pagina/${p.slug}`, position: i } }),
+      enlaces.map((enlace, i) =>
+        db.menuItem.create({ data: { menu, label: enlace.label, url: enlace.href, position: i } }),
       ),
     );
+    resumen.push(`${enlaces.length} en ${menu}`);
   }
 
-  await registrar(admin, "create", null, `Sembró los menús: ${principal.length} enlaces arriba y ${paginas.length} en el pie`);
+  if (resumen.length === 0) redirect(`/admin/menus?menu=${pedido === "footer" ? "footer" : "main"}`);
+
+  await registrar(admin, "create", null, `Copió los enlaces que ya tenía la web: ${resumen.join(" y ")}`);
   refrescar();
-  redirect("/admin/menus?ok=sembrado");
+  redirect(`/admin/menus?menu=${pedido === "footer" ? "footer" : "main"}&ok=sembrado`);
 }

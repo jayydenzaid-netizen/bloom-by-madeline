@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
-import { getAdmin } from "@/lib/auth";
+import { requireOwner } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { buscar } from "@/lib/search";
 import { describirValor, describirVigencia, estadoDescuento, type ClaveEstado } from "@/lib/discounts";
@@ -42,8 +42,7 @@ export default async function DescuentosPage({ searchParams }: { searchParams: P
   // Cada pantalla comprueba la sesión por su cuenta: en App Router la página se
   // renderiza aunque el layout no la pinte, y el resultado viaja en el payload
   // RSC. Solo redirect() aborta el render de verdad.
-  const admin = await getAdmin();
-  if (!admin) redirect("/admin/login");
+  const admin = await requireOwner("descuentos");
 
   const sp = await searchParams;
   const q = uno(sp.q).trim();

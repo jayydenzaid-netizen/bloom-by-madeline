@@ -24,7 +24,11 @@ const flag = (name, def) => {
 };
 const BASE = flag("base", "http://localhost:4590");
 const SHOTS = args.includes("--shots");
-const ADMIN_EMAIL = flag("email", process.env.ADMIN_EMAIL || "madeline@bloombymadeline.com");
+// Credenciales del panel. Se entra con usuario, no con correo.
+//
+// Salen del entorno (los scripts se lanzan con --env-file, ver package.json) o
+// de un --flag. Aquí no se escribe la de verdad: este repositorio es público.
+const ADMIN_USUARIO = flag("usuario", process.env.ADMIN_USERNAME || "admin");
 const ADMIN_PASSWORD = flag("password", process.env.ADMIN_PASSWORD || "bloom2026");
 const OUT = path.resolve("qa/shots");
 
@@ -87,7 +91,7 @@ async function login() {
   const res = await page.goto(`${BASE}/admin/login`, { waitUntil: "networkidle2", timeout: 45000 });
   if (!res || res.status() >= 400) return { ok: false, motivo: `login devolvió ${res?.status()}` };
   try {
-    await page.type('input[type="email"], input[name="email"]', ADMIN_EMAIL, { delay: 5 });
+    await page.type('input[name="usuario"]', ADMIN_USUARIO, { delay: 5 });
     await page.type('input[type="password"], input[name="password"]', ADMIN_PASSWORD, { delay: 5 });
     await Promise.all([
       page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 }).catch(() => {}),

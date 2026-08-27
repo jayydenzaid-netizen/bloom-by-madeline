@@ -792,7 +792,9 @@ html.static .hero-arch img { animation: none; }
   margin-top: auto;
   padding-top: 26px;
   font-size: 12.5px;
-  color: rgba(246,243,237,.45);
+  /* .45 daba ~4.27:1 sobre el ink: por debajo del AA de 4.5:1 para texto normal.
+     .6 sube a ~5.3:1 sin perder el aire tenue del pie. */
+  color: rgba(246,243,237,.6);
 }
 .visitanos-map {
   position: relative;

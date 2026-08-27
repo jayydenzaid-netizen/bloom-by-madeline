@@ -133,6 +133,83 @@ async function aplicar(
   return { variantId, before, after, delta, movementId: movimiento.id };
 }
 
+/* ───────────── API para quien YA está dentro de una transacción ───────────── */
+
+/**
+ * Registra un cambio de stock DENTRO de una transacción ya abierta.
+ *
+ * Es la puerta para quien ya corre en su propia transacción y no puede abrir
+ * otra: la cancelación de un pedido (devuelve stock) o un recuento hecho desde
+ * el listado de productos. Así el movimiento entra o se revierte JUNTO con el
+ * resto de la operación, nunca a medias.
+ *
+ * `cambio` fija el destino: `{ delta }` suma/resta, `{ setTo }` deja un valor
+ * exacto (lo que hace un recuento físico). La razón por defecto es `manual`.
+ */
+export async function aplicarStockEnTx(
+  tx: Prisma.TransactionClient,
+  variantId: string,
+  cambio: { delta: number } | { setTo: number },
+  opts: AdjustOptions = {},
+): Promise<StockChange | null> {
+  const siguiente =
+    "setTo" in cambio ? () => Math.trunc(cambio.setTo) : (before: number) => before + Math.trunc(cambio.delta);
+  const reason = normalizarRazon(opts.reason, "manual");
+  return aplicar(tx, variantId, siguiente, reason, opts);
+}
+
+/**
+ * Descuento de VENTA dentro de una transacción abierta (el checkout de la
+ * tienda). Decrementa SOLO si aún hay bastante —el `gte` del WHERE es el guardia
+ * atómico contra dos compras simultáneas por la última unidad— y deja su
+ * `StockMovement` con razón `sale`.
+ *
+ * Devuelve `null` cuando el stock se agotó entre la validación del carrito y
+ * este punto, para que el llamador reviente la transacción y avise a la clienta.
+ * `cantidad` siempre llega > 0 (el checkout salta las variantes sin control de
+ * stock antes de llamar), así que `null` solo significa «se agotó».
+ */
+export async function descontarVentaEnTx(
+  tx: Prisma.TransactionClient,
+  variantId: string,
+  cantidad: number,
+  opts: Omit<AdjustOptions, "reason"> = {},
+): Promise<StockChange | null> {
+  const qty = Math.max(0, Math.trunc(cantidad));
+  if (qty === 0) return null;
+
+  const res = await tx.productVariant.updateMany({
+    where: { id: variantId, trackStock: true, stock: { gte: qty } },
+    data: { stock: { decrement: qty } },
+  });
+  if (res.count !== 1) return null;
+
+  // El descuento fue EXACTAMENTE qty (lo garantiza el `gte`), así que el «antes»
+  // se deriva del «después» sin ninguna ventana de carrera.
+  const variante = await tx.productVariant.findUnique({
+    where: { id: variantId },
+    select: { stock: true },
+  });
+  const after = variante?.stock ?? 0;
+  const before = after + qty;
+
+  const movimiento = await tx.stockMovement.create({
+    data: {
+      variantId,
+      reason: "sale",
+      delta: -qty,
+      before,
+      after,
+      reference: opts.reference ?? null,
+      note: opts.note ?? "",
+      userId: opts.userId ?? null,
+    },
+    select: { id: true },
+  });
+
+  return { variantId, before, after, delta: -qty, movementId: movimiento.id };
+}
+
 /* ─────────────────────────── API pública ─────────────────────────── */
 
 /**

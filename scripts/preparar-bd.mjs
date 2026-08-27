@@ -27,6 +27,12 @@ function correr(comando) {
   execSync(comando, { stdio: "inherit", env: process.env });
 }
 
+// Antes del push: los cambios de forma que push no sabe aplicar solo sobre una
+// tabla que ya tiene filas (hoy, la columna `username` de AdminUser con su
+// índice único). Ver scripts/migrar-usuario.mjs.
+console.log("▸ Aplicando migraciones a mano…");
+correr("node scripts/migrar-usuario.mjs");
+
 console.log("▸ Creando o actualizando las tablas en Postgres…");
 correr("npx prisma db push --skip-generate");
 

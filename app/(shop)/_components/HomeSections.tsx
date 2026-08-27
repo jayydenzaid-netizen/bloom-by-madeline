@@ -1,5 +1,17 @@
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
+import type {
+  ContenidoBanner,
+  ContenidoBoutique,
+  ContenidoCita,
+  ContenidoColeccion,
+  ContenidoComoComprar,
+  ContenidoFilosofia,
+  ContenidoHero,
+  ContenidoInstagram,
+  ContenidoMarquee,
+  ContenidoVisitanos,
+} from "@/lib/home-content";
 import ProductCard, { type ProductCardItem } from "./ProductCard";
 
 /**
@@ -7,17 +19,71 @@ import ProductCard, { type ProductCardItem } from "./ProductCard";
  * `legacy/index.html`. El marcado es deliberadamente idéntico al del sitio que
  * está en producción: las clases (`.hero`, `.marquee`, `.paso`…) ya existen en
  * `globals.css` y ese CSS costó meses de pulido, así que aquí no se reinventa
- * nada — solo se sustituyen los datos escritos a mano por los de la tienda.
+ * nada.
+ *
+ * Lo que cambió: los textos y las fotos ya NO están escritos aquí dentro. Llegan
+ * en `contenido`, que sale de `lib/home-content.ts` (los valores de siempre) con
+ * encima lo que Madeline haya escrito en /admin/contenido. Este fichero solo
+ * sabe PINTAR; qué se pinta lo decide el contenido.
  *
  * Todo son Server Components: la portada no necesita ni una línea de JavaScript
  * propio. Lo poco que se mueve (revelado al hacer scroll, nav sólida, cajón del
  * carrito) ya lo pone el proveedor del layout.
  */
 
-/** Espacio fino: separa las letras de "B L O O M" sin romper la palabra. */
+/** Espacio fino (U+2009): separa las letras de "B L O O M" sin romper la palabra.
+ *  Se escribe escapado porque un carácter invisible se pierde en cualquier copia. */
 const FINO = " ";
-/** Espacio duro para que "casual elegante" y "para ti" no se partan en dos líneas. */
-const DURO = " ";
+
+/* ═══════════ FORMATO DE TEXTO ═══════════ */
+
+/**
+ * El mini-formato que puede escribir Madeline en el panel:
+ *
+ *   · un salto de línea  → un renglón nuevo (`<br>`),
+ *   · `*algo*`           → cursiva (la serif elegante cuando es un titular),
+ *   · `**algo**`         → negrita.
+ *
+ * No se interpreta HTML a propósito: lo que ella escribe se pinta como TEXTO,
+ * así que pegar `<script>` desde cualquier sitio no puede hacer nada. Por eso
+ * aquí no hay ni un `dangerouslySetInnerHTML`.
+ */
+type Enfasis = "titular" | "texto";
+
+function conFormato(valor: string, enfasis: Enfasis = "texto"): ReactNode {
+  const lineas = valor.split("\n");
+  return lineas.map((linea, i) => (
+    <Fragment key={i}>
+      {i > 0 ? <br /> : null}
+      {trozos(linea, enfasis)}
+    </Fragment>
+  ));
+}
+
+function trozos(linea: string, enfasis: Enfasis): ReactNode[] {
+  const salida: ReactNode[] = [];
+  const marcas = /\*\*([^*]+)\*\*|\*([^*]+)\*/g;
+  let desde = 0;
+  let m: RegExpExecArray | null;
+
+  while ((m = marcas.exec(linea)) !== null) {
+    if (m.index > desde) salida.push(linea.slice(desde, m.index));
+    if (m[1] !== undefined) {
+      salida.push(<strong key={m.index}>{m[1]}</strong>);
+    } else {
+      // En los titulares la cursiva es la serif de la marca; en un párrafo
+      // corriente es un énfasis normal, exactamente como en el sitio de hoy.
+      salida.push(
+        <em key={m.index} className={enfasis === "titular" ? "serif-it" : undefined}>
+          {m[2]}
+        </em>,
+      );
+    }
+    desde = m.index + m[0].length;
+  }
+  if (desde < linea.length) salida.push(linea.slice(desde));
+  return salida;
+}
 
 /* ═══════════ PRELOADER ═══════════ */
 
@@ -48,13 +114,15 @@ export function Preloader() {
 /* ═══════════ HERO ═══════════ */
 
 export function Hero({
+  contenido,
+  marquee,
   igUrl,
   igHandle,
-  address,
 }: {
+  contenido: ContenidoHero;
+  marquee: ContenidoMarquee;
   igUrl: string;
   igHandle: string;
-  address: string;
 }) {
   return (
     <section className="hero">
@@ -67,43 +135,24 @@ export function Hero({
             para que la FOTO aparezca antes del texto largo. Por eso no se pueden
             envolver en más divs: romperían ese orden. */}
         <div className="hero-copy">
-          <p className="overline reveal">Boutique de moda femenina · Hamilton, Ohio</p>
-          <h1 className="hero-title">
-            <span className="line">
-              <span>Elevamos</span>
-            </span>
-            <span className="line">
-              <span>tu estilo</span>
-            </span>
-            <span className="line">
-              <span className="serif-it">casual{DURO}elegante.</span>
-            </span>
-          </h1>
-          <p className="hero-sub reveal">
-            Tendencias exclusivas seleccionadas a mano, nuevas llegadas cada semana y una atención
-            que se siente como ir de compras con tu mejor amiga.
-          </p>
+          <p className="overline reveal">{contenido.overline}</p>
+          <h1 className="hero-title">{renglonesDelTitular(contenido.titulo)}</h1>
+          <p className="hero-sub reveal">{conFormato(contenido.parrafo)}</p>
           <div className="hero-ctas reveal">
-            <Link className="btn btn-ink" href="/#coleccion">
-              Ver nuevas llegadas
+            <Link className="btn btn-ink" href={contenido.ctaUrl}>
+              {contenido.ctaLabel}
             </Link>
             <a className="btn btn-ghost" href={igUrl} target="_blank" rel="noopener">
               @{igHandle}
             </a>
           </div>
           <ul className="hero-stats reveal">
-            <li>
-              <strong>2,880+</strong>
-              <span>seguidoras</span>
-            </li>
-            <li>
-              <strong>S · M · L</strong>
-              <span>tallas disponibles</span>
-            </li>
-            <li>
-              <strong>USA</strong>
-              <span>envíos a todo el país</span>
-            </li>
+            {contenido.datos.map((dato) => (
+              <li key={dato.valor + dato.etiqueta}>
+                <strong>{dato.valor}</strong>
+                <span>{dato.etiqueta}</span>
+              </li>
+            ))}
           </ul>
         </div>
 
@@ -113,15 +162,11 @@ export function Hero({
               movimiento que de verdad se nota es el Ken Burns, que es CSS. */}
           <figure className="hero-arch" data-parallax="0.06">
             {/* eslint-disable-next-line @next/next/no-img-element -- foto local servida tal cual, sin optimizador */}
-            <img
-              src="/assets/post-03-vestido-negro-olivo.jpg"
-              alt="Vestido midi a rayas oliva y crema en maniquí dentro de la boutique Bloom by Madeline"
-              loading="eager"
-            />
+            <img src={contenido.foto.url} alt={contenido.foto.alt} loading="eager" />
           </figure>
           <figure className="hero-polaroid" data-parallax="0.12">
             {/* eslint-disable-next-line @next/next/no-img-element -- foto local servida tal cual, sin optimizador */}
-            <img src="/assets/post-05-vestido-blanco.jpg" alt="Vestido mini verde lima en la boutique" />
+            <img src={contenido.polaroid.url} alt={contenido.polaroid.alt} />
           </figure>
           <div className="hero-badge" aria-hidden="true">
             <svg viewBox="0 0 100 100">
@@ -129,7 +174,7 @@ export function Hero({
                 <path id="circlePath" d="M50,50 m-37,0 a37,37 0 1,1 74,0 a37,37 0 1,1 -74,0" />
               </defs>
               <text>
-                <textPath href="#circlePath">ENVÍOS A TODO USA · BLOOM ·</textPath>
+                <textPath href="#circlePath">{contenido.insignia}</textPath>
               </text>
             </svg>
             <svg className="badge-lotus" viewBox="0 0 120 104">
@@ -137,39 +182,50 @@ export function Hero({
             </svg>
           </div>
           <span className="hero-pill">
-            <i aria-hidden="true">✿</i> Nuevas llegadas esta semana
+            <i aria-hidden="true">✿</i> {contenido.pastilla}
           </span>
         </div>
       </div>
 
-      <Marquee address={address} />
+      {marquee.visible ? <Marquee frases={marquee.frases} /> : null}
     </section>
   );
 }
 
+/**
+ * El titular grande: un renglón por línea. Una línea entera marcada con
+ * asteriscos se pinta en la cursiva serif —es el remate del diseño— y lo hace
+ * con la clase en el propio `<span>` de la línea, que es como está hoy en
+ * producción y como lo esperan las animaciones de `globals.css`.
+ */
+function renglonesDelTitular(titulo: string): ReactNode {
+  return titulo.split("\n").map((linea, i) => {
+    const entera = /^\*([^*]+)\*$/.exec(linea.trim());
+    return (
+      <span className="line" key={i}>
+        {entera ? (
+          <span className="serif-it">{entera[1]}</span>
+        ) : (
+          <span>{trozos(linea, "titular")}</span>
+        )}
+      </span>
+    );
+  });
+}
+
 /** Cinta que corre bajo el hero. Es decorativa: `aria-hidden` y texto duplicado
  *  para que el bucle no enseñe el corte. */
-function Marquee({ address }: { address: string }) {
-  const items = [
-    "Nuevas llegadas cada semana",
-    "Tallas S · M · L",
-    "Envíos a todo USA",
-    "Pedidos por Instagram DM",
-    // La dirección la manda Ajustes; las comas se vuelven puntos medios para
-    // que respire igual que el resto de la cinta.
-    address.replace(/,\s*/g, " · "),
-  ];
-
+function Marquee({ frases }: { frases: string[] }) {
   // La animación desplaza el track un 50%: la lista tiene que ir DUPLICADA
   // exacta o el bucle daría un salto visible al reiniciarse.
   return (
     <div className="marquee" aria-hidden="true">
       <div className="marquee-track">
-        {[...items, ...items].map((texto, i) => (
+        {[...frases, ...frases].map((frase, i) => (
           // El ✿ es hermano del texto, no hijo: la cinta es un flex con gap y
           // meterlo dentro del span se comería la separación.
-          <Fragment key={`${texto}-${i}`}>
-            <span>{texto}</span>
+          <Fragment key={`${frase}-${i}`}>
+            <span>{frase}</span>
             <i>✿</i>
           </Fragment>
         ))}
@@ -197,13 +253,13 @@ export type InspiracionItem = {
  *    como vende hoy la boutique. Una rejilla vacía nunca es una opción.
  */
 export function Coleccion({
+  contenido,
   productos,
   inspiracion,
-  dmUrl,
 }: {
+  contenido: ContenidoColeccion;
   productos: ProductCardItem[];
   inspiracion: InspiracionItem[];
-  dmUrl: string;
 }) {
   const hayTienda = productos.length > 0;
 
@@ -211,18 +267,10 @@ export function Coleccion({
     <section className="section coleccion" id="coleccion">
       <div className="section-head">
         <div>
-          <p className="overline reveal">01 — La Colección</p>
-          <h2 className="reveal">
-            Nuevas <em className="serif-it">llegadas</em>
-          </h2>
+          <p className="overline reveal">{contenido.overline}</p>
+          <h2 className="reveal">{conFormato(contenido.titulo, "titular")}</h2>
         </div>
-        <p className="section-note reveal">
-          Cada pieza nombrada como una flor,
-          <br />
-          porque aquí todo florece.
-          <br />
-          <strong>Pedidos por DM · respuesta el mismo día.</strong>
-        </p>
+        <p className="section-note reveal">{conFormato(contenido.nota)}</p>
       </div>
 
       {hayTienda ? (
@@ -238,9 +286,9 @@ export function Coleccion({
           {/* El sitio viejo remataba mandando al DM porque no había tienda. Ahora
               sí la hay, así que el remate lleva al catálogo completo. */}
           <div className="coleccion-cta reveal">
-            <p>Esto es solo una parte — en la tienda está todo.</p>
-            <Link className="btn btn-ink" href="/tienda">
-              Ver toda la tienda
+            <p>{contenido.tiendaNota}</p>
+            <Link className="btn btn-ink" href={contenido.tiendaUrl}>
+              {contenido.tiendaLabel}
             </Link>
           </div>
         </>
@@ -252,7 +300,7 @@ export function Coleccion({
                 <a
                   className="product product-insp reveal"
                   key={pieza.imageUrl + pieza.title}
-                  href={dmUrl}
+                  href={contenido.dmUrl}
                   target="_blank"
                   rel="noopener"
                 >
@@ -275,9 +323,9 @@ export function Coleccion({
           ) : null}
 
           <div className="coleccion-cta reveal">
-            <p>¿Viste algo en nuestro Instagram que te enamoró?</p>
-            <a className="btn btn-ink" href={dmUrl} target="_blank" rel="noopener">
-              Escríbenos por DM y te lo apartamos
+            <p>{contenido.dmNota}</p>
+            <a className="btn btn-ink" href={contenido.dmUrl} target="_blank" rel="noopener">
+              {contenido.dmLabel}
             </a>
           </div>
         </>
@@ -288,53 +336,40 @@ export function Coleccion({
 
 /* ═══════════ CITA ═══════════ */
 
-export function Cita() {
+export function Cita({ contenido }: { contenido: ContenidoCita }) {
   return (
     <section className="quote">
       <svg className="quote-lotus reveal" viewBox="0 0 120 104" aria-hidden="true">
         <use href="#lotus" />
       </svg>
-      <blockquote className="reveal">
-        «{FINO}Cada prenda cuenta una historia…
-        <br />
-        <em>haz que la tuya brille con estilo.</em>
-        {FINO}»
-      </blockquote>
+      <blockquote className="reveal">{conFormato(contenido.texto)}</blockquote>
     </section>
   );
 }
 
 /* ═══════════ FILOSOFÍA ═══════════ */
 
-export function Filosofia() {
+export function Filosofia({ contenido }: { contenido: ContenidoFilosofia }) {
   return (
     <section className="section filosofia" id="filosofia">
       <div className="filosofia-grid">
         <div className="filosofia-copy">
-          <p className="overline overline-light reveal">02 — Nuestra Filosofía</p>
-          <h2 className="reveal">
-            Vestir con <em className="serif-it">intención</em>
-          </h2>
-          <p className="filosofia-sub reveal">(No es moda… es presencia.)</p>
-          <p className="filosofia-text reveal">
-            En Bloom no seguimos tendencias por seguirlas. Seleccionamos cada pieza pensando en la
-            mujer que la va a llevar: su día, su cuerpo, su momento. Porque cuando te vistes con
-            intención, no entras a un lugar — <em>floreces en él</em>.
-          </p>
+          <p className="overline overline-light reveal">{contenido.overline}</p>
+          <h2 className="reveal">{conFormato(contenido.titulo, "titular")}</h2>
+          {contenido.intro ? (
+            <p className="filosofia-sub reveal">{conFormato(contenido.intro)}</p>
+          ) : null}
+          {contenido.texto ? (
+            <p className="filosofia-text reveal">{conFormato(contenido.texto)}</p>
+          ) : null}
         </div>
         <ol className="filosofia-list">
-          <li className="reveal">
-            <span>01</span>Coherencia
-          </li>
-          <li className="reveal">
-            <span>02</span>Identidad
-          </li>
-          <li className="reveal">
-            <span>03</span>Presencia
-          </li>
-          <li className="reveal">
-            <span>04</span>Intención
-          </li>
+          {contenido.palabras.map((palabra, i) => (
+            <li className="reveal" key={palabra}>
+              <span>{String(i + 1).padStart(2, "0")}</span>
+              {palabra}
+            </li>
+          ))}
         </ol>
       </div>
     </section>
@@ -343,55 +378,31 @@ export function Filosofia() {
 
 /* ═══════════ LA BOUTIQUE ═══════════ */
 
-export function Boutique() {
+export function Boutique({ contenido }: { contenido: ContenidoBoutique }) {
   return (
     <section className="section boutique" id="boutique">
       <div className="boutique-grid">
         <div className="boutique-visual">
           <figure className="boutique-main reveal" data-parallax="0.05">
             {/* eslint-disable-next-line @next/next/no-img-element -- foto local servida tal cual, sin optimizador */}
-            <img
-              src="/assets/boutique-interior.jpg"
-              alt="Interior de la boutique Bloom by Madeline: logo de loto en la pared y mostrador"
-              loading="lazy"
-            />
+            <img src={contenido.foto.url} alt={contenido.foto.alt} loading="lazy" />
           </figure>
           <figure className="boutique-small reveal">
             {/* eslint-disable-next-line @next/next/no-img-element -- foto local servida tal cual, sin optimizador */}
-            <img
-              src="/assets/post-09-coleccion-exclusiva.jpg"
-              alt="Escaparate de Bloom by Madeline con letrero de neón OPEN"
-              loading="lazy"
-            />
+            <img src={contenido.fotoPequena.url} alt={contenido.fotoPequena.alt} loading="lazy" />
           </figure>
         </div>
         <div className="boutique-copy">
-          <p className="overline reveal">03 — La Boutique</p>
-          <h2 className="reveal">
-            Un espacio pensado <em className="serif-it">para{DURO}ti</em>
-          </h2>
-          <p className="reveal">
-            En pleno Grand Blvd de Hamilton, nuestra boutique es ese lugar donde entras «solo a
-            mirar» y sales sintiéndote otra. Pruébate todo, pide opinión y deja que armemos tu
-            outfit juntas.
-          </p>
+          <p className="overline reveal">{contenido.overline}</p>
+          <h2 className="reveal">{conFormato(contenido.titulo, "titular")}</h2>
+          <p className="reveal">{conFormato(contenido.texto)}</p>
           <ul className="boutique-features">
-            <li className="reveal">
-              <strong>Atención personalizada</strong>Te ayudamos a encontrar tu look, sin prisa y sin
-              presión.
-            </li>
-            <li className="reveal">
-              <strong>Pruébatelo antes de llevarlo</strong>Probador en tienda para que salgas segura
-              de tu compra.
-            </li>
-            <li className="reveal">
-              <strong>Nuevas llegadas semanales</strong>Cada semana llegan piezas nuevas — y vuelan
-              rápido.
-            </li>
-            <li className="reveal">
-              <strong>Apartados por DM</strong>¿La viste en Instagram? Escríbenos y te la
-              reservamos.
-            </li>
+            {contenido.ventajas.map((v) => (
+              <li className="reveal" key={v.titulo}>
+                <strong>{v.titulo}</strong>
+                {v.texto}
+              </li>
+            ))}
           </ul>
         </div>
       </div>
@@ -401,52 +412,28 @@ export function Boutique() {
 
 /* ═══════════ CÓMO COMPRAR ═══════════ */
 
-export function ComoComprar({ address, hours }: { address: string; hours: string }) {
+export function ComoComprar({ contenido }: { contenido: ContenidoComoComprar }) {
   return (
     <section className="section como-comprar">
       <div className="section-head">
         <div>
-          <p className="overline reveal">04 — Cómo Comprar</p>
-          <h2 className="reveal">
-            Tan fácil como <em className="serif-it">enamorarse</em>
-          </h2>
+          <p className="overline reveal">{contenido.overline}</p>
+          <h2 className="reveal">{conFormato(contenido.titulo, "titular")}</h2>
         </div>
       </div>
       <div className="pasos">
-        <div className="paso reveal">
-          <svg className="paso-lotus" viewBox="0 0 120 104" aria-hidden="true">
-            <use href="#lotus" />
-          </svg>
-          <span className="paso-num">01</span>
-          <h3>Visítanos en la boutique</h3>
-          {/* Dirección y horario salen de Ajustes: si Madeline los cambia en el
-              panel, cambian aquí sin tocar código. */}
-          <p>
-            {address}. Pruébate todo lo que quieras — {hours.toLowerCase()}.
-          </p>
-        </div>
-        <div className="paso reveal">
-          <svg className="paso-lotus" viewBox="0 0 120 104" aria-hidden="true">
-            <use href="#lotus" />
-          </svg>
-          <span className="paso-num">02</span>
-          <h3>O pide por Instagram DM</h3>
-          <p>
-            ¿Viste una pieza en nuestro perfil? Mándanos un mensaje con la foto y tu talla, y te
-            confirmamos al momento.
-          </p>
-        </div>
-        <div className="paso reveal">
-          <svg className="paso-lotus" viewBox="0 0 120 104" aria-hidden="true">
-            <use href="#lotus" />
-          </svg>
-          <span className="paso-num">03</span>
-          <h3>Envíos a todo USA</h3>
-          <p>
-            ¿No estás en Ohio? No importa. Hacemos envíos a todo Estados Unidos — tu look llega
-            hasta tu puerta.
-          </p>
-        </div>
+        {contenido.pasos.map((paso, i) => (
+          <div className="paso reveal" key={paso.titulo}>
+            <svg className="paso-lotus" viewBox="0 0 120 104" aria-hidden="true">
+              <use href="#lotus" />
+            </svg>
+            <span className="paso-num">{String(i + 1).padStart(2, "0")}</span>
+            <h3>{paso.titulo}</h3>
+            {/* La dirección y el horario del primer paso salen de Ajustes: si
+                Madeline los cambia allí, cambian aquí sin tocar código. */}
+            <p>{conFormato(paso.texto)}</p>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -455,18 +442,16 @@ export function ComoComprar({ address, hours }: { address: string; hours: string
 /* ═══════════ VISÍTANOS ═══════════ */
 
 export function Visitanos({
+  contenido,
   address,
   hours,
   igHandle,
-  dmUrl,
-  mapsUrl,
   mapEmbedUrl,
 }: {
+  contenido: ContenidoVisitanos;
   address: string;
   hours: string;
   igHandle: string;
-  dmUrl: string;
-  mapsUrl: string;
   /** `null` cuando la dirección ya no es la que tiene coordenadas conocidas:
    *  antes que enseñar un mapa que apunta a otro sitio, no se enseña mapa. */
   mapEmbedUrl: string | null;
@@ -478,12 +463,8 @@ export function Visitanos({
     <section className="section visitanos" id="visitanos">
       <div className="visitanos-grid">
         <div className="visitanos-card reveal">
-          <p className="overline">05 — Visítanos</p>
-          <h2>
-            Te esperamos
-            <br />
-            en <em className="serif-it">Hamilton</em>
-          </h2>
+          <p className="overline">{contenido.overline}</p>
+          <h2>{conFormato(contenido.titulo, "titular")}</h2>
           <dl className="visitanos-info">
             <div>
               <dt>Dirección</dt>
@@ -520,22 +501,20 @@ export function Visitanos({
             </div>
           </dl>
           <div className="visitanos-ctas">
-            <a className="btn btn-ink" href={mapsUrl} target="_blank" rel="noopener">
-              Cómo llegar
+            <a className="btn btn-ink" href={contenido.mapaUrl} target="_blank" rel="noopener">
+              {contenido.mapaLabel}
             </a>
-            <a className="btn btn-ghost" href={dmUrl} target="_blank" rel="noopener">
-              Enviar DM
+            <a className="btn btn-ghost" href={contenido.dmUrl} target="_blank" rel="noopener">
+              {contenido.dmLabel}
             </a>
           </div>
-          <p className="visitanos-note">
-            El horario puede variar — confírmalo siempre en nuestro Instagram.
-          </p>
+          <p className="visitanos-note">{conFormato(contenido.nota)}</p>
         </div>
 
         {mapEmbedUrl ? (
           <a
             className="visitanos-map reveal"
-            href={mapsUrl}
+            href={contenido.mapaUrl}
             target="_blank"
             rel="noopener"
             aria-label={`Abrir en Google Maps: ${address}`}
@@ -561,41 +540,64 @@ export function Visitanos({
 
 /* ═══════════ INSTAGRAM ═══════════ */
 
-/** Fotos reales de sus publicaciones, ya en el repo. No es un feed en vivo:
- *  la API de Instagram exige una app aprobada y la boutique no la tiene. */
-const IG_POSTS = [
-  { src: "/assets/post-02-tendencia.jpg", alt: "Publicación de Instagram: set de lunares" },
-  { src: "/assets/post-08-look-perfecto.jpg", alt: "Publicación de Instagram: top de plumas lila" },
-  { src: "/assets/post-10-vestido-orange.jpg", alt: "Publicación de Instagram: vestido naranja" },
-  { src: "/assets/post-12-vestido-coral.jpg", alt: "Publicación de Instagram: vestido durazno" },
-];
-
-export function InstagramGrid({ igUrl, igHandle }: { igUrl: string; igHandle: string }) {
+/**
+ * Fotos reales de sus publicaciones, ya en el repo, y ahora editables desde el
+ * panel. No es un feed en vivo: la API de Instagram exige una app aprobada y la
+ * boutique no la tiene.
+ */
+export function InstagramGrid({ contenido }: { contenido: ContenidoInstagram }) {
   return (
     <section className="section instagram">
       <div className="ig-head reveal">
-        <p className="overline">Síguenos</p>
-        <h2>
-          <em className="serif-it">Enamórate</em> en Instagram
-        </h2>
-        <p className="ig-sub">
-          Únete a más de <strong>2,880 seguidoras</strong> que ven las nuevas llegadas antes que
-          nadie.
-        </p>
+        <p className="overline">{contenido.overline}</p>
+        <h2>{conFormato(contenido.titulo, "titular")}</h2>
+        <p className="ig-sub">{conFormato(contenido.subtitulo)}</p>
       </div>
       <div className="ig-grid">
-        {IG_POSTS.map((post) => (
-          <a className="reveal" key={post.src} href={igUrl} target="_blank" rel="noopener">
+        {contenido.fotos.map((foto) => (
+          <a
+            className="reveal"
+            key={foto.url}
+            href={contenido.ctaUrl}
+            target="_blank"
+            rel="noopener"
+          >
             {/* eslint-disable-next-line @next/next/no-img-element -- foto local servida tal cual, sin optimizador */}
-            <img src={post.src} alt={post.alt} loading="lazy" />
+            <img src={foto.url} alt={foto.alt} loading="lazy" />
           </a>
         ))}
       </div>
       <div className="ig-cta reveal">
-        <a className="btn btn-ink" href={igUrl} target="_blank" rel="noopener">
-          Seguir a @{igHandle}
+        <a className="btn btn-ink" href={contenido.ctaUrl} target="_blank" rel="noopener">
+          {contenido.ctaLabel}
         </a>
       </div>
+    </section>
+  );
+}
+
+/* ═══════════ FRANJA DE AVISO ═══════════ */
+
+/**
+ * La tira para anunciar algo puntual (rebajas, horario especial). No existe en
+ * el sitio de hoy: nace apagada y en blanco, así que mientras Madeline no
+ * escriba nada aquí no se pinta absolutamente nada.
+ *
+ * Usa solo clases que ya existen (`.section`, `.overline`, `.btn`): el módulo no
+ * puede tocar `globals.css`, y una sección con CSS inventado a medias se vería
+ * peor que no tenerla.
+ */
+export function Banner({ contenido }: { contenido: ContenidoBanner }) {
+  if (!contenido.texto && !contenido.linkLabel) return null;
+
+  return (
+    <section className="section banner-aviso" style={{ textAlign: "center" }}>
+      {contenido.texto ? <p className="overline reveal">{conFormato(contenido.texto)}</p> : null}
+      {contenido.linkLabel && contenido.linkUrl ? (
+        <Link className="btn btn-ghost" href={contenido.linkUrl}>
+          {contenido.linkLabel}
+        </Link>
+      ) : null}
     </section>
   );
 }

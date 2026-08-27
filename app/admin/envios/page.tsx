@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/auth";
+import { requireOwner } from "@/lib/permissions";
 import { formatCents, parseToCents } from "@/lib/money";
 import {
   cargarAjustesEnvio,
@@ -58,8 +57,7 @@ const ERRORES: Record<string, string> = {
 type Params = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function EnviosPage({ searchParams }: { searchParams: Params }) {
-  const admin = await getAdmin();
-  if (!admin) redirect("/admin/login");
+  const admin = await requireOwner("envios");
 
   const sp = await searchParams;
   const uno = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : sp[k]) ?? "";

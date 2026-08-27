@@ -718,7 +718,13 @@ export async function customerStats(desde: Date, hasta: Date, limite = 8): Promi
 
 /** Escapa un campo: comillas dobladas y todo entre comillas, que el dinero lleva comas. */
 function celda(valor: string | number | null | undefined): string {
-  const texto = valor === null || valor === undefined ? "" : String(valor);
+  let texto = valor === null || valor === undefined ? "" : String(valor);
+  // Anti-inyección de fórmulas: Excel y Google Sheets EJECUTAN una celda que
+  // empieza por = + - @ (o tab/retorno). Los títulos vienen del proveedor
+  // (AliExpress) y el nombre y correo son de la clienta, así que un
+  // `=HYPERLINK("http://malo")` se ejecutaría al abrir el CSV. Un apóstrofo
+  // delante la vuelve texto; las hojas de cálculo no lo muestran.
+  if (/^[=+\-@\t\r]/.test(texto)) texto = `'${texto}`;
   return `"${texto.replace(/"/g, '""')}"`;
 }
 

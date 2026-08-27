@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/auth";
+import { requireOwner } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { textoPlano } from "@/lib/markdown";
 import { Badge, Button, Card, EmptyState, PageHeader } from "../_components/ui";
@@ -58,8 +57,7 @@ type Props = {
 };
 
 export default async function ContenidoPage({ searchParams }: Props) {
-  const admin = await getAdmin();
-  if (!admin) redirect("/admin/login");
+  const admin = await requireOwner("contenido");
 
   const sp = await searchParams;
   const bloques = await db.homeBlock.findMany({ orderBy: [{ position: "asc" }, { kind: "asc" }] });

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { aplicarStockEnTx } from "@/lib/inventory";
 import { parseToCents } from "@/lib/money";
 
 /**
@@ -102,9 +103,20 @@ export async function fijarStock(productId: string, texto: string): Promise<Resu
   const existe = await db.product.findUnique({ where: { id: productId }, select: { slug: true, title: true } });
   if (!existe) return { ok: false, mensaje: "Ese producto ya no existe." };
 
-  await db.productVariant.updateMany({
-    where: { productId },
-    data: { stock: n, trackStock: true },
+  // La REGLA DE LA CASA (lib/inventory.ts) manda que ningún cambio de stock se
+  // escriba a mano: fijar existencias desde el listado es un recuento, y como tal
+  // deja su línea en el historial de movimientos. Todo en una transacción para
+  // que activar el control y contar cada talla ocurran juntos o no ocurran.
+  const variantes = await db.productVariant.findMany({ where: { productId }, select: { id: true } });
+  await db.$transaction(async (tx) => {
+    await tx.productVariant.updateMany({ where: { productId }, data: { trackStock: true } });
+    for (const v of variantes) {
+      await aplicarStockEnTx(tx, v.id, { setTo: n }, {
+        reason: "count",
+        userId: admin.id,
+        note: "Recuento desde el listado de productos",
+      });
+    }
   });
 
   await logActivity({

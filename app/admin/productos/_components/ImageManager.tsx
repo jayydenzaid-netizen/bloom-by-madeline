@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button, EmptyState } from "../../_components/ui";
+import MediaPicker from "../../medios/_components/MediaPicker";
 import type { ImagenDraft } from "../actions";
 
 /**
@@ -12,6 +13,12 @@ import type { ImagenDraft } from "../actions";
  * Las subidas se mandan en el mismo envío del formulario (input file con
  * name="archivos"): así el producto y sus fotos se guardan o fallan juntos, sin
  * quedarse ficheros huérfanos en /public si el guardado se cae.
+ *
+ * Hay tres vías de añadir foto y cada una resuelve un caso distinto:
+ *  · **biblioteca** — lo normal: una foto que ya está subida al sitio. Es la vía
+ *    buena, porque la URL vive en nuestro dominio y no caduca.
+ *  · **dirección** — para una foto de proveedor recién importada.
+ *  · **subir** — desde el móvil de Madeline, en el mismo envío del formulario.
  */
 
 type Props = {
@@ -22,6 +29,35 @@ type Props = {
 export default function ImageManager({ imagenes, onCambio }: Props) {
   const [nuevaUrl, setNuevaUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Lo elegido en la biblioteca DURANTE esta sesión de edición. No es la lista
+   * de fotos del producto: si lo fuera, el botón "Quitar todas" del picker
+   * borraría de un clic fotos (y textos alternativos) que Madeline no había
+   * tocado. Así, deseleccionar solo puede deshacer lo que ella acaba de añadir.
+   */
+  const [elegidasBiblioteca, setElegidasBiblioteca] = useState<string[]>([]);
+
+  // Una foto deja de contar como "elegida" en cuanto sale de la ficha por otra
+  // vía (el botón Quitar de la tarjeta). Si no, el picker seguiría marcándola.
+  const seleccionViva = elegidasBiblioteca.filter((url) => imagenes.some((img) => img.url === url));
+
+  /**
+   * Reconcilia la selección de la biblioteca con la lista de fotos: lo nuevo se
+   * añade al final y lo que se deselecciona se quita. Se aplica al vuelo, sin
+   * un "confirmar" extra, porque el formulario todavía no ha guardado nada:
+   * hasta que no se pulse Guardar, todo esto es reversible.
+   */
+  function alElegirDeBiblioteca(urls: string[]) {
+    const quitadas = seleccionViva.filter((url) => !urls.includes(url));
+    const nuevas = urls.filter((url) => !imagenes.some((img) => img.url === url));
+
+    setError(null);
+    setElegidasBiblioteca(urls);
+    onCambio([
+      ...imagenes.filter((img) => !quitadas.includes(img.url)),
+      ...nuevas.map((url) => ({ id: null, url, alt: "" })),
+    ]);
+  }
 
   function mover(indice: number, salto: number) {
     const destino = indice + salto;
@@ -110,6 +146,22 @@ export default function ImageManager({ imagenes, onCambio }: Props) {
       )}
 
       {error ? <p className="adm-field-err">{error}</p> : null}
+
+      {/* Biblioteca: el picker es un componente cliente que NO abre un <form>
+          propio y cuyos botones son todos type="button", así que puede vivir
+          dentro del formulario del producto sin enviarlo ni perder lo escrito.
+          Se monta y se desmonta con su propio estado; al cerrarse no deja
+          ninguna capa fija detrás (verificado con document.elementFromPoint). */}
+      <div style={{ marginTop: 18 }}>
+        <MediaPicker
+          multiple
+          label="Biblioteca de imágenes"
+          boton="Elegir de la biblioteca"
+          hint="Las fotos que marques se añaden al final de la lista de arriba. Puedes elegir varias de una vez, y subir una nueva a la biblioteca desde la misma ventana."
+          value={seleccionViva}
+          onChange={alElegirDeBiblioteca}
+        />
+      </div>
 
       <div className="cat-img-alta">
         <div className="adm-field">

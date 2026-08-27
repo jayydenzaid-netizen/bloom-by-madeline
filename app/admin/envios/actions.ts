@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { logActivity } from "@/lib/activity";
-import { getAdmin } from "@/lib/auth";
+import { requireOwner } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { parseToCents } from "@/lib/money";
 import {
@@ -27,9 +27,8 @@ import {
 const VOLVER = "/admin/envios";
 
 async function exigirSesion() {
-  const admin = await getAdmin();
-  if (!admin) redirect("/admin/login");
-  return admin;
+  // Envíos e impuestos: solo la dueña. Devuelve la cuenta (con rol) para la bitácora.
+  return requireOwner("envios");
 }
 
 function refrescar() {

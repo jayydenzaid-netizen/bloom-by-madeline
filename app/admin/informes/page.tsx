@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { z } from "zod";
-import { getAdmin } from "@/lib/auth";
+import { getAdminConRol, requireOwner } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import {
   ATAJOS,
@@ -82,8 +81,10 @@ async function registrarExportacion(datos: { etiqueta: string; filas: number }):
   const validado = EsquemaExportacion.safeParse(datos);
   if (!validado.success) return { ok: false, error: "Datos de la exportación no válidos." };
 
-  const admin = await getAdmin();
-  if (!admin) return { ok: false, error: "La sesión ha caducado. Vuelve a entrar." };
+  const admin = await getAdminConRol();
+  if (!admin || admin.role !== "owner") {
+    return { ok: false, error: "Solo la dueña puede exportar informes." };
+  }
 
   try {
     await db.activityLog.create({
@@ -111,8 +112,7 @@ export default async function InformesPage({
 }) {
   // Defensa en profundidad (ver _ADMIN_UI.md §1): esta pantalla resume la
   // facturación entera de la tienda, no puede filtrarse en un payload RSC.
-  const admin = await getAdmin();
-  if (!admin) redirect("/admin/login");
+  const admin = await requireOwner("informes");
 
   const params = await searchParams;
   const uno = (clave: string): string => {

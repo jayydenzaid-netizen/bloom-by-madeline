@@ -7,6 +7,7 @@ import { z } from "zod";
 import { logActivity } from "@/lib/activity";
 import { hashPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { AYUDA_USUARIO, claveUsuario, validarUsuario } from "@/lib/usuario";
 import {
   ETIQUETA_ROL,
   ROLES,
@@ -46,6 +47,7 @@ export type CodigoEquipo =
   | "sin-permiso"
   | "datos"
   | "email-duplicado"
+  | "usuario-duplicado"
   | "no-existe"
   | "ultimo-owner"
   | "auto-desactivar"
@@ -118,6 +120,11 @@ const idSchema = z.string().trim().min(1).max(64);
 
 const nuevaCuentaSchema = z.object({
   nombre: z.string().trim().min(2, "Escribe el nombre.").max(60, "Ese nombre es demasiado largo."),
+  // El usuario es con lo que se entra; el correo se queda como forma de contacto.
+  usuario: z.string().superRefine((bruto, ctx) => {
+    const veredicto = validarUsuario(bruto);
+    if (!veredicto.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: veredicto.error });
+  }),
   email: z.string().trim().toLowerCase().email("Ese correo no parece válido.").max(160),
   rol: z.enum(ROLES),
 });
@@ -151,15 +158,24 @@ export async function crearCuenta(formData: FormData): Promise<ResultadoEquipo> 
 
   const datos = nuevaCuentaSchema.safeParse({
     nombre: formData.get("nombre"),
+    usuario: formData.get("usuario"),
     email: formData.get("email"),
     rol: formData.get("rol"),
   });
   if (!datos.success) {
-    return { ok: false, codigo: "datos", detalle: datos.error.issues[0]?.message };
+    return { ok: false, codigo: "datos", detalle: datos.error.issues[0]?.message ?? AYUDA_USUARIO };
   }
+
+  const usuario = datos.data.usuario.trim();
 
   const yaExiste = await db.adminUser.findUnique({ where: { email: datos.data.email }, select: { id: true } });
   if (yaExiste) return { ok: false, codigo: "email-duplicado" };
+
+  // Se compara en minúsculas: dos cuentas no pueden ser «Ana» y «ana», o nadie
+  // sabría cuál de las dos abre el panel. La tabla tiene un puñado de filas.
+  const usuarios = await db.adminUser.findMany({ select: { username: true } });
+  const ocupado = usuarios.some((c) => c.username && claveUsuario(c.username) === claveUsuario(usuario));
+  if (ocupado) return { ok: false, codigo: "usuario-duplicado" };
 
   const clave = generarClaveInicial();
 
@@ -167,6 +183,7 @@ export async function crearCuenta(formData: FormData): Promise<ResultadoEquipo> 
     const creada = await db.adminUser.create({
       data: {
         name: datos.data.nombre,
+        username: usuario,
         email: datos.data.email,
         role: datos.data.rol,
         isActive: true,
@@ -183,8 +200,8 @@ export async function crearCuenta(formData: FormData): Promise<ResultadoEquipo> 
       action: "create",
       entityType: "admin_user",
       entityId: creada.id,
-      summary: `Creó la cuenta de ${datos.data.nombre} (${datos.data.email}) como ${ETIQUETA_ROL[datos.data.rol]}`,
-      meta: { rol: datos.data.rol },
+      summary: `Creó la cuenta de ${datos.data.nombre} (usuario ${usuario}) como ${ETIQUETA_ROL[datos.data.rol]}`,
+      meta: { rol: datos.data.rol, usuario, email: datos.data.email },
     });
 
     refrescar();

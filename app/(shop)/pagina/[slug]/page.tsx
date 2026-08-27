@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { redirigirSiHay } from "@/lib/seo";
+import { getSettings } from "@/lib/settings";
 import { db } from "@/lib/db";
 import { markdownAHtml, textoPlano } from "@/lib/markdown";
 
@@ -55,8 +57,12 @@ const fecha = new Intl.DateTimeFormat("es-US", { day: "numeric", month: "long", 
 export default async function PaginaPublica({ params }: Props) {
   const { slug } = await params;
   const pagina = await buscarPagina(slug);
-  if (!pagina) notFound();
+  if (!pagina) {
+    await redirigirSiHay(`/pagina/${slug}`);
+    notFound();
+  }
 
+  const settings = await getSettings();
   const html = markdownAHtml(pagina.content);
 
   return (
@@ -80,7 +86,7 @@ export default async function PaginaPublica({ params }: Props) {
           <p>Última actualización: {fecha.format(pagina.updatedAt)}</p>
           <p>
             ¿Te queda alguna duda? Escríbenos por{" "}
-            <a href="https://ig.me/m/bloombymadelin" target="_blank" rel="noopener noreferrer">
+            <a href={settings.instagramDm} target="_blank" rel="noopener noreferrer">
               Instagram
             </a>{" "}
             o pásate por la boutique.

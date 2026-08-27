@@ -59,7 +59,7 @@ const FALLO: Record<string, string> = {
   "clave-actual": "La contraseña actual no es correcta.",
   "clave-debil":
     "Esa contraseña es demasiado fácil. Necesita 10 caracteres o más, con letras y algún número " +
-    "(o 16 caracteres si prefieres una frase), y no puede llevar dentro tu nombre ni tu correo.",
+    "(o 16 caracteres si prefieres una frase), y no puede llevar dentro tu nombre, tu usuario ni tu correo.",
   "no-coincide": "Las dos contraseñas nuevas no son iguales.",
   "clave-repetida": "Esa es la contraseña que ya tenías. Elige una distinta.",
   "sesion-actual": "Esa es la sesión de este dispositivo. Para cerrarla usa «Salir» en el menú.",
@@ -182,6 +182,9 @@ export default async function CuentaPage({
       <div className="adm-cols-2">
         <Card title="Tus datos">
           <dl className="eq-datos">
+            {/* Primero el usuario: es lo que hay que escribir para entrar. */}
+            <dt>Usuario</dt>
+            <dd>{admin.username ?? "—"}</dd>
             <dt>Correo</dt>
             <dd>{admin.email}</dd>
             <dt>Rol</dt>

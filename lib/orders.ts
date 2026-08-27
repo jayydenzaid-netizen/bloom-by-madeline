@@ -2,8 +2,21 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { describirValor, redeemDiscount, validateDiscount } from "@/lib/discounts";
+import { descontarVentaEnTx } from "@/lib/inventory";
 import { formatCents } from "@/lib/money";
 import { getSettings } from "@/lib/settings";
+import {
+  cargarZonas,
+  getTaxConfig,
+  resolverEnvio,
+  resolverImpuesto,
+  type AjustesEnvio,
+  type ConfigImpuestos,
+  type Destino,
+  type ResultadoEnvio,
+  type ZonaEnvio,
+} from "@/lib/shipping";
 
 /**
  * Pedidos: numeración correlativa, creación desde el carrito y control de acceso
@@ -82,6 +95,9 @@ export type CheckoutDetails = {
   country?: string;
   note?: string;
   paymentMethod: OrderPaymentMethod;
+  /** Código de descuento escrito por la clienta (opcional). El importe NUNCA
+   *  llega del formulario: se recalcula aquí con `validateDiscount`. */
+  discountCode?: string;
 };
 
 /**
@@ -112,10 +128,26 @@ export async function createOrderFromCart(
   }
 
   // Los ajustes son configuración, no dinero del pedido: se pueden leer fuera de la
-  // transacción. Los precios, no.
+  // transacción. Los precios, no. Cargamos también las zonas de envío y el impuesto
+  // configurados en el panel, para que la caja cobre lo que Madeline dejó puesto y
+  // no un envío plano fijo. Con la config por defecto (sin zonas, impuesto apagado)
+  // esto da EXACTAMENTE lo mismo que antes: solo cambia cuando ella lo configura.
   const settings = await getSettings();
+  const [zonas, taxCfg] = await Promise.all([cargarZonas(), getTaxConfig()]);
+  const ajustesEnvio: AjustesEnvio = {
+    freeShippingOverCents: settings.freeShippingOverCents,
+    flatShippingCents: settings.flatShippingCents,
+    localPickup: settings.localPickup,
+    shippingNotice: settings.shippingNotice,
+  };
   const email = details.email.trim().toLowerCase();
   const pickup = details.paymentMethod === "pickup";
+  // El destino manda en el envío por zona y en el impuesto. En recogida no hay
+  // dirección de envío: el envío es 0 y el impuesto de mostrador lo decide Madeline
+  // con su contable, así que aquí no se cobra impuesto de recogida.
+  const destino: Destino = pickup
+    ? { country: "US" }
+    : { state: details.state, country: (details.country ?? "US").trim().toUpperCase() || "US" };
 
   for (let intento = 0; intento < NUMBER_RETRIES; intento++) {
     try {
@@ -129,6 +161,9 @@ export async function createOrderFromCart(
                 product: {
                   include: {
                     images: { orderBy: { position: "asc" }, take: 1, select: { url: true } },
+                    // Para poder evaluar un código con ámbito de colección: qué
+                    // colecciones cubre cada línea del carrito.
+                    collections: { select: { collectionId: true } },
                   },
                 },
               },
@@ -153,6 +188,7 @@ export async function createOrderFromCart(
           costCents: number | null;
           quantity: number;
           descontarStock: boolean;
+          collectionIds: string[];
         }[] = [];
 
         for (const item of cart.items) {
@@ -167,16 +203,18 @@ export async function createOrderFromCart(
             cambios.push(`«${product.title}» todavía no tiene precio publicado.`);
             continue;
           }
+          let cantidad = item.quantity;
           if (variant.trackStock) {
             if (variant.stock <= 0) {
               cambios.push(`«${product.title} · ${variant.title}» se agotó.`);
               continue;
             }
             if (variant.stock < item.quantity) {
-              cambios.push(
-                `De «${product.title} · ${variant.title}» solo quedan ${variant.stock}.`,
-              );
-              continue;
+              // El carrito ya le muestra la cantidad recortada al stock disponible
+              // (ver getCart en lib/cart.ts); aquí se respeta esa misma cantidad en
+              // vez de rechazar la compra. Antes esto era un bucle: la clienta veía
+              // 2 unidades en el carrito, pulsaba pagar y le decían «solo quedan 2».
+              cantidad = variant.stock;
             }
           }
 
@@ -191,8 +229,9 @@ export async function createOrderFromCart(
             imageUrl: variant.imageUrl ?? product.images[0]?.url ?? null,
             priceCents: variant.priceCents,
             costCents: variant.costCents ?? null,
-            quantity: item.quantity,
+            quantity: cantidad,
             descontarStock: variant.trackStock,
+            collectionIds: product.collections.map((c) => c.collectionId),
           });
         }
 
@@ -207,9 +246,35 @@ export async function createOrderFromCart(
         }
 
         // ── 2. Totales, calculados aquí y solo aquí ──
-        const subtotalCents = lines.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
-        const shippingCents = pickup ? 0 : shippingForSubtotal(subtotalCents, settings);
-        const totalCents = subtotalCents + shippingCents;
+        // Toda la matemática (descuento, envío por zona, impuesto) vive en
+        // `calcularTotales`, la MISMA función que usa la cotización en vivo del
+        // checkout: así la caja nunca puede enseñar un número y cobrar otro. Se
+        // valida el código DENTRO de la transacción (con `tx`) contra el mismo
+        // estado que se va a canjear.
+        const codigoDescuento = (details.discountCode ?? "").trim();
+        const desglose = await calcularTotales({
+          lines: lines.map((l) => ({
+            productId: l.productId,
+            collectionIds: l.collectionIds,
+            priceCents: l.priceCents,
+            quantity: l.quantity,
+          })),
+          destino,
+          pickup,
+          code: codigoDescuento,
+          email,
+          zonas,
+          ajustesEnvio,
+          taxCfg,
+          cliente: tx,
+        });
+        // Un código inválido no se traga en silencio: la clienta lo escribió
+        // esperando una rebaja, y cobrarle el precio entero sin avisar la engaña.
+        if (codigoDescuento && desglose.discountError) {
+          throw new OrderProblem(desglose.discountError, false);
+        }
+        const { subtotalCents, discountCents, shippingCents, taxCents, totalCents } = desglose;
+        const discountId = desglose.discountId;
 
         // ── 3. Clienta (upsert por email, sin borrar lo que ya sabíamos de ella) ──
         const customer = await tx.customer.upsert({
@@ -241,8 +306,8 @@ export async function createOrderFromCart(
             paymentMethod: details.paymentMethod,
             subtotalCents,
             shippingCents,
-            taxCents: 0,
-            discountCents: 0,
+            taxCents,
+            discountCents,
             totalCents,
             // En recogida no se pide dirección: guardar una a medias confunde al preparar.
             shipName: pickup ? "" : details.name.trim(),
@@ -271,15 +336,16 @@ export async function createOrderFromCart(
         });
 
         // ── 5. Stock: solo de las variantes que lo controlan ──
+        // Por la puerta oficial de inventario: descuenta con el mismo guardia
+        // atómico de antes (solo si aún hay bastante) Y deja su StockMovement con
+        // razón `sale`, para que la venta web aparezca en el historial igual que
+        // ya hace el mostrador. Sin `userId`: la hizo la clienta, no el panel.
         for (const l of lines) {
           if (!l.descontarStock) continue;
-          // El `gte` en el WHERE es la comprobación de verdad: si otra compra se coló
-          // entre la validación y este UPDATE, no descuenta nada y la cuenta sale 0.
-          const res = await tx.productVariant.updateMany({
-            where: { id: l.variantId, trackStock: true, stock: { gte: l.quantity } },
-            data: { stock: { decrement: l.quantity } },
+          const cambio = await descontarVentaEnTx(tx, l.variantId, l.quantity, {
+            reference: order.number,
           });
-          if (res.count !== 1) {
+          if (!cambio) {
             throw new OrderProblem(
               `«${l.title} · ${l.variantTitle}» se agotó mientras confirmabas. Revisa tu carrito.`,
               true,
@@ -287,7 +353,16 @@ export async function createOrderFromCart(
           }
         }
 
-        // ── 6. El carrito ya cumplió su función ──
+        // ── 6. Canje del descuento, dentro de la misma transacción ──
+        // Así el uso del código y el pedido entran juntos: nunca se cuenta un uso
+        // de un pedido que no llegó a crearse, ni se cobra una rebaja sin registrar
+        // el uso. El `updateMany` condicionado corta la carrera por el último uso.
+        if (discountId) {
+          const canje = await redeemDiscount(discountId, order.id, email, tx);
+          if (!canje.ok) throw new OrderProblem(canje.reason, false);
+        }
+
+        // ── 7. El carrito ya cumplió su función ──
         await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
 
         return {
@@ -333,6 +408,122 @@ export function shippingForSubtotal(
   if (settings.freeShippingOverCents <= 0) return 0;
   if (subtotalCents >= settings.freeShippingOverCents) return 0;
   return settings.flatShippingCents;
+}
+
+/**
+ * De todas las opciones de envío a domicilio que devuelve `resolverEnvio` (puede
+ * haber estándar y exprés), la MÁS BARATA. Es lo que la caja cobra mientras no
+ * exista un selector de método de envío: nunca se le cobra a la clienta la opción
+ * cara sin que ella la elija. La recogida se excluye (se ofrece aparte, a 0).
+ */
+function envioMasBarato(resultado: ResultadoEnvio): number {
+  const domicilio = resultado.opciones.filter((o) => !o.esRecogida);
+  if (domicilio.length === 0) return 0;
+  const minimo = domicilio.reduce(
+    (min, o) => Math.min(min, Math.max(0, Math.round(o.priceCents || 0))),
+    Number.POSITIVE_INFINITY,
+  );
+  return Number.isFinite(minimo) ? minimo : 0;
+}
+
+/** Una línea del pedido con lo justo para calcular descuento, envío e impuesto. */
+export type LineaCalculo = {
+  productId: string;
+  collectionIds: string[];
+  priceCents: number;
+  quantity: number;
+};
+
+/** El desglose completo de un pedido: lo que se guarda Y lo que se enseña. */
+export type DesgloseTotales = {
+  subtotalCents: number;
+  discountCents: number;
+  /** id del descuento aplicado, para canjearlo. null si no hay o no vale. */
+  discountId: string | null;
+  /** "20 %" · "$10.00" · "Envío gratis" — para la línea del resumen. */
+  discountLabel: string | null;
+  /** Motivo por el que el código NO se aplicó (para enseñárselo a la clienta). */
+  discountError: string | null;
+  freeShipping: boolean;
+  shippingCents: number;
+  taxCents: number;
+  taxLabel: string;
+  totalCents: number;
+};
+
+/**
+ * La matemática del pedido en un solo sitio: descuento, envío por zona e
+ * impuesto sobre la base ya rebajada. La usan por igual `createOrderFromCart` (lo
+ * que se cobra) y `cotizarCheckout` (lo que se enseña antes de confirmar), para
+ * que sea imposible que difieran.
+ *
+ * Un código inválido NO revienta aquí: se devuelve en `discountError` y los
+ * totales salen sin él. Es el llamador quien decide —el pedido aborta, la
+ * cotización solo lo muestra—. Con `cliente` (una transacción) el código se
+ * valida contra el mismo estado que se va a canjear.
+ */
+export async function calcularTotales(params: {
+  lines: LineaCalculo[];
+  destino: Destino;
+  pickup: boolean;
+  code: string;
+  email: string;
+  zonas: ZonaEnvio[];
+  ajustesEnvio: AjustesEnvio;
+  taxCfg: ConfigImpuestos;
+  cliente?: Prisma.TransactionClient;
+}): Promise<DesgloseTotales> {
+  const { lines, destino, pickup, zonas, ajustesEnvio, taxCfg } = params;
+  const subtotalCents = lines.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
+
+  let discountCents = 0;
+  let freeShipping = false;
+  let discountId: string | null = null;
+  let discountLabel: string | null = null;
+  let discountError: string | null = null;
+
+  const code = params.code.trim();
+  if (code) {
+    const res = await validateDiscount(
+      code,
+      { subtotalCents, email: params.email, lineas: lines },
+      params.cliente,
+    );
+    if (res.ok) {
+      discountCents = res.discountCents;
+      freeShipping = res.freeShipping;
+      discountId = res.discount.id;
+      discountLabel = describirValor(res.discount);
+    } else {
+      discountError = res.reason;
+    }
+  }
+
+  const envio = resolverEnvio(subtotalCents, destino, { zonas, ajustes: ajustesEnvio });
+  const shippingCents = pickup || freeShipping ? 0 : envioMasBarato(envio);
+
+  // El impuesto grava la base ya rebajada (subtotal − descuento), nunca el envío
+  // salvo que la contable lo confirme. En recogida no se cobra impuesto de envío.
+  const baseImponible = Math.max(0, subtotalCents - discountCents);
+  const imp = pickup
+    ? { taxCents: 0, etiqueta: taxCfg.etiqueta }
+    : resolverImpuesto(baseImponible, destino, taxCfg);
+  const taxCents = imp.taxCents;
+
+  const totalCents = Math.max(0, subtotalCents - discountCents) + shippingCents + taxCents;
+
+  return {
+    subtotalCents,
+    discountCents,
+    discountId,
+    discountLabel,
+    discountError,
+    freeShipping,
+    shippingCents,
+    taxCents,
+    taxLabel: imp.etiqueta,
+    totalCents,
+  };
 }
 
 // ─────────────────────────────── consultar ───────────────────────────────
@@ -465,11 +656,18 @@ export function buildDmSummary(input: {
   subtotalCents: number;
   shippingCents: number;
   totalCents: number;
+  /** Rebaja aplicada (opcional): sin ella el total no cuadraría con las líneas. */
+  discountCents?: number;
+  /** Impuesto cobrado (opcional). */
+  taxCents?: number;
   orderNumber?: string | null;
 }): string {
   const cabecera = input.orderNumber
     ? `✿ Pedido ${input.orderNumber} — Bloom by Madeline`
     : "✿ Pedido — Bloom by Madeline";
+
+  const descuento = input.discountCents ?? 0;
+  const impuesto = input.taxCents ?? 0;
 
   return [
     cabecera,
@@ -478,7 +676,11 @@ export function buildDmSummary(input: {
         `${l.quantity}× ${l.title}${l.variantTitle ? ` · ${l.variantTitle}` : ""} — ${formatCents(l.lineTotalCents)}`,
     ),
     `Subtotal: ${formatCents(input.subtotalCents)}`,
+    // Descuento e impuesto solo aparecen si los hay: un DM con «Descuento: $0.00»
+    // solo confunde. Sin ellos, esto queda idéntico a como estaba.
+    ...(descuento > 0 ? [`Descuento: −${formatCents(descuento)}`] : []),
     `Envío: ${input.shippingCents === 0 ? "gratis" : formatCents(input.shippingCents)}`,
+    ...(impuesto > 0 ? [`Impuesto: ${formatCents(impuesto)}`] : []),
     `Total: ${formatCents(input.totalCents)}`,
   ].join("\n");
 }

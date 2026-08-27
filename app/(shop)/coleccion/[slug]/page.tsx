@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { redirigirSiHay } from "@/lib/seo";
 import { db } from "@/lib/db";
 import {
   Catalogo,
@@ -54,7 +55,10 @@ export default async function ColeccionPage({ params, searchParams }: Props) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
 
   const coleccion = await buscarColeccion(slug);
-  if (!coleccion) notFound();
+  if (!coleccion) {
+    await redirigirSiHay(`/coleccion/${slug}`);
+    notFound();
+  }
 
   // Aquí la colección la fija la ruta: el parámetro `col` no pinta nada.
   const filtros = { ...leerParams(sp), col: "" };

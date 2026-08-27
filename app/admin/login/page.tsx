@@ -2,13 +2,14 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
+import { USUARIO_MAX } from "@/lib/usuario";
 import { loginAction, type LoginState } from "./actions";
 
 /**
  * Entrada al panel.
  *
  * Es componente cliente porque el error tiene que aparecer bajo el formulario
- * sin recargar ni viajar por la URL: el correo de Madeline no pinta nada en la
+ * sin recargar ni viajar por la URL: el usuario de Madeline no pinta nada en la
  * barra de direcciones ni en los logs del servidor.
  *
  * Ojo: esta pantalla también la pinta app/admin/layout.tsx cuando no hay sesión,
@@ -33,17 +34,24 @@ export default function LoginPage() {
 
       <form action={formAction} noValidate>
         <div className="adm-field">
-          <label className="adm-field-lbl" htmlFor="adm-email">
-            Correo
+          <label className="adm-field-lbl" htmlFor="adm-usuario">
+            Usuario
           </label>
           <input
-            id="adm-email"
-            name="email"
-            type="email"
+            id="adm-usuario"
+            name="usuario"
+            type="text"
             autoComplete="username"
+            /* El teclado del móvil pone mayúscula a la primera letra por su
+               cuenta y el corrector "arregla" nombres que no son palabras: los
+               dos han dejado a gente fuera de su propio panel. Aquí se apagan. */
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            maxLength={USUARIO_MAX}
             autoFocus
             required
-            placeholder="tucorreo@ejemplo.com"
+            placeholder="tu usuario"
           />
         </div>
 

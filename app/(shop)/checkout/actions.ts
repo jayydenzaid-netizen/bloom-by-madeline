@@ -4,12 +4,21 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { readCartToken } from "@/lib/cart";
+import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import {
+  cargarZonas,
+  getTaxConfig,
+  type AjustesEnvio,
+  type Destino,
+} from "@/lib/shipping";
+import {
+  calcularTotales,
   createOrderFromCart,
   emailMatchesOrder,
   grantOrderAccess,
   normalizeOrderNumber,
+  type LineaCalculo,
   type OrderPaymentMethod,
 } from "@/lib/orders";
 
@@ -31,7 +40,8 @@ export type CheckoutField =
   | "state"
   | "zip"
   | "note"
-  | "paymentMethod";
+  | "paymentMethod"
+  | "discountCode";
 
 export type CheckoutState = {
   /** Error general (carrito vacío, método no disponible, fallo al guardar). */
@@ -59,6 +69,7 @@ const ESTADO_VACIO: CheckoutState = {
     zip: "",
     note: "",
     paymentMethod: "",
+    discountCode: "",
   },
 };
 
@@ -73,6 +84,7 @@ const CAMPOS: CheckoutField[] = [
   "zip",
   "note",
   "paymentMethod",
+  "discountCode",
 ];
 
 function readValues(formData: FormData): Record<CheckoutField, string> {
@@ -109,6 +121,8 @@ const checkoutSchema = z
     paymentMethod: z.enum(["dm", "pickup", "stripe"], {
       errorMap: () => ({ message: "Elige cómo quieres pagar." }),
     }),
+    // El código es opcional; su validez la decide `validateDiscount` en el pedido.
+    discountCode: z.string().trim().max(40, "El código es demasiado largo."),
   })
   .superRefine((data, ctx) => {
     if (data.paymentMethod === "pickup") return;
@@ -194,9 +208,19 @@ export async function submitCheckout(
     country: "US",
     note: data.note,
     paymentMethod: data.paymentMethod,
+    discountCode: data.discountCode,
   });
 
   if (!result.ok) {
+    // Si el fallo es del código (y ella escribió uno), se marca junto al campo del
+    // código para que sepa qué corregir, en vez de un error general despistante.
+    if (data.discountCode && !result.changed) {
+      return {
+        fieldErrors: { discountCode: result.error },
+        values,
+        formError: "Revisa el código de descuento.",
+      };
+    }
     return { fieldErrors: {}, values, formError: result.error };
   }
 
@@ -207,6 +231,107 @@ export async function submitCheckout(
 
   // Fuera de cualquier try: redirect() funciona lanzando y un catch se lo tragaría.
   redirect(`/pedido/${result.number}`);
+}
+
+/* ───────────────────────── cotización en vivo ───────────────────────── */
+
+/** Lo que el resumen del checkout necesita para pintarse sin sorpresas al pagar. */
+export type CotizacionCheckout = {
+  subtotalCents: number;
+  discountCents: number;
+  discountLabel: string | null;
+  discountError: string | null;
+  freeShipping: boolean;
+  shippingCents: number;
+  taxCents: number;
+  taxLabel: string;
+  totalCents: number;
+};
+
+/**
+ * Recalcula el desglose (descuento, envío por zona, impuesto) con los datos que
+ * la clienta va escribiendo, para que el resumen enseñe EXACTAMENTE lo que se va
+ * a registrar. Usa la misma `calcularTotales` que el pedido: es imposible que
+ * difieran. Solo lee; no crea nada. Los precios salen de la BD, nunca del
+ * navegador.
+ */
+export async function cotizarCheckout(input: {
+  state: string;
+  country?: string;
+  pickup: boolean;
+  code: string;
+  email: string;
+}): Promise<CotizacionCheckout> {
+  const token = await readCartToken();
+  const [cart, settings, zonas, taxCfg] = await Promise.all([
+    token
+      ? db.cart.findUnique({
+          where: { token },
+          include: {
+            items: {
+              include: {
+                variant: true,
+                product: { include: { collections: { select: { collectionId: true } } } },
+              },
+            },
+          },
+        })
+      : null,
+    getSettings(),
+    cargarZonas(),
+    getTaxConfig(),
+  ]);
+
+  const lines: LineaCalculo[] = [];
+  for (const item of cart?.items ?? []) {
+    const { product, variant } = item;
+    if (!product || !variant || product.status !== "active" || variant.priceCents <= 0) continue;
+    let cantidad = item.quantity;
+    if (variant.trackStock) {
+      if (variant.stock <= 0) continue;
+      if (variant.stock < item.quantity) cantidad = variant.stock;
+    }
+    lines.push({
+      productId: product.id,
+      collectionIds: product.collections.map((c) => c.collectionId),
+      priceCents: variant.priceCents,
+      quantity: cantidad,
+    });
+  }
+
+  const ajustesEnvio: AjustesEnvio = {
+    freeShippingOverCents: settings.freeShippingOverCents,
+    flatShippingCents: settings.flatShippingCents,
+    localPickup: settings.localPickup,
+    shippingNotice: settings.shippingNotice,
+  };
+  const destino: Destino = input.pickup
+    ? { country: "US" }
+    : { state: input.state, country: (input.country ?? "US").trim().toUpperCase() || "US" };
+
+  const d = await calcularTotales({
+    lines,
+    destino,
+    pickup: input.pickup,
+    code: input.code,
+    // Con correo se comprueba «una vez por clienta»; vacío no rompe nada.
+    email: input.email.trim(),
+    zonas,
+    ajustesEnvio,
+    taxCfg,
+  });
+
+  return {
+    subtotalCents: d.subtotalCents,
+    discountCents: d.discountCents,
+    discountLabel: d.discountLabel,
+    discountError: d.discountError,
+    freeShipping: d.freeShipping,
+    shippingCents: d.shippingCents,
+    taxCents: d.taxCents,
+    taxLabel: d.taxLabel,
+    totalCents: d.totalCents,
+  };
 }
 
 /**

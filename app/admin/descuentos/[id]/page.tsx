@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getAdmin } from "@/lib/auth";
+import { notFound } from "next/navigation";
+import { requireOwner } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { idsAplicables } from "@/lib/discounts";
 import { Card, DataTable, EmptyState, Money, type Column } from "../../_components/ui";
@@ -49,8 +49,7 @@ export default async function DescuentoPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const admin = await getAdmin();
-  if (!admin) redirect("/admin/login");
+  const admin = await requireOwner("descuentos");
 
   // En Next 15 params y searchParams son promesas: hay que esperarlas.
   const { id } = await params;

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { redirigirSiHay } from "@/lib/seo";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatCents } from "@/lib/money";
@@ -124,7 +125,13 @@ export default async function ProductoPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const vistaPrevia = await vistaPreviaAutorizada(searchParams);
   const producto = await buscarProducto(slug, vistaPrevia);
-  if (!producto) notFound();
+  if (!producto) {
+    // Si Madeline cambió el slug y dejó una redirección en Herramientas, el enlace
+    // viejo (el que anda por los DMs de Instagram) lleva a la prenda nueva con un
+    // 308, en vez de morir en un 404. Solo se consulta cuando ya iba a ser 404.
+    await redirigirSiHay(`/producto/${slug}`);
+    notFound();
+  }
 
   // La banda solo aparece cuando lo que se está viendo NO es lo que ve la
   // clienta. Si la pieza ya está activa, la vista previa y la página pública son

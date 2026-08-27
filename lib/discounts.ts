@@ -15,6 +15,7 @@
 // (`validateDiscount` y `redeemDiscount`) cargan el cliente de Prisma bajo
 // demanda, ya dentro de la función.
 
+import type { Prisma } from "@prisma/client";
 import { formatCents } from "@/lib/money";
 
 /* ─────────────────────────────── tipos ─────────────────────────────── */
@@ -290,11 +291,17 @@ async function baseDeDatos() {
  * límite de usos, que el subtotal llega al mínimo y que —si es de un solo uso
  * por clienta— ese correo no lo gastó ya.
  */
-export async function validateDiscount(code: string, ctx: ContextoDescuento): Promise<ResultadoDescuento> {
+export async function validateDiscount(
+  code: string,
+  ctx: ContextoDescuento,
+  /** Cliente de transacción, para validar dentro de la misma transacción que crea
+   *  el pedido (así el código se comprueba contra el estado que se va a canjear). */
+  tx?: Prisma.TransactionClient,
+): Promise<ResultadoDescuento> {
   const codigo = normalizarCodigo(code);
   if (!codigo) return { ok: false, reason: "Escribe un código de descuento para aplicarlo." };
 
-  const db = await baseDeDatos();
+  const db = tx ?? (await baseDeDatos());
   const discount = await db.discount.findUnique({ where: { code: codigo } });
   if (!discount) {
     return { ok: false, reason: "Ese código no existe. Revísalo, a lo mejor se coló una letra." };
@@ -327,17 +334,19 @@ export async function redeemDiscount(
   discountId: string,
   orderId: string,
   email: string | null | undefined,
+  /** Si se pasa, el canje corre DENTRO de esa transacción (la del pedido) en vez
+   *  de abrir una propia: así el uso del código y el pedido entran juntos o no
+   *  entra ninguno. Sin él, abre su transacción como siempre. */
+  tx?: Prisma.TransactionClient,
 ): Promise<ResultadoCanje> {
-  const db = await baseDeDatos();
-
-  return db.$transaction(async (tx): Promise<ResultadoCanje> => {
-    const discount = await tx.discount.findUnique({
+  const canjear = async (cliente: Prisma.TransactionClient): Promise<ResultadoCanje> => {
+    const discount = await cliente.discount.findUnique({
       where: { id: discountId },
       select: { id: true, usageLimit: true, usageCount: true },
     });
     if (!discount) return { ok: false, reason: "Ese código de descuento ya no existe." };
 
-    const actualizados = await tx.discount.updateMany({
+    const actualizados = await cliente.discount.updateMany({
       where:
         discount.usageLimit > 0
           ? { id: discountId, usageCount: { lt: discount.usageLimit } }
@@ -348,12 +357,17 @@ export async function redeemDiscount(
       return { ok: false, reason: "Este código se agotó justo ahora: alguien usó el último." };
     }
 
-    await tx.discountUsage.create({
+    await cliente.discountUsage.create({
       data: { discountId, orderId, email: normalizarEmail(email) },
     });
 
     return { ok: true, usageCount: discount.usageCount + 1 };
-  });
+  };
+
+  if (tx) return canjear(tx);
+
+  const db = await baseDeDatos();
+  return db.$transaction(canjear);
 }
 
 /* ───────────────────── cómo se cuenta y se enseña ───────────────────── */

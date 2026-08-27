@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/auth";
+import { requireOwner } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import DiscountForm from "../_components/DiscountForm";
 
@@ -16,8 +15,7 @@ import DiscountForm from "../_components/DiscountForm";
 export const dynamic = "force-dynamic";
 
 export default async function NuevoDescuentoPage() {
-  const admin = await getAdmin();
-  if (!admin) redirect("/admin/login");
+  const admin = await requireOwner("descuentos");
 
   const [colecciones, productos] = await Promise.all([
     db.collection.findMany({ orderBy: [{ position: "asc" }, { title: "asc" }], select: { id: true, title: true } }),

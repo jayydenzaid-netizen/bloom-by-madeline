@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { USUARIO_MAX } from "@/lib/usuario";
 import {
   DESCRIPCION_ROL,
   ETIQUETA_ROL,
@@ -70,6 +71,7 @@ const FALLO: Record<string, string> = {
   "sin-permiso": "Esta sección es solo para la dueña de la tienda.",
   datos: "Revisa los datos: falta algo o no tiene el formato correcto.",
   "email-duplicado": "Ya hay una cuenta con ese correo.",
+  "usuario-duplicado": "Ese usuario ya está cogido. Elige otro.",
   "no-existe": "Esa cuenta ya no existe.",
   "ultimo-owner":
     "No se puede: es la última cuenta de dueña activa. Si la apagas o la conviertes en ayudante, " +
@@ -86,6 +88,7 @@ const FALLO: Record<string, string> = {
 type Cuenta = {
   id: string;
   name: string;
+  username: string | null;
   email: string;
   role: Rol;
   isActive: boolean;
@@ -118,7 +121,16 @@ export default async function EquipoPage({
   const [filas, sesionesPorUsuario] = await Promise.all([
     db.adminUser.findMany({
       orderBy: [{ isActive: "desc" }, { createdAt: "asc" }],
-      select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true, lastLoginAt: true },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        lastLoginAt: true,
+      },
     }),
     db.session.groupBy({ by: ["userId"], where: { expiresAt: { gt: ahora } }, _count: { _all: true } }),
   ]);
@@ -151,7 +163,10 @@ export default async function EquipoPage({
             {c.name || "Sin nombre"}
             {c.id === admin.id ? <Badge tone="info">Tú</Badge> : null}
           </span>
-          <span className="adm-muted adm-small">{c.email}</span>
+          <span className="adm-muted adm-small">
+            {/* Lo primero es el usuario: es el dato que hace falta para entrar. */}
+            {c.username ? `usuario: ${c.username}` : "sin usuario"} · {c.email}
+          </span>
         </div>
       ),
     },
@@ -264,8 +279,9 @@ export default async function EquipoPage({
       {claveNueva && cuentaNueva ? (
         <Card title="Contraseña para entrar">
           <p className="eq-nota">
-            Esta contraseña es para <strong>{cuentaNueva.name || cuentaNueva.email}</strong>. Aquí no hay correo
-            configurado, así que <strong>tienes que dársela tú en mano</strong> (o por mensaje). Se enseña solo
+            Esta contraseña es para <strong>{cuentaNueva.name || cuentaNueva.email}</strong>, que entra con el
+            usuario <strong>{cuentaNueva.username ?? "—"}</strong>. Aquí no hay correo configurado, así que{" "}
+            <strong>tienes que darle las dos cosas en mano</strong> (o por mensaje). La contraseña se enseña solo
             ahora: si cierras esta pantalla o pasan 30 minutos, desaparece y habrá que generar otra.
           </p>
           <p className="eq-clave" aria-label="Contraseña inicial">
@@ -317,7 +333,23 @@ export default async function EquipoPage({
               <input id="nombre" name="nombre" type="text" required maxLength={60} autoComplete="off" />
             </Field>
 
-            <Field label="Correo" htmlFor="email" required hint="Con este correo entrará en el panel.">
+            <Field label="Usuario" htmlFor="usuario" required hint="Con esto entrará en el panel. Sin espacios.">
+              <input
+                id="usuario"
+                name="usuario"
+                type="text"
+                required
+                maxLength={USUARIO_MAX}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoComplete="off"
+              />
+            </Field>
+          </div>
+
+          <div className="adm-cols-2">
+            <Field label="Correo" htmlFor="email" required hint="Para avisarla y para la bitácora. No sirve para entrar.">
               <input id="email" name="email" type="email" required maxLength={160} autoComplete="off" />
             </Field>
           </div>

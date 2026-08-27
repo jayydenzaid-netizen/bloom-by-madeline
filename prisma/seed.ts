@@ -22,7 +22,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 
 import { db } from "@/lib/db";
-import { ensureSeedAdmin } from "@/lib/auth";
+import { ensureSeedAdmin, ensureUsernames } from "@/lib/auth";
 import { DEFAULT_SETTINGS, saveSettings, type StoreSettings } from "@/lib/settings";
 import { slugify, uniqueCollectionSlug, uniqueProductSlug } from "@/lib/slug";
 import { applyPricing, DEFAULT_PRICING, formatCents } from "@/lib/money";
@@ -355,9 +355,13 @@ const resumen = {
 async function seedAdmin(): Promise<string> {
   const antes = await db.adminUser.count();
   await ensureSeedAdmin();
+  // Y si la base viene de la época en que se entraba por correo, se le pone
+  // usuario a la cuenta: si no, el seed dejaría un panel imposible de abrir.
+  await ensureUsernames();
   resumen.adminCreado = antes === 0;
-  const admin = await db.adminUser.findFirst({ select: { email: true } });
-  return admin?.email ?? "(sin admin)";
+  const admin = await db.adminUser.findFirst({ select: { username: true, email: true } });
+  // Se devuelve el usuario, que es lo que hay que escribir para entrar.
+  return admin?.username ?? admin?.email ?? "(sin admin)";
 }
 
 async function seedAjustes(): Promise<void> {
@@ -554,7 +558,7 @@ async function main(): Promise<void> {
     ...(conDemo ? DEMO_PRODUCTS.map((p) => p.image) : []),
   ]);
 
-  const adminEmail = await seedAdmin();
+  const adminUsuario = await seedAdmin();
   await seedAjustes();
   const coleccionIds = await seedColecciones();
   await seedCatalogoReal(coleccionIds);
@@ -567,7 +571,7 @@ async function main(): Promise<void> {
   console.log("");
   console.log("🌸 Seed de Bloom by Madeline");
   console.log("──────────────────────────────────────────────");
-  console.log(`Admin           ${adminEmail} ${resumen.adminCreado ? "(creado)" : "(ya existía)"}`);
+  console.log(`Admin           usuario ${adminUsuario} ${resumen.adminCreado ? "(creado)" : "(ya existía)"}`);
   console.log(
     `Ajustes         ${resumen.ajustesEscritos.length} claves sembradas` +
       (resumen.ajustesEscritos.length ? ` (${resumen.ajustesEscritos.join(", ")})` : " (ya estaban)"),

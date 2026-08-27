@@ -1,7 +1,6 @@
 import { headers } from "next/headers";
 import Script from "next/script";
-import { redirect } from "next/navigation";
-import { getAdmin } from "@/lib/auth";
+import { requireOwner } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { applyPricing, formatCents, margin } from "@/lib/money";
 import { getSettings } from "@/lib/settings";
@@ -42,8 +41,7 @@ export default async function AjustesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const admin = await getAdmin();
-  if (!admin) redirect("/admin/login");
+  const admin = await requireOwner("ajustes");
 
   const sp = await searchParams;
   const uno = (key: string): string => {

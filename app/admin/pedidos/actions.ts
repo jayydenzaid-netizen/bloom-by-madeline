@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { aplicarStockEnTx } from "@/lib/inventory";
 
 /**
  * Acciones sobre un pedido: cobrar, reembolsar, cancelar, enviar y anotar.
@@ -56,10 +57,12 @@ function anotar(notaActual: string, texto: string): string {
   return previo ? `${previo}\n${linea}` : linea;
 }
 
-/** Todas las acciones pasan por aquí: sin sesión no se toca ningún pedido. */
-async function exigirSesion(): Promise<void> {
+/** Todas las acciones pasan por aquí: sin sesión no se toca ningún pedido.
+ *  Devuelve la cuenta para que quien cambie stock deje su nombre en el rastro. */
+async function exigirSesion() {
   const admin = await getAdmin();
   if (!admin) redirect("/admin/login");
+  return admin;
 }
 
 function volver(id: string, estado: string): never {
@@ -133,7 +136,7 @@ export async function marcarReembolsado(formData: FormData): Promise<void> {
 /* ──────────────────────────── cancelación ──────────────────────────── */
 
 export async function marcarCancelado(formData: FormData): Promise<void> {
-  await exigirSesion();
+  const admin = await exigirSesion();
   const datos = motivoSchema.parse({
     id: String(formData.get("id") ?? ""),
     motivo: String(formData.get("motivo") ?? ""),
@@ -143,6 +146,7 @@ export async function marcarCancelado(formData: FormData): Promise<void> {
     const pedido = await tx.order.findUnique({
       where: { id: datos.id },
       include: { items: { select: { variantId: true, quantity: true } } },
+      // El número identifica la devolución en el historial de movimientos.
     });
     if (!pedido) return "no-existe" as const;
 
@@ -162,9 +166,13 @@ export async function marcarCancelado(formData: FormData): Promise<void> {
       // Sin variante (producto borrado) o sin control de stock no hay nada que
       // devolver: el inventario de dropshipping no es nuestro.
       if (!variante || !variante.trackStock) continue;
-      await tx.productVariant.update({
-        where: { id: variante.id },
-        data: { stock: { increment: item.quantity } },
+      // Por la puerta oficial: el stock vuelve Y queda su línea en el historial
+      // (razón `cancel`), dentro de esta misma transacción.
+      await aplicarStockEnTx(tx, variante.id, { delta: item.quantity }, {
+        reason: "cancel",
+        reference: pedido.number,
+        userId: admin.id,
+        note: datos.motivo ? `Cancelación: ${datos.motivo}` : "Pedido cancelado",
       });
       unidades += item.quantity;
     }

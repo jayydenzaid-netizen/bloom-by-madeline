@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { getAdmin } from "@/lib/auth";
+import { requireOwner } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { parseToCents } from "@/lib/money";
 import { saveSettings } from "@/lib/settings";
@@ -30,8 +30,9 @@ import { saveSettings } from "@/lib/settings";
 const IMPORT_TOKEN_KEY = "importToken";
 
 async function exigirSesion(): Promise<void> {
-  const admin = await getAdmin();
-  if (!admin) redirect("/admin/login");
+  // Ajustes es solo de la dueña (precios, cobros, impuestos). requireOwner rebota
+  // a una ayudante a su cuenta con el motivo, incluso ante un POST directo.
+  await requireOwner("ajustes");
 }
 
 function texto(formData: FormData, campo: string): string {

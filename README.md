@@ -19,9 +19,10 @@ npm run dev
 
 Tienda en http://localhost:4590 · Panel en http://localhost:4590/admin
 
-Las credenciales iniciales del panel salen de `ADMIN_EMAIL` y `ADMIN_PASSWORD` del `.env`
-y solo se usan para crear la cuenta la primera vez. Copia `.env.example` a `.env` para
-empezar.
+Al panel se entra con **usuario y contraseña**, no con el correo. Las credenciales
+iniciales salen de `ADMIN_USERNAME` y `ADMIN_PASSWORD` del `.env` y solo se usan para
+crear la cuenta la primera vez (o para ponerle usuario a una cuenta antigua). Copia
+`.env.example` a `.env` para empezar.
 
 ## Cómo está montado
 
@@ -89,8 +90,9 @@ npm run desplegar
 
 que además comprueba tipos y pasa las pruebas antes de publicar nada.
 
-Las demás variables (`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SESSION_SECRET`,
-`NEXT_PUBLIC_SITE_URL`) ya están configuradas en el proyecto de Vercel.
+Las demás variables (`ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_EMAIL`,
+`SESSION_SECRET`, `NEXT_PUBLIC_SITE_URL`) ya están configuradas en el proyecto de
+Vercel.
 
 ## Verificar que funciona
 

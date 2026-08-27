@@ -4,12 +4,19 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/activity";
 import { db } from "@/lib/db";
-import { createSession, ensureSeedAdmin, verifyPassword } from "@/lib/auth";
+import {
+  createSession,
+  ensureSeedAdmin,
+  ensureUsernames,
+  findAdminByUsername,
+  verifyPassword,
+} from "@/lib/auth";
+import { claveUsuario, normalizarUsuario } from "@/lib/usuario";
 
 export type LoginState = { error?: string };
 
 /**
- * Freno de fuerza bruta, por correo y por IP.
+ * Freno de fuerza bruta, por usuario y por IP.
  *
  * En memoria del proceso a propósito: el panel lo usan una o dos personas y
  * meter una tabla para esto complicaría el despliegue.
@@ -28,8 +35,9 @@ const MAX_ATTEMPTS = 8;
 const MAX_ATTEMPTS_IP = 20;
 const LOCK_MS = 10 * 60 * 1000;
 
-function throttleKey(email: string): string {
-  return email.trim().toLowerCase() || "sin-email";
+/** El contador va por usuario en minúsculas: «Madeline21» y «madeline21» son la misma puerta. */
+function throttleKey(usuario: string): string {
+  return claveUsuario(usuario) || "sin-usuario";
 }
 
 /** IP de quien pide, según las cabeceras del proxy. Solo para el contador. */
@@ -56,15 +64,15 @@ function registerFailure(key: string): void {
 }
 
 export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const usuario = normalizarUsuario(formData.get("usuario"));
   const password = String(formData.get("password") ?? "");
 
-  if (!email || !password) {
-    return { error: "Escribe tu correo y tu contraseña." };
+  if (!usuario || !password) {
+    return { error: "Escribe tu usuario y tu contraseña." };
   }
 
   const ip = await clientIp();
-  const key = throttleKey(email);
+  const key = throttleKey(usuario);
   const keyIp = `ip:${ip}`;
   if (isLocked(key) || isLocked(keyIp, MAX_ATTEMPTS_IP)) {
     // No se registra nada aquí: mientras dure el bloqueo, cada recarga escribiría
@@ -76,12 +84,14 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   // Primer arranque del proyecto: si la tabla está vacía se crea la cuenta con
   // las credenciales del entorno, si no sería imposible entrar nunca.
   await ensureSeedAdmin();
+  // Y las cuentas de cuando se entraba por correo reciben aquí su usuario.
+  await ensureUsernames();
 
-  const user = await db.adminUser.findUnique({ where: { email } });
+  const user = await findAdminByUsername(usuario);
 
-  // Mismo mensaje si falla el correo o la contraseña: decir cuál de los dos
+  // Mismo mensaje si falla el usuario o la contraseña: decir cuál de los dos
   // falló le regala al atacante la mitad del trabajo.
-  const genericError = "Correo o contraseña incorrectos.";
+  const genericError = "Usuario o contraseña incorrectos.";
 
   if (!user || !verifyPassword(password, user.passwordHash)) {
     registerFailure(key);
@@ -89,25 +99,25 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
 
     await logActivity({
       userId: user?.id ?? null,
-      userEmail: email,
+      userEmail: user?.email ?? null,
       action: "login_failed",
       entityType: "admin_user",
       entityId: user?.id ?? null,
-      summary: `Intento de entrada fallido con ${email}`,
+      summary: `Intento de entrada fallido con el usuario ${usuario}`,
       // El motivo solo lo ve la dueña en Actividad; en pantalla el mensaje
       // sigue siendo el mismo para los dos casos.
-      meta: { ip, motivo: user ? "contraseña incorrecta" : "correo desconocido" },
+      meta: { ip, usuario, motivo: user ? "contraseña incorrecta" : "usuario desconocido" },
     });
 
     if (isLocked(key) || isLocked(keyIp, MAX_ATTEMPTS_IP)) {
       await logActivity({
         userId: user?.id ?? null,
-        userEmail: email,
+        userEmail: user?.email ?? null,
         action: "security",
         entityType: "admin_user",
         entityId: user?.id ?? null,
-        summary: `Entrada bloqueada 10 minutos tras demasiados intentos fallidos (${email})`,
-        meta: { ip },
+        summary: `Entrada bloqueada 10 minutos tras demasiados intentos fallidos (${usuario})`,
+        meta: { ip, usuario },
       });
     }
 
@@ -124,8 +134,8 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
       action: "login_failed",
       entityType: "admin_user",
       entityId: user.id,
-      summary: `Intento de entrada con una cuenta desactivada (${user.email})`,
-      meta: { ip, motivo: "cuenta desactivada" },
+      summary: `Intento de entrada con una cuenta desactivada (${user.username ?? user.email})`,
+      meta: { ip, usuario, motivo: "cuenta desactivada" },
     });
     return { error: "Esta cuenta está desactivada. Pídele a la dueña de la tienda que la vuelva a activar." };
   }
@@ -141,8 +151,8 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     action: "login",
     entityType: "admin_user",
     entityId: user.id,
-    summary: `${user.name || user.email} entró en el panel`,
-    meta: { ip },
+    summary: `${user.name || user.username || user.email} entró en el panel`,
+    meta: { ip, usuario: user.username },
   });
 
   // redirect() lanza una excepción de control de Next: tiene que quedar fuera

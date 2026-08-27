@@ -25,8 +25,12 @@ const flag = (n, d) => {
   return hit ? hit.split("=").slice(1).join("=") : d;
 };
 const BASE = flag("base", "http://localhost:4661");
-const EMAIL = flag("email", "madeline@bloombymadeline.com");
-const PASSWORD = flag("password", "bloom2026");
+// Credenciales del panel. Se entra con usuario, no con correo.
+//
+// Salen del entorno (los scripts se lanzan con --env-file, ver package.json) o
+// de un --flag. Aquí no se escribe la de verdad: este repositorio es público.
+const USUARIO = flag("usuario", process.env.ADMIN_USERNAME || "admin");
+const PASSWORD = flag("password", process.env.ADMIN_PASSWORD || "bloom2026");
 const only = flag("only", "");
 const BLOQUES = only ? only.split(",").map((s) => s.trim()) : null;
 const activo = (b) => !BLOQUES || BLOQUES.includes(b);
@@ -202,7 +206,7 @@ const page = await browser.newPage();
 await page.setViewport({ width: 1440, height: 1200 });
 
 await page.goto(`${BASE}/admin/login`, { waitUntil: "networkidle2", timeout: 60000 });
-await page.type('input[name="email"]', EMAIL, { delay: 3 });
+await page.type('input[name="usuario"]', USUARIO, { delay: 3 });
 await page.type('input[name="password"]', PASSWORD, { delay: 3 });
 await Promise.all([
   page.waitForNavigation({ waitUntil: "networkidle2", timeout: 45000 }).catch(() => {}),

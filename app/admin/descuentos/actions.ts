@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { getAdmin, type AdminIdentity } from "@/lib/auth";
+import { type AdminIdentity } from "@/lib/auth";
+import { getAdminConRol, requireOwner } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { AMBITOS_DESCUENTO, TIPOS_DESCUENTO, normalizarCodigo } from "@/lib/discounts";
 import { parseToCents } from "@/lib/money";
@@ -106,8 +107,12 @@ function entero(valor: FormDataEntryValue | null): number {
 /* ─────────────────────── guardar un descuento ─────────────────────── */
 
 export async function guardarDescuento(_prev: EstadoDescuento, fd: FormData): Promise<EstadoDescuento> {
-  const admin = await getAdmin();
-  if (!admin) return { error: "Tu sesión caducó. Vuelve a entrar y repite el guardado." };
+  // Reservado a la dueña: los descuentos revelan y mueven margen. Un POST directo
+  // de una ayudante (el enlace ni le aparece en el menú) se corta aquí.
+  const admin = await getAdminConRol();
+  if (!admin || admin.role !== "owner") {
+    return { error: "Solo la dueña puede crear o editar descuentos." };
+  }
 
   const id = String(fd.get("id") ?? "").trim() || null;
   const type = String(fd.get("type") ?? "percentage");
@@ -219,8 +224,8 @@ export async function guardarDescuento(_prev: EstadoDescuento, fd: FormData): Pr
  * exactamente qué se pierde.
  */
 export async function accionDescuento(fd: FormData): Promise<void> {
-  const admin = await getAdmin();
-  if (!admin) redirect("/admin/login");
+  // Reservado a la dueña: aquí vive el borrado definitivo de un código.
+  const admin = await requireOwner("descuentos");
 
   const accion = String(fd.get("accion") ?? "");
   const id = String(fd.get("id") ?? "").trim();

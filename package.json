@@ -9,16 +9,29 @@
     "start": "next start -p 4590",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:push": "node scripts/db-provider.mjs && prisma db push",
+    "db:push": "node scripts/db-provider.mjs && node scripts/migrar-usuario.mjs && prisma db push",
     "db:generate": "node scripts/db-provider.mjs && prisma generate",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma db push --force-reset && npm run db:seed",
     "test": "tsx --test tests/*.test.ts",
-    "db:deploy": "node scripts/db-provider.mjs && prisma db push --accept-data-loss",
+    "db:deploy": "node scripts/db-provider.mjs && node scripts/migrar-usuario.mjs && prisma db push --accept-data-loss",
     "desplegar": "node scripts/desplegar.mjs",
-    "qa": "node qa/audit.mjs",
-    "qa:compra": "node qa/compra.mjs"
+    "qa": "node --env-file-if-exists=.env qa/audit.mjs",
+    "qa:compra": "node --env-file-if-exists=.env qa/compra.mjs",
+    "qa:login": "node --env-file-if-exists=.env qa/login.mjs",
+
+    "shopify:verificar": "tsx shopify/verificar.ts",
+    "shopify:prueba": "tsx shopify/verificar.ts --prueba",
+    "shopify:importar": "tsx shopify/importar.ts",
+    "shopify:puente": "tsx shopify/puente.ts",
+    "shopify:migrar": "tsx shopify/migrar-catalogo.ts",
+    "shopify:migrar:real": "tsx shopify/migrar-catalogo.ts --aplicar",
+
+    "tema:construir": "node shopify/construir-tema.mjs",
+    "tema:validar": "node shopify/validar-tema.mjs",
+    "tema:zip": "node shopify/construir-tema.mjs --zip",
+    "tema:vista": "node shopify/vista-previa.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",

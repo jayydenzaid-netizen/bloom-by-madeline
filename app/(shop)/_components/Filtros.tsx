@@ -655,13 +655,31 @@ export function Catalogo({ base, params, datos, mostrarColecciones = true }: Pro
             <svg className="cat-vacio-lotus" viewBox="0 0 120 110" aria-hidden="true">
               <use href="#lotus" />
             </svg>
-            <p className="cat-vacio-titulo">No encontramos nada con esos filtros</p>
-            <p className="cat-vacio-sub">
-              Prueba con otra talla, amplía el rango de precio o mira el catálogo completo.
-            </p>
-            <Link className="btn btn-ink btn-sm" href={base}>
-              Limpiar filtros
-            </Link>
+            {hayFiltros(params) ? (
+              <>
+                <p className="cat-vacio-titulo">No encontramos nada con esos filtros</p>
+                <p className="cat-vacio-sub">
+                  Prueba con otra talla, amplía el rango de precio o mira el catálogo completo.
+                </p>
+                <Link className="btn btn-ink btn-sm" href={base}>
+                  Limpiar filtros
+                </Link>
+              </>
+            ) : (
+              /* Sin filtros aplicados y sin piezas: la tienda está recién montada o
+                 todo sigue en borrador. Culpar a «esos filtros» que ella no puso, y
+                 ofrecerle «limpiar» lo que no existe, la deja perdida. */
+              <>
+                <p className="cat-vacio-titulo">Muy pronto habrá piezas nuevas aquí</p>
+                <p className="cat-vacio-sub">
+                  Estamos preparando la próxima llegada. Síguenos en Instagram para verla
+                  antes que nadie.
+                </p>
+                <Link className="btn btn-ink btn-sm" href="/">
+                  Volver a la portada
+                </Link>
+              </>
+            )}
           </div>
         )}
 

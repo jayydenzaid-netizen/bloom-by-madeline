@@ -1,8 +1,11 @@
+import { Fragment, type ReactNode } from "react";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
+import { cargarPortada, type KindOrdenable } from "@/lib/home-content";
 import { DEFAULT_SETTINGS, getSettings, type StoreSettings } from "@/lib/settings";
 import { type ProductCardItem } from "./_components/ProductCard";
 import {
+  Banner,
   Boutique,
   Cita,
   Coleccion,
@@ -20,9 +23,15 @@ import "./home.css";
  * Portada.
  *
  * Es el mismo sitio editorial que está en producción (`legacy/index.html`), pero
- * la sección de colección ya no lleva ocho fichas escritas a mano: lee el
- * catálogo. Y los datos del negocio —dirección, horario, Instagram— salen de
- * Ajustes, para que Madeline los cambie desde el panel sin tocar código.
+ * ya no lleva nada escrito a fuego:
+ *
+ *  · las prendas salen del catálogo,
+ *  · los datos del negocio —dirección, horario, Instagram— salen de Ajustes,
+ *  · y los textos y fotos del escaparate salen de /admin/contenido, con el
+ *    contenido de siempre como valor por defecto (ver `lib/home-content.ts`).
+ *
+ * Con la tabla de bloques vacía esta página se pinta EXACTAMENTE igual que
+ * antes: la portada nunca depende de que haya algo configurado.
  *
  * La página entera es Server Component. El único JavaScript de la portada es el
  * del layout (cajón del carrito, revelado al hacer scroll): ni el preloader lo
@@ -45,6 +54,7 @@ const MAP_EMBED =
 
 export default async function HomePage() {
   const settings = await getSettings();
+  const portada = await cargarPortada(settings);
   const cabeceras = await headers();
 
   // El telón de marca es para el primer pintado, no para cada vez que se vuelve a
@@ -95,32 +105,47 @@ export default async function HomePage() {
 
   const igHandle = settings.instagram.replace(/^@/, "");
   const igUrl = `https://www.instagram.com/${igHandle}/`;
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(settings.address)}`;
   const direccionConocida = settings.address === DEFAULT_SETTINGS.address;
+
+  // Cada sección movible, lista para pintar. El orden y qué se pinta lo decide
+  // `portada.orden`, que ya viene ordenado por `position` y sin lo apagado: así
+  // apagar «cita» desde el panel es literalmente no pintarla, sin huecos.
+  const secciones: Record<KindOrdenable, ReactNode> = {
+    coleccion: (
+      <Coleccion contenido={portada.coleccion} productos={productos} inspiracion={inspiracion} />
+    ),
+    cita: <Cita contenido={portada.cita} />,
+    filosofia: <Filosofia contenido={portada.filosofia} />,
+    boutique: <Boutique contenido={portada.boutique} />,
+    comoComprar: <ComoComprar contenido={portada.comoComprar} />,
+    visitanos: (
+      <Visitanos
+        contenido={portada.visitanos}
+        address={settings.address}
+        hours={settings.hours}
+        igHandle={igHandle}
+        mapEmbedUrl={direccionConocida ? MAP_EMBED : null}
+      />
+    ),
+    instagram: <InstagramGrid contenido={portada.instagram} />,
+    banner: <Banner contenido={portada.banner} />,
+  };
 
   return (
     <>
       {cargaCompleta ? <Preloader /> : null}
 
-      <Hero igUrl={igUrl} igHandle={igHandle} address={settings.address} />
-
-      <Coleccion productos={productos} inspiracion={inspiracion} dmUrl={settings.instagramDm} />
-
-      <Cita />
-      <Filosofia />
-      <Boutique />
-      <ComoComprar address={settings.address} hours={settings.hours} />
-
-      <Visitanos
-        address={settings.address}
-        hours={settings.hours}
+      {/* El hero no es opcional: una portada sin hero no es una portada. */}
+      <Hero
+        contenido={portada.hero}
+        marquee={portada.marquee}
+        igUrl={igUrl}
         igHandle={igHandle}
-        dmUrl={settings.instagramDm}
-        mapsUrl={mapsUrl}
-        mapEmbedUrl={direccionConocida ? MAP_EMBED : null}
       />
 
-      <InstagramGrid igUrl={igUrl} igHandle={igHandle} />
+      {portada.orden.map((kind) => (
+        <Fragment key={kind}>{secciones[kind]}</Fragment>
+      ))}
 
       <JsonLd data={fichaDelNegocio(settings, igUrl, direccionConocida)} />
       {productos.length > 0 ? <JsonLd data={listaDeProductos(productos, settings)} /> : null}

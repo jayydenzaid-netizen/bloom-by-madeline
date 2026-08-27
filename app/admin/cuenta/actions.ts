@@ -50,7 +50,10 @@ const MIN_CLAVE = 10;
  * permite una frase larga sin números porque "vestidos de verano en hamilton"
  * es mejor contraseña que "Bloom1!" y hay que dejar que la gente la use.
  */
-function evaluarFuerza(clave: string, contexto: { email: string; nombre: string }): string | null {
+function evaluarFuerza(
+  clave: string,
+  contexto: { email: string; nombre: string; usuario: string | null },
+): string | null {
   if (clave.length < MIN_CLAVE) return `La contraseña necesita al menos ${MIN_CLAVE} caracteres.`;
   if (clave.length > 200) return "Esa contraseña es absurdamente larga.";
 
@@ -63,8 +66,10 @@ function evaluarFuerza(clave: string, contexto: { email: string; nombre: string 
   }
 
   const minuscula = clave.toLowerCase();
-  const usuario = contexto.email.split("@")[0]?.toLowerCase() ?? "";
-  if (usuario.length >= 4 && minuscula.includes(usuario)) return "No uses tu correo dentro de la contraseña.";
+  const correo = contexto.email.split("@")[0]?.toLowerCase() ?? "";
+  if (correo.length >= 4 && minuscula.includes(correo)) return "No uses tu correo dentro de la contraseña.";
+  const usuario = (contexto.usuario ?? "").toLowerCase();
+  if (usuario.length >= 4 && minuscula.includes(usuario)) return "No uses tu usuario dentro de la contraseña.";
   const nombre = contexto.nombre.trim().toLowerCase();
   if (nombre.length >= 4 && minuscula.includes(nombre)) return "No uses tu nombre dentro de la contraseña.";
   if (["bloom2026", "contrasena", "password", "12345678910"].some((mala) => minuscula.includes(mala))) {
@@ -151,7 +156,7 @@ export async function cambiarContrasena(formData: FormData): Promise<ResultadoCu
 
   if (verifyPassword(nueva, fila.passwordHash)) return { ok: false, codigo: "clave-repetida" };
 
-  const problema = evaluarFuerza(nueva, { email: admin.email, nombre: admin.name });
+  const problema = evaluarFuerza(nueva, { email: admin.email, nombre: admin.name, usuario: admin.username });
   if (problema) return { ok: false, codigo: "clave-debil", detalle: problema };
 
   try {
