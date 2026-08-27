@@ -17,3 +17,11 @@ shopify/
 # Base de datos de desarrollo.
 prisma/dev.db
 prisma/dev.db-journal
+
+# Secretos locales: NUNCA viajan al despliegue. El build de producción usa las
+# variables de entorno del PROYECTO en Vercel (Neon, ADMIN_*, SESSION_SECRET…),
+# no estos ficheros. `vercel deploy` sube el disco, así que se excluyen aquí.
+.env
+.env.local
+.env.production.local
+.env.*.local
