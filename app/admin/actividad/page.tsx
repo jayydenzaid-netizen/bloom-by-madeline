@@ -98,8 +98,14 @@ export default async function ActividadPage({
   const admin = await requireOwner("actividad");
   const filtros = leerFiltros(await searchParams);
 
+  // Los intentos de entrada anónimos se guardan con userEmail "" (lib/activity.ts).
+  // Sin un valor propio, su <option> chocaba con «Todo el mundo» (ambos value="")
+  // y filtrar por «El sistema» no filtraba nada. Este centinela los distingue.
+  const FILTRO_SISTEMA = "__sistema__";
+
   const where: Prisma.ActivityLogWhereInput = {};
-  if (filtros.usuario) where.userEmail = filtros.usuario;
+  if (filtros.usuario === FILTRO_SISTEMA) where.userEmail = "";
+  else if (filtros.usuario) where.userEmail = filtros.usuario;
   if (filtros.entidad) where.entityType = filtros.entidad;
   if (filtros.desde || filtros.hasta) {
     where.createdAt = {
@@ -196,7 +202,7 @@ export default async function ActividadPage({
             <select id="usuario" name="usuario" defaultValue={filtros.usuario}>
               <option value="">Todo el mundo</option>
               {usuarios.map((u) => (
-                <option key={u.userEmail} value={u.userEmail}>
+                <option key={u.userEmail || "sistema"} value={u.userEmail || FILTRO_SISTEMA}>
                   {u.userEmail || "El sistema"} ({u._count._all})
                 </option>
               ))}

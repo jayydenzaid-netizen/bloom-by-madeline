@@ -64,23 +64,28 @@ export type ResultadoEquipo =
 
 /**
  * Aquí no hay correo configurado, así que la contraseña inicial se le da a la
- * persona en mano. Se guarda en memoria del proceso, no en la base de datos:
- * una contraseña en claro dentro de una tabla es una fuga esperando su turno.
+ * persona en mano: se genera al crear la cuenta y se enseña UNA vez en la
+ * pantalla siguiente.
  *
- * Limitación consciente: si el servidor se reinicia (o si algún día esto corre
- * en varias instancias sin estado compartido), la clave se pierde. No es grave:
- * la dueña pulsa "Generar contraseña nueva" y sale otra. Se avisa en pantalla.
+ * Se guarda en la tabla Setting (con expiración corta), NO en memoria del
+ * proceso. En Vercel el POST que crea la cuenta y el GET que la enseña son dos
+ * invocaciones que pueden caer en instancias distintas: un Map no viajaría entre
+ * ellas y la ayudante se quedaría sin forma de entrar. Guardarla en la base la
+ * hace legible desde cualquier instancia. Va en claro a propósito —se enseña en
+ * claro en pantalla igual—, prefijada, con vida de 30 minutos, y se borra al
+ * pulsar "Ya la copié" o al caducar.
  */
-const clavesIniciales = new Map<string, { clave: string; expira: number }>();
+const CLAVE_PREFIX = "initclave:";
 const VIDA_CLAVE_MS = 30 * 60 * 1000;
 
-function guardarClaveInicial(userId: string, clave: string): void {
-  // De paso se limpian las caducadas: el Map no crece sin control.
-  const ahora = Date.now();
-  for (const [id, dato] of clavesIniciales) {
-    if (dato.expira <= ahora) clavesIniciales.delete(id);
-  }
-  clavesIniciales.set(userId, { clave, expira: ahora + VIDA_CLAVE_MS });
+async function guardarClaveInicial(userId: string, clave: string): Promise<void> {
+  const key = CLAVE_PREFIX + userId;
+  const value = JSON.stringify({ clave, expira: Date.now() + VIDA_CLAVE_MS });
+  await db.setting.upsert({ where: { key }, create: { key, value }, update: { value } });
+}
+
+async function borrarClaveInicial(userId: string): Promise<void> {
+  await db.setting.deleteMany({ where: { key: CLAVE_PREFIX + userId } });
 }
 
 /**
@@ -105,13 +110,19 @@ export async function leerClaveInicial(userId: string): Promise<string | null> {
   const admin = await getAdminConRol();
   if (!can(admin, "equipo.gestionar")) return null;
 
-  const dato = clavesIniciales.get(userId);
-  if (!dato) return null;
-  if (dato.expira <= Date.now()) {
-    clavesIniciales.delete(userId);
+  const fila = await db.setting.findUnique({ where: { key: CLAVE_PREFIX + userId }, select: { value: true } });
+  if (!fila) return null;
+  try {
+    const dato = JSON.parse(fila.value) as { clave?: string; expira?: number };
+    if (!dato.clave || typeof dato.expira !== "number" || dato.expira <= Date.now()) {
+      await borrarClaveInicial(userId);
+      return null;
+    }
+    return dato.clave;
+  } catch {
+    await borrarClaveInicial(userId);
     return null;
   }
-  return dato.clave;
 }
 
 /* ─────────────────────────────── esquemas ─────────────────────────────── */
@@ -192,7 +203,7 @@ export async function crearCuenta(formData: FormData): Promise<ResultadoEquipo> 
       select: { id: true },
     });
 
-    guardarClaveInicial(creada.id, clave);
+    await guardarClaveInicial(creada.id, clave);
 
     await logActivity({
       userId: admin.id,
@@ -385,7 +396,7 @@ export async function restablecerClave(formData: FormData): Promise<ResultadoEqu
     await db.adminUser.update({ where: { id: id.data }, data: { passwordHash: hashPassword(clave) } });
     // La contraseña vieja deja de valer, así que sus sesiones también.
     const cerradas = await db.session.deleteMany({ where: { userId: id.data } });
-    guardarClaveInicial(id.data, clave);
+    await guardarClaveInicial(id.data, clave);
 
     await logActivity({
       userId: admin.id,
@@ -410,7 +421,7 @@ export async function descartarClaveInicial(formData: FormData): Promise<Resulta
   if (!admin) return { ok: false, codigo: "sin-permiso" };
 
   const id = idSchema.safeParse(formData.get("id"));
-  if (id.success) clavesIniciales.delete(id.data);
+  if (id.success) await borrarClaveInicial(id.data);
   refrescar();
   return { ok: true, codigo: "creada" };
 }

@@ -187,11 +187,20 @@ export async function createImportJob(
 const ORIGENES_CON_PRECIO_PROPIO: ImportMethod[] = ["csv", "migracion"];
 
 function revisionInicial(normalized: NormalizedProduct): RevisionBorrador {
-  if (!ORIGENES_CON_PRECIO_PROPIO.includes(normalized.method)) return {};
+  // Orígenes SIN precio propio (Alibaba, AliExpress, HTML, marcador): su
+  // `priceCents` es la regla POR DEFECTO aplicada al coste, NO un precio del
+  // proveedor. Se devuelven listas VACÍAS (no `{}`): el editor las lee como «ningún
+  // precio es del origen» y pone cada fila como recalculable, para que la regla de
+  // la tienda de Ajustes la mueva. Con `{}` (undefined) el editor no corregía la
+  // heurística inicial y las filas de Alibaba se quedaban «manual» → la regla no
+  // las tocaba nunca y Madeline perdía margen sin enterarse.
+  if (!ORIGENES_CON_PRECIO_PROPIO.includes(normalized.method)) {
+    return { preciosDecididos: [], preciosDelOrigen: [] };
+  }
   const conPrecio = normalized.variants
     .map((variant, index) => (typeof variant.priceCents === "number" && variant.priceCents > 0 ? index : -1))
     .filter((index) => index >= 0);
-  if (conPrecio.length === 0) return {};
+  if (conPrecio.length === 0) return { preciosDecididos: [], preciosDelOrigen: [] };
   // Un precio escrito en el origen manda sobre la regla: nace "decidido".
   return { preciosDecididos: conPrecio, preciosDelOrigen: conPrecio };
 }
