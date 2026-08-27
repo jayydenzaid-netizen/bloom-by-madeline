@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Galería de la ficha: foto grande, miniaturas y ampliación a pantalla completa.
@@ -33,6 +33,14 @@ export default function Galeria({
   const [montada, setMontada] = useState(false); // controla el atributo hidden
   const [visible, setVisible] = useState(false); // controla la clase .show (fundido)
   const [zoom, setZoom] = useState(false);
+
+  // Foco accesible: al abrir se lleva al botón de cerrar y se atrapa el Tab dentro
+  // del diálogo; al cerrar vuelve al botón que abrió, para no perder a quien navega
+  // con teclado (mismo patrón que CartDrawer).
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cerrarRef = useRef<HTMLButtonElement>(null);
+  const disparadorRef = useRef<HTMLButtonElement>(null);
+  const abiertoAntes = useRef(false);
 
   const total = imagenes.length;
   const indice = Math.min(Math.max(activa, 0), Math.max(total - 1, 0));
@@ -68,15 +76,50 @@ export default function Galeria({
       if (e.key === "Escape") cerrar();
       if (e.key === "ArrowRight") mover(1);
       if (e.key === "ArrowLeft") mover(-1);
+      if (e.key === "Tab") {
+        // Atrapar el Tab: sin esto, tabular saca el foco al contenido de fondo que
+        // la capa a pantalla completa está tapando.
+        const foco = dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled])");
+        if (!foco || foco.length === 0) return;
+        const primero = foco[0];
+        const ultimo = foco[foco.length - 1];
+        const activo = document.activeElement;
+        if (!dialogRef.current?.contains(activo)) {
+          e.preventDefault();
+          primero.focus();
+        } else if (e.shiftKey && activo === primero) {
+          e.preventDefault();
+          ultimo.focus();
+        } else if (!e.shiftKey && activo === ultimo) {
+          e.preventDefault();
+          primero.focus();
+        }
+      }
     };
     document.addEventListener("keydown", alPulsar);
     return () => document.removeEventListener("keydown", alPulsar);
   }, [montada, cerrar, mover]);
 
+  // Foco al abrir (al botón de cerrar) y devolución al cerrar (al disparador).
+  useEffect(() => {
+    if (montada) {
+      abiertoAntes.current = true;
+      const id = requestAnimationFrame(() => cerrarRef.current?.focus());
+      return () => cancelAnimationFrame(id);
+    }
+    // Solo devuelve el foco si venía de estar abierto: en el primer render (cerrado)
+    // no debe robar el foco al cargar la página.
+    if (abiertoAntes.current) {
+      abiertoAntes.current = false;
+      disparadorRef.current?.focus();
+    }
+  }, [montada]);
+
   return (
     <div className="pf-galeria">
       {/* Botón y no <figure> con onClick: así se abre también con el teclado. */}
       <button
+        ref={disparadorRef}
         type="button"
         className="pf-foto"
         onClick={() => foto && setMontada(true)}
@@ -111,6 +154,7 @@ export default function Galeria({
       ) : null}
 
       <div
+        ref={dialogRef}
         className={visible ? "lightbox show" : "lightbox"}
         hidden={!montada}
         onClick={cerrar}
@@ -118,7 +162,7 @@ export default function Galeria({
         aria-modal="true"
         aria-label={`Fotos de ${titulo}`}
       >
-        <button className="lightbox-close" type="button" onClick={cerrar} aria-label="Cerrar la foto">
+        <button ref={cerrarRef} className="lightbox-close" type="button" onClick={cerrar} aria-label="Cerrar la foto">
           ×
         </button>
 
