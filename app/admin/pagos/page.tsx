@@ -62,6 +62,15 @@ const ERRORES: Record<string, string> = {
   "square-fallo": "Square rechazó el token. Revisa que sea de producción (o cambia el entorno a pruebas).",
   "sin-metodos":
     "No puedes apagar el DM y la recogida sin tener una pasarela activa: nadie podría terminar una compra.",
+  // Se intentó ENCENDER un cobro que la pasarela rechaza. Se guarda apagado a
+  // propósito: ofrecer una tarjeta que no cobra deja a la clienta con el pedido
+  // hecho, su talla apartada y sin forma de pagar.
+  "stripe-fallo-activar":
+    "Stripe rechazó esa llave, así que NO se activó el cobro con tarjeta (se guardó apagado). Comprueba que sea la clave secreta correcta y vuelve a intentarlo.",
+  "paypal-fallo-activar":
+    "PayPal rechazó esas credenciales, así que NO se activó (se guardó apagado). Revisa el Client ID, el Secret y si son de «Real» o de «Pruebas».",
+  "square-fallo-activar":
+    "Square rechazó ese token, así que NO se activó el cobro con tarjeta (se guardó apagado). Lo más común: el token es de «Sandbox» y el entorno está en «Real» (o al revés). Revísalo y vuelve a intentarlo.",
   desconocido: "No se pudo aplicar el cambio. Inténtalo otra vez.",
 };
 

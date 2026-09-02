@@ -99,20 +99,33 @@ export default async function CheckoutPage() {
           badge: "Próximamente",
         },
       ];
+  // Los métodos manuales apagados en el panel NO se enseñan: apagarlos es una
+  // decisión ya tomada, y una tarjeta gris de «Instagram DM» solo estorba y
+  // hace parecer artesanal una tienda que ya cobra con tarjeta. (La regla de
+  // enseñar-apagado se queda para la tarjeta sin conectar, que sí promete algo
+  // que viene: ver `metodosOnline`.)
   const metodosManuales: CheckoutMethodOption[] = [
-    {
-      id: "dm",
-      label: "Pedir por Instagram DM",
-      description:
-        "Registramos tu pedido y te copiamos el resumen para que lo pegues en el chat. Madeline te confirma el pago por ahí.",
-      enabled: settings.payDm,
-    },
-    {
-      id: "pickup",
-      label: "Recoger en la boutique",
-      description: "Sin envío: lo preparamos y lo recoges en la tienda cuando te avisemos.",
-      enabled: settings.payPickup,
-    },
+    ...(settings.payDm
+      ? [
+          {
+            id: "dm" as const,
+            label: "Pedir por Instagram DM",
+            description:
+              "Registramos tu pedido y te copiamos el resumen para que lo pegues en el chat. Madeline te confirma el pago por ahí.",
+            enabled: true,
+          },
+        ]
+      : []),
+    ...(settings.payPickup
+      ? [
+          {
+            id: "pickup" as const,
+            label: "Recoger en la boutique",
+            description: "Sin envío: lo preparamos y lo recoges en la tienda cuando te avisemos.",
+            enabled: true,
+          },
+        ]
+      : []),
   ];
   // Con cobro online activo, la tarjeta va primero y es la opción por defecto:
   // el DM pasa a ser el plan B, no la caja principal.

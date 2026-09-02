@@ -60,6 +60,32 @@ export type Verificacion =
 /** fetch inyectable: los tests lo sustituyen por un stub sin tocar la red. */
 export type FetchLike = typeof fetch;
 
+/**
+ * Fallo de una pasarela, distinguiendo QUIÉN falló.
+ *
+ * `credencial: true` = la pasarela contestó y rechazó las llaves (token malo,
+ * caducado, de otro entorno). `false` = no llegamos a preguntar (red, timeout):
+ * de eso NO se puede concluir que las llaves estén mal, y por tanto nunca debe
+ * apagarse un cobro que quizá funciona.
+ */
+export class ErrorPasarela extends Error {
+  constructor(
+    message: string,
+    readonly credencial: boolean,
+  ) {
+    super(message);
+    this.name = "ErrorPasarela";
+  }
+}
+
+/** Resultado de «probar conexión». `motivo` explica un fallo para poder actuar. */
+export type ResultadoPrueba = {
+  ok: boolean;
+  detalle: string;
+  /** credencial = las llaves están mal · red = no se pudo preguntar. */
+  motivo?: "credencial" | "red";
+};
+
 /** 1234 -> "12.34". PayPal quiere decimales en texto; con Int de centavos es exacto. */
 export function centavosADecimales(cents: number): string {
   return (cents / 100).toFixed(2);

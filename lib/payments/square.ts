@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ConfigSquare } from "./config";
-import type { DatosPago, FetchLike, SesionPago, Verificacion } from "./tipos";
+import { ErrorPasarela, type DatosPago, type FetchLike, type SesionPago, type Verificacion } from "./tipos";
 
 /**
  * Square Payment Links (página de cobro hosted), por REST puro.
@@ -48,7 +48,13 @@ async function llamarSquare(
   const json = (await res.json().catch(() => ({}))) as RespuestaSquare;
   if (!res.ok) {
     const detalle = json.errors?.[0]?.detail ?? json.errors?.[0]?.code ?? `HTTP ${res.status}`;
-    throw new Error(`Square: ${String(detalle).slice(0, 200)}`);
+    // Square contestó: 401 = token inválido/caducado, 403 = sin permiso.
+    // Su categoría AUTHENTICATION_ERROR lo dice explícitamente.
+    const categoria = json.errors?.[0]?.category ?? "";
+    throw new ErrorPasarela(
+      `Square: ${String(detalle).slice(0, 200)}`,
+      res.status === 401 || res.status === 403 || categoria === "AUTHENTICATION_ERROR",
+    );
   }
   return json;
 }
@@ -185,7 +191,7 @@ export type LocalSquare = { id: string; nombre: string };
 export async function probarSquare(
   cfg: ConfigSquare,
   f: FetchLike = fetch,
-): Promise<{ ok: boolean; detalle: string; locales: LocalSquare[] }> {
+): Promise<{ ok: boolean; detalle: string; locales: LocalSquare[]; motivo?: "credencial" | "red" }> {
   try {
     const json = await llamarSquare(cfg, "GET", "/v2/locations", null, f);
     const crudos = Array.isArray(json.locations)
@@ -195,7 +201,12 @@ export async function probarSquare(
       .filter((l) => l.id && l.status !== "INACTIVE")
       .map((l) => ({ id: l.id as string, nombre: l.name ?? l.id! }));
     if (locales.length === 0) {
-      return { ok: false, detalle: "el token vale pero la cuenta no tiene locales activos", locales: [] };
+      return {
+        ok: false,
+        detalle: "el token vale pero la cuenta no tiene locales activos",
+        locales: [],
+        motivo: "credencial",
+      };
     }
     const coincide = !cfg.locationId || locales.some((l) => l.id === cfg.locationId);
     return {
@@ -204,8 +215,14 @@ export async function probarSquare(
         ? `${locales.length} ${locales.length === 1 ? "local activo" : "locales activos"}`
         : "el Location ID guardado no es de esta cuenta",
       locales,
+      ...(coincide ? {} : { motivo: "credencial" as const }),
     };
   } catch (err) {
-    return { ok: false, detalle: err instanceof Error ? err.message : "fallo de red", locales: [] };
+    return {
+      ok: false,
+      detalle: err instanceof Error ? err.message : "fallo de red",
+      locales: [],
+      motivo: err instanceof ErrorPasarela && err.credencial ? "credencial" : "red",
+    };
   }
 }

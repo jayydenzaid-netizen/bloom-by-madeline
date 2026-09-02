@@ -1,5 +1,13 @@
 import type { ConfigPaypal } from "./config";
-import { centavosADecimales, type DatosPago, type FetchLike, type SesionPago, type Verificacion } from "./tipos";
+import {
+  centavosADecimales,
+  ErrorPasarela,
+  type DatosPago,
+  type FetchLike,
+  type ResultadoPrueba,
+  type SesionPago,
+  type Verificacion,
+} from "./tipos";
 
 /**
  * PayPal Orders v2 (página de aprobación hosted), por REST puro.
@@ -40,7 +48,11 @@ async function tokenPaypal(cfg: ConfigPaypal, f: FetchLike): Promise<string> {
   });
   const json = (await res.json().catch(() => ({}))) as { access_token?: string; error_description?: string };
   if (!res.ok || !json.access_token) {
-    throw new Error(`PayPal: ${String(json.error_description ?? `HTTP ${res.status}`).slice(0, 200)}`);
+    // PayPal contestó y no dio token: las credenciales no valen (401 típico).
+    throw new ErrorPasarela(
+      `PayPal: ${String(json.error_description ?? `HTTP ${res.status}`).slice(0, 200)}`,
+      true,
+    );
   }
   return json.access_token;
 }
@@ -234,14 +246,15 @@ export async function verificarOrdenPaypal(
   return evaluarOrden(orden, esperado);
 }
 
-export async function probarPaypal(
-  cfg: ConfigPaypal,
-  f: FetchLike = fetch,
-): Promise<{ ok: boolean; detalle: string }> {
+export async function probarPaypal(cfg: ConfigPaypal, f: FetchLike = fetch): Promise<ResultadoPrueba> {
   try {
     await tokenPaypal(cfg, f);
     return { ok: true, detalle: cfg.entorno === "sandbox" ? "credenciales válidas (sandbox)" : "credenciales válidas" };
   } catch (err) {
-    return { ok: false, detalle: err instanceof Error ? err.message : "fallo de red" };
+    return {
+      ok: false,
+      detalle: err instanceof Error ? err.message : "fallo de red",
+      motivo: err instanceof ErrorPasarela && err.credencial ? "credencial" : "red",
+    };
   }
 }

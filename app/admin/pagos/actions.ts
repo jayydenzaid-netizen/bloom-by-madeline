@@ -13,6 +13,8 @@ import {
   paypalConfigurado,
   squareConfigurado,
   stripeConfigurado,
+  type ConfigPagos,
+  type MetodoOnline,
 } from "@/lib/payments/config";
 import { probarPaypal } from "@/lib/payments/paypal";
 import { probarSquare } from "@/lib/payments/square";
@@ -49,6 +51,31 @@ function marcado(formData: FormData, campo: string): boolean {
   return formData.get(campo) === "on";
 }
 
+/**
+ * Antes de ENCENDER un método se le pregunta al proveedor si sus llaves cobran
+ * de verdad. Sin esto, el checkout puede quedar ofreciendo «Pagar con tarjeta»
+ * con un token que la pasarela rechaza: la clienta rellena sus datos, el pedido
+ * se crea con su stock apartado, y el cobro no ocurre nunca. Pasó de verdad
+ * (Square activo con un token rechazado), y por eso este guardia existe.
+ *
+ * Un fallo de RED no apaga nada: la pasarela puede estar de bajón y las llaves
+ * ser correctas. Solo un rechazo explícito de credenciales impide activar.
+ */
+async function credencialesValen(
+  proveedor: MetodoOnline,
+  cfg: ConfigPagos,
+): Promise<{ vale: boolean; motivo?: "credencial" | "red" }> {
+  const r =
+    proveedor === "stripe"
+      ? await probarStripe(cfg.stripe)
+      : proveedor === "paypal"
+        ? await probarPaypal(cfg.paypal)
+        : await probarSquare(cfg.square);
+  // Con la red caída se guarda como pedía la dueña: no se puede concluir nada.
+  if (!r.ok && r.motivo === "red") return { vale: true, motivo: "red" };
+  return { vale: r.ok, motivo: r.motivo };
+}
+
 function terminar(resultado: { hecho?: string; error?: string }): never {
   revalidatePath("/admin/pagos");
   // El checkout enseña los métodos según esta configuración.
@@ -79,6 +106,15 @@ export async function guardarStripe(formData: FormData): Promise<void> {
   };
   if (cfg.activo && !stripeConfigurado(cfg)) terminar({ error: "stripe-sin-llave" });
 
+  // No se enciende un cobro que la pasarela no acepta (ver `credencialesValen`).
+  if (cfg.activo) {
+    const prueba = await credencialesValen("stripe", { ...(await leerConfigPagos()), stripe: cfg });
+    if (!prueba.vale) {
+      await guardarConfigStripe({ ...cfg, activo: false });
+      terminar({ error: "stripe-fallo-activar" });
+    }
+  }
+
   await guardarConfigStripe(cfg);
   await registrarActividad({
     admin,
@@ -102,6 +138,14 @@ export async function guardarPaypal(formData: FormData): Promise<void> {
     entorno: (texto(formData, "entorno") === "sandbox" ? "sandbox" : "live") as "live" | "sandbox",
   };
   if (cfg.activo && !paypalConfigurado(cfg)) terminar({ error: "paypal-sin-llaves" });
+
+  if (cfg.activo) {
+    const prueba = await credencialesValen("paypal", { ...(await leerConfigPagos()), paypal: cfg });
+    if (!prueba.vale) {
+      await guardarConfigPaypal({ ...cfg, activo: false });
+      terminar({ error: "paypal-fallo-activar" });
+    }
+  }
 
   await guardarConfigPaypal(cfg);
   await registrarActividad({
@@ -128,6 +172,14 @@ export async function guardarSquare(formData: FormData): Promise<void> {
       | "sandbox",
   };
   if (cfg.activo && !squareConfigurado(cfg)) terminar({ error: "square-sin-llaves" });
+
+  if (cfg.activo) {
+    const prueba = await credencialesValen("square", { ...(await leerConfigPagos()), square: cfg });
+    if (!prueba.vale) {
+      await guardarConfigSquare({ ...cfg, activo: false });
+      terminar({ error: "square-fallo-activar" });
+    }
+  }
 
   await guardarConfigSquare(cfg);
   await registrarActividad({

@@ -1,5 +1,5 @@
 import type { ConfigStripe } from "./config";
-import type { DatosPago, FetchLike, SesionPago, Verificacion } from "./tipos";
+import { ErrorPasarela, type DatosPago, type FetchLike, type ResultadoPrueba, type SesionPago, type Verificacion } from "./tipos";
 
 /**
  * Stripe Checkout (página hosted), por REST puro con fetch.
@@ -76,7 +76,8 @@ async function llamarStripe(
     // El mensaje de Stripe es seguro de propagar (no incluye la llave), pero se
     // recorta: acaba en logs y en códigos de aviso, no en novelas.
     const detalle = json.error?.message ?? `HTTP ${res.status}`;
-    throw new Error(`Stripe: ${String(detalle).slice(0, 200)}`);
+    // Stripe contestó: si rechaza la llave es 401 (y 403 si no tiene permiso).
+    throw new ErrorPasarela(`Stripe: ${String(detalle).slice(0, 200)}`, res.status === 401 || res.status === 403);
   }
   return json;
 }
@@ -155,10 +156,7 @@ export async function verificarSesionStripe(
 }
 
 /** «Probar conexión» del panel: valida la llave contra la cuenta, sin cobrar nada. */
-export async function probarStripe(
-  cfg: ConfigStripe,
-  f: FetchLike = fetch,
-): Promise<{ ok: boolean; detalle: string }> {
+export async function probarStripe(cfg: ConfigStripe, f: FetchLike = fetch): Promise<ResultadoPrueba> {
   try {
     const cuenta = await llamarStripe(cfg, "GET", "/v1/account", null, f);
     const settings = cuenta.settings as { dashboard?: { display_name?: string } } | undefined;
@@ -172,8 +170,14 @@ export async function probarStripe(
     try {
       await llamarStripe(cfg, "GET", "/v1/balance", null, f);
       return { ok: true, detalle: "llave válida (restringida, sin permiso de cuenta)" };
-    } catch {
-      return { ok: false, detalle: err instanceof Error ? err.message : "fallo de red" };
+    } catch (err2) {
+      const rechazo = err instanceof ErrorPasarela ? err.credencial : false;
+      const alcanzada = err instanceof ErrorPasarela || err2 instanceof ErrorPasarela;
+      return {
+        ok: false,
+        detalle: err instanceof Error ? err.message : "fallo de red",
+        motivo: rechazo || alcanzada ? "credencial" : "red",
+      };
     }
   }
 }

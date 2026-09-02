@@ -132,13 +132,23 @@ await page.evaluate(() => {
   if (check && !check.checked) check.click();
 });
 await enviarFormularioDe(page, "#stripe-key");
-// OJO: los badges del panel van con text-transform: uppercase, e innerText
-// devuelve el texto TAL CUAL SE VE ("ACTIVO EN EL CHECKOUT"): regex siempre /i.
-await esperar(page, () => /Activo en el checkout/i.test(document.body.innerText), 8000);
+// ⭐ LA COMPROBACIÓN QUE MÁS IMPORTA. Una llave con formato bueno pero que la
+// pasarela rechaza NO puede encender el cobro: si lo hiciera, el checkout
+// ofrecería «Pagar con tarjeta», la clienta llegaría al final, se crearía su
+// pedido con la talla apartada y el cobro no ocurriría nunca. Pasó de verdad en
+// producción con un token de Square, y de ahí salió este guardia.
+// (OJO: los badges van en mayúsculas por CSS e innerText las devuelve así:
+// las regex van siempre con /i.)
+await esperar(page, () => /rechazó esa llave/i.test(document.querySelector(".pag-aviso")?.textContent ?? ""), 20000);
+const trasActivar = await page.evaluate(() => ({
+  aviso: document.querySelector(".pag-aviso")?.textContent?.trim() ?? "(sin aviso)",
+  activo: /Activo en el checkout/i.test(document.body.innerText),
+  guardadoSinActivar: /Guardado, sin activar/i.test(document.body.innerText),
+}));
 anota(
-  "con llave sk_ guardada, Stripe queda ACTIVO",
-  await page.evaluate(() => /Activo en el checkout/i.test(document.body.innerText) && /ya ofrece pagar con tarjeta/i.test(document.querySelector(".pag-aviso")?.textContent ?? "")),
-  await page.evaluate(() => `aviso=«${document.querySelector(".pag-aviso")?.textContent?.trim().slice(0, 70) ?? "(sin aviso)"}» badges=${[...document.querySelectorAll(".pag-estado")].map((e) => e.textContent.trim().slice(0, 30)).join("|")}`),
+  "una llave que la pasarela RECHAZA no puede activarse (queda guardada y apagada)",
+  !trasActivar.activo && trasActivar.guardadoSinActivar && /rechazó esa llave/i.test(trasActivar.aviso),
+  trasActivar.aviso.slice(0, 90),
 );
 anota(
   "la llave no se enseña entera: solo su final",
@@ -154,9 +164,11 @@ await page.evaluate(() => {
     ?.click();
 });
 await esperarRespuesta(page, antesDeProbar);
+await esperar(page, () => /rechaz/i.test(document.querySelector(".pag-aviso")?.textContent ?? ""), 25000);
 anota(
   "probar conexión con la llave falsa avisa del rechazo",
   await page.evaluate(() => /rechazó la llave/i.test(document.querySelector(".pag-aviso")?.textContent ?? "")),
+  await page.evaluate(() => `url=${location.search} aviso=«${document.querySelector(".pag-aviso")?.textContent?.trim().slice(0, 80) ?? "(sin aviso)"}»`),
 );
 
 /* ── 6. El checkout ofrece la tarjeta y la pone primera ── */
@@ -196,17 +208,20 @@ await page.goto(`${BASE}/checkout`, { waitUntil: "networkidle2" });
 const metodos = await page.evaluate(() =>
   [...document.querySelectorAll('input[name="paymentMethod"]')].map((r) => ({ v: r.value, off: r.disabled, sel: r.checked })),
 );
+// Con la llave rechazada, el cobro con tarjeta NO se ofrece: aparece apagada
+// («Próximamente») y la compra sigue siendo posible por los métodos manuales.
+const stripe = metodos.find((m) => m.v === "stripe");
 anota(
-  "el checkout ofrece stripe habilitado y como opción por defecto",
-  metodos[0]?.v === "stripe" && !metodos[0].off && metodos[0].sel,
+  "con la llave rechazada, la tarjeta NO se ofrece: sale apagada",
+  !!stripe && stripe.off && !stripe.sel,
   JSON.stringify(metodos),
 );
 anota(
-  "el botón dice «Continuar al pago seguro» con la tarjeta elegida",
-  await page.evaluate(() => /Continuar al pago seguro/.test(document.querySelector(".co-submit")?.textContent ?? "")),
+  "aun así se puede terminar la compra por otro método",
+  metodos.some((m) => !m.off),
 );
 
-/* ── 7. Pedido con Stripe: la pasarela falla y el pedido sobrevive ── */
+/* ── 7. Un pedido por un método manual llega hasta su confirmación ── */
 await page.evaluate(() => {
   const poner = (name, valor) => {
     const el = document.querySelector(`[name="${name}"]`);
@@ -222,6 +237,8 @@ await page.evaluate(() => {
   poner("city", "Hamilton");
   poner("state", "OH");
   poner("zip", "45011");
+  // El primer método que SÍ esté disponible (dm o recogida).
+  document.querySelector('input[name="paymentMethod"]:not(:disabled)')?.click();
 });
 await page.evaluate(() => document.querySelector('form button[type="submit"]')?.click());
 await esperar(page, () => /\/pedido\//.test(location.pathname), 25000);
@@ -229,22 +246,18 @@ await esperar(page, () => /\/pedido\//.test(location.pathname), 25000);
 const pedidoFinal = await page.evaluate(() => ({
   url: location.pathname + location.search,
   numero: (document.body.innerText.match(/BLM-\d+/) ?? [null])[0],
-  avisa: /No pudimos conectar con la página de pago/i.test(document.body.innerText),
-  botonPagar: [...document.querySelectorAll("button")].some((b) => /Pagar ahora/.test(b.textContent ?? "")),
-  pendiente: /Pendiente de pago/i.test(document.body.innerText),
 }));
 anota(
-  "con la pasarela caída, el pedido se crea igual y aterriza con aviso",
-  !!pedidoFinal.numero && /pago=sin-conexion/.test(pedidoFinal.url) && pedidoFinal.avisa,
+  "el pedido se crea y aterriza en su confirmación",
+  !!pedidoFinal.numero && /\/pedido\//.test(pedidoFinal.url),
   pedidoFinal.url,
 );
-anota("el pedido ofrece «Pagar ahora» para reintentar", pedidoFinal.botonPagar && pedidoFinal.pendiente);
 
-/* ── 8. En el panel, el pedido sale como Tarjeta (Stripe) por cobrar ── */
+/* ── 8. El pedido aparece en el panel ── */
 await page.goto(`${BASE}/admin/pedidos`, { waitUntil: "networkidle2" });
 anota(
-  "el panel etiqueta el método como Tarjeta (Stripe)",
-  await page.evaluate(() => /Tarjeta \(Stripe\)/.test(document.body.innerText)),
+  "el pedido nuevo sale en el panel",
+  await page.evaluate((n) => document.body.innerText.includes(n), pedidoFinal.numero ?? "BLM-"),
 );
 
 /* ── 9. Limpieza: quitar la llave falsa; el checkout vuelve a Próximamente ── */
