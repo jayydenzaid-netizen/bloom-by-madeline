@@ -60,6 +60,10 @@ const ERRORES: Record<string, string> = {
   "paypal-fallo": "PayPal rechazó las credenciales. Revisa Client ID, Secret y el entorno (real o pruebas).",
   "square-sin-llaves": "Para activar Square hacen falta el token de acceso y el Location ID.",
   "square-fallo": "Square rechazó el token. Revisa que sea de producción (o cambia el entorno a pruebas).",
+  "square-es-sandbox":
+    "Ese token es de PRUEBAS (Sandbox) pero tienes el entorno en «Real», y por eso Square lo rechaza. Dos salidas: cambia «Entorno» a «Pruebas» para ensayar sin cobrar, o pega el token de la pestaña «Production» de Square para cobrar de verdad.",
+  "square-es-produccion":
+    "Ese token es de PRODUCCIÓN (Real) pero tienes el entorno en «Pruebas». Cambia «Entorno» a «Real», guarda, y ya cobrará de verdad.",
   "sin-metodos":
     "No puedes apagar el DM y la recogida sin tener una pasarela activa: nadie podría terminar una compra.",
   // Se intentó ENCENDER un cobro que la pasarela rechaza. Se guarda apagado a

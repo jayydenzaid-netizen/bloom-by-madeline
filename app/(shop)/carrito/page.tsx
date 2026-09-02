@@ -67,6 +67,9 @@ export default async function CarritoPage() {
     );
   }
 
+  // Un carrito donde TODO se agotó no puede llevar al checkout: no hay nada
+  // que comprar, solo líneas que quitar.
+  const hayComprables = cart.lines.some((l) => !l.soldOut);
   const faltan = cart.freeShippingMissingCents;
   const progreso =
     faltan > 0 ? Math.round((cart.subtotalCents / (cart.subtotalCents + faltan)) * 100) : 100;
@@ -95,6 +98,42 @@ export default async function CarritoPage() {
         <ul className="cp-lines">
           {cart.lines.map((line) => {
             const tope = line.available !== null && line.quantity >= line.available;
+            // Se agotó mientras estaba aquí: se enseña apagada, con su botón de
+            // quitar. Sin esto la línea desaparecía de la vista pero seguía en la
+            // base, y el checkout rechazaba el pedido pidiendo «revisa tu
+            // carrito» sin que hubiera nada visible que revisar: sin salida.
+            if (line.soldOut) {
+              return (
+                <li className="cp-line cp-line-agotada" key={line.id}>
+                  <Link className="cp-foto" href={`/producto/${line.slug}`}>
+                    {line.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- las fotos viven en el CDN del proveedor
+                      <img src={line.imageUrl} alt={line.title} />
+                    ) : (
+                      <span className="cd-noimg" aria-hidden="true" />
+                    )}
+                  </Link>
+                  <div className="cp-info">
+                    <h2>
+                      <Link href={`/producto/${line.slug}`}>{line.title}</Link>
+                    </h2>
+                    {line.variantTitle ? <p className="ci-meta">{line.variantTitle}</p> : null}
+                    <p className="cp-agotada-aviso">
+                      Se agotó mientras lo tenías en el carrito. Quítalo para poder seguir con tu
+                      compra.
+                    </p>
+                    <div className="cp-controls">
+                      <form action={quitarLinea.bind(null, line.id)}>
+                        <button className="cp-del" type="submit">
+                          Quitar
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                  <span className="cp-total">—</span>
+                </li>
+              );
+            }
             return (
               <li className="cp-line" key={line.id}>
                 <Link className="cp-foto" href={`/producto/${line.slug}`}>
@@ -184,9 +223,16 @@ export default async function CarritoPage() {
             <strong>{formatCents(cart.totalCents)}</strong>
           </div>
 
-          <Link className="btn btn-ink cp-cta" href="/checkout">
-            Finalizar compra
-          </Link>
+          {hayComprables ? (
+            <Link className="btn btn-ink cp-cta" href="/checkout">
+              Finalizar compra
+            </Link>
+          ) : (
+            <p className="cp-agotada-aviso">
+              Todo lo que queda en tu carrito se agotó. Quítalo y elige otra pieza para poder
+              seguir.
+            </p>
+          )}
           {settings.payDm ? (
             <DmHandoff dmUrl={settings.instagramDm} summary={resumenDm} className="btn btn-ghost cp-cta" />
           ) : null}

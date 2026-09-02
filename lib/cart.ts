@@ -18,6 +18,16 @@ export type CartLine = {
   lineTotalCents: number;
   /** Unidades disponibles. null = sin límite (el proveedor tiene el stock). */
   available: number | null;
+  /**
+   * Se agotó mientras estaba en el carrito.
+   *
+   * Estas líneas SE ENSEÑAN, tachadas y con su botón de quitar, en vez de
+   * desaparecer. Ocultarlas dejaba el carrito en un callejón sin salida: la
+   * fila seguía en la base y el checkout abortaba el pedido entero diciendo
+   * «revisa tu carrito», pero en el carrito no había nada que revisar ni nada
+   * que pulsar. La compradora no podía comprar nunca más, y nadie se enteraba.
+   */
+  soldOut?: boolean;
 };
 
 export type CartView = {
@@ -96,7 +106,9 @@ export async function getCart(token: string | null): Promise<CartView> {
     const priceCents = item.variant.priceCents;
     const available = item.variant.trackStock ? item.variant.stock : null;
     const quantity = available === null ? item.quantity : Math.min(item.quantity, Math.max(0, available));
-    if (quantity <= 0) continue;
+    // Agotada: se conserva en la lista marcada, para que la clienta la vea y
+    // pueda quitarla. Ni suma al total ni cuenta como pieza (ver más abajo).
+    const soldOut = quantity <= 0;
 
     lines.push({
       id: item.id,
@@ -107,18 +119,21 @@ export async function getCart(token: string | null): Promise<CartView> {
       variantTitle: item.variant.title,
       imageUrl: item.variant.imageUrl,
       priceCents,
-      quantity,
-      lineTotalCents: priceCents * quantity,
+      quantity: soldOut ? item.quantity : quantity,
+      lineTotalCents: soldOut ? 0 : priceCents * quantity,
       available,
+      ...(soldOut ? { soldOut: true } : {}),
     });
   }
 
-  const subtotalCents = lines.reduce((sum, l) => sum + l.lineTotalCents, 0);
-  const count = lines.reduce((sum, l) => sum + l.quantity, 0);
+  // El dinero y el badge solo cuentan lo que se puede comprar de verdad.
+  const comprables = lines.filter((l) => !l.soldOut);
+  const subtotalCents = comprables.reduce((sum, l) => sum + l.lineTotalCents, 0);
+  const count = comprables.reduce((sum, l) => sum + l.quantity, 0);
 
   const qualifies =
     settings.freeShippingOverCents <= 0 || subtotalCents >= settings.freeShippingOverCents;
-  const shippingCents = lines.length === 0 || qualifies ? 0 : settings.flatShippingCents;
+  const shippingCents = comprables.length === 0 || qualifies ? 0 : settings.flatShippingCents;
   const freeShippingMissingCents =
     settings.freeShippingOverCents > 0 && !qualifies
       ? settings.freeShippingOverCents - subtotalCents
@@ -135,13 +150,34 @@ export async function getCart(token: string | null): Promise<CartView> {
   };
 }
 
-/** Atajo para el badge del nav: solo cuenta, sin traer todo el carrito. */
+/**
+ * Atajo para el badge del nav: solo cuenta, sin traer todo el carrito.
+ *
+ * Cuenta lo COMPRABLE, igual que `getCart`: una talla agotada sigue en el
+ * carrito para poder quitarla, pero un badge que anuncia una pieza que ya no
+ * se puede comprar manda a la clienta a un carrito donde no hay nada que hacer.
+ */
 export async function getCartCount(): Promise<number> {
   const token = await readCartToken();
   if (!token) return 0;
   const cart = await db.cart.findUnique({
     where: { token },
-    select: { items: { select: { quantity: true } } },
+    select: {
+      items: {
+        select: {
+          quantity: true,
+          product: { select: { status: true } },
+          variant: { select: { stock: true, trackStock: true } },
+        },
+      },
+    },
   });
-  return cart?.items.reduce((s, i) => s + i.quantity, 0) ?? 0;
+  return (
+    cart?.items.reduce((s, i) => {
+      if (!i.product || !i.variant || i.product.status === "archived") return s;
+      const disponible = i.variant.trackStock ? i.variant.stock : null;
+      const cantidad = disponible === null ? i.quantity : Math.min(i.quantity, Math.max(0, disponible));
+      return s + Math.max(0, cantidad);
+    }, 0) ?? 0
+  );
 }

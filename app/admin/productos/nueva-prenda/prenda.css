@@ -1,0 +1,266 @@
+/* «Añadir prenda» — diseñada para el teléfono primero.
+ *
+ * Reglas que manda esta pantalla:
+ *  · Una sola columna. Se usa con una mano, de pie y con la prenda en la otra.
+ *  · Nada que se pueda tocar mide menos de 48px: es el mínimo cómodo para un
+ *    pulgar, y aquí se toca mucho (tallas, contadores, quitar fotos).
+ *  · Tipografía de 16px o más en los campos: por debajo, Safari de iPhone hace
+ *    zoom al enfocar y descoloca la página entera.
+ */
+
+.np-form {
+  display: grid;
+  gap: 14px;
+  max-width: 640px;
+}
+
+.np-paso {
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  padding: 18px 16px;
+}
+
+.np-titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.np-num {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--adm-ink);
+  color: var(--adm-surface);
+  font-size: 13px;
+}
+
+.np-ayuda {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--adm-muted);
+}
+.np-ayuda-mal { color: var(--adm-danger); }
+
+/* ─────────────── fotos ─────────────── */
+
+.np-fotos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 10px;
+}
+
+.np-foto {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--adm-line);
+  background: var(--adm-surface-2);
+}
+.np-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.np-foto-mal { border-color: var(--adm-danger); }
+
+.np-portada,
+.np-subiendo,
+.np-foto-error {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 5px 8px;
+  font-size: 11.5px;
+  text-align: center;
+  background: rgba(0, 0, 0, .62);
+  color: #fff;
+}
+.np-foto-error { background: var(--adm-danger); line-height: 1.35; }
+
+/* Botón de quitar: 44px reales aunque se vea pequeño. */
+.np-quitar-foto {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .58);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.np-anadir-foto {
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  aspect-ratio: 3 / 4;
+  border: 1.5px dashed var(--adm-line);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: center;
+  font-size: 13px;
+  color: var(--adm-muted);
+  background: var(--adm-surface-2);
+}
+.np-anadir-foto span[aria-hidden] { font-size: 26px; line-height: 1; }
+/* El input se esconde SIN `display:none`: así sigue existiendo para los
+   lectores de pantalla y para el teclado, y el navegador puede enfocarlo. */
+.np-anadir-foto input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.np-anadir-foto { position: relative; }
+
+/* ─────────────── campos ─────────────── */
+
+.np-campo { display: grid; gap: 6px; margin-bottom: 14px; }
+.np-campo > span { font-size: 13.5px; color: var(--adm-muted); }
+
+.np-campo input,
+.np-campo textarea {
+  width: 100%;
+  /* 16px o el iPhone hace zoom al enfocar. */
+  font-size: 16px;
+  padding: 13px 14px;
+  min-height: 50px;
+  border: 1px solid var(--adm-line);
+  border-radius: 10px;
+  background: var(--adm-surface);
+  color: var(--adm-ink);
+  font-family: inherit;
+}
+.np-campo textarea { min-height: 84px; resize: vertical; line-height: 1.5; }
+
+.np-precio { position: relative; display: flex; align-items: center; }
+.np-precio em {
+  position: absolute;
+  left: 14px;
+  font-style: normal;
+  font-size: 17px;
+  color: var(--adm-muted);
+}
+.np-precio input { padding-left: 30px; font-size: 19px; }
+
+/* ─────────────── tallas ─────────────── */
+
+.np-tallas { display: flex; flex-wrap: wrap; gap: 9px; }
+
+.np-talla {
+  min-width: 58px;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1.5px solid var(--adm-line);
+  border-radius: 10px;
+  background: var(--adm-surface);
+  color: var(--adm-ink);
+  font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.np-talla-on {
+  background: var(--adm-ink);
+  border-color: var(--adm-ink);
+  color: var(--adm-surface);
+}
+
+.np-cantidades { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
+.np-cantidades li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--adm-line);
+}
+.np-cant-talla { font-size: 15px; }
+
+.np-contador { display: flex; align-items: center; gap: 4px; }
+.np-contador button {
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--adm-line);
+  border-radius: 10px;
+  background: var(--adm-surface);
+  color: var(--adm-ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.np-contador strong { min-width: 42px; text-align: center; font-size: 17px; font-weight: 500; }
+
+/* ─────────────── guardar ─────────────── */
+
+.np-guardar { display: grid; gap: 10px; }
+.np-resumen { margin: 0; font-size: 13.5px; color: var(--adm-muted); text-align: center; }
+
+.np-btn {
+  width: 100%;
+  min-height: 54px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-size: 16px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.np-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.np-btn-primario { background: var(--adm-ink); color: var(--adm-surface); }
+.np-btn-suave {
+  background: var(--adm-surface);
+  border-color: var(--adm-line);
+  color: var(--adm-ink);
+}
+
+.np-exito,
+.np-error {
+  padding: 12px 14px;
+  border-radius: var(--adm-r);
+  font-size: 14px;
+  line-height: 1.55;
+  border: 1px solid var(--adm-line);
+}
+.np-exito {
+  display: grid;
+  gap: 4px;
+  background: var(--adm-success-soft);
+  border-color: rgba(46, 107, 79, .28);
+  color: var(--adm-success);
+}
+.np-error {
+  background: var(--adm-danger-soft);
+  border-color: rgba(160, 48, 42, .28);
+  color: var(--adm-danger);
+}
+
+.np-avanzado {
+  margin: 18px 0 0;
+  font-size: 13px;
+  color: var(--adm-muted);
+  max-width: 640px;
+}
+
+/* En pantalla grande el formulario no se estira: sigue leyéndose como una
+   columna, que es como se rellena. */
+@media (min-width: 760px) {
+  .np-fotos { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+}
+
+/* Por debajo de 900px el panel pone su barra de navegación FIJA abajo: sin este
+   hueco taparía el botón de guardar, que es justo el último de la página. */
+@media (max-width: 899px) {
+  .np-avanzado { margin-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); }
+}

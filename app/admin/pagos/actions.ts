@@ -293,9 +293,14 @@ export async function probarConexion(formData: FormData): Promise<void> {
       admin,
       action: "update",
       entityType: "setting",
-      summary: `Probó la conexión con Square: ${r.ok ? `bien (${r.detalle})` : "falló"}.`,
+      summary: `Probó la conexión con Square: ${r.ok ? `bien (${r.detalle})` : `falló (${r.detalle})`}.`,
     });
-    terminar(r.ok ? { hecho: "square-conexion" } : { error: "square-fallo" });
+    if (r.ok) terminar({ hecho: "square-conexion" });
+    // Si el token es del OTRO entorno se dice tal cual: es el fallo más común
+    // y con «Unauthorized» a secas nadie adivina qué hacer.
+    if (/PRUEBAS \(Sandbox\)/.test(r.detalle)) terminar({ error: "square-es-sandbox" });
+    if (/PRODUCCIÓN \(Real\)/.test(r.detalle)) terminar({ error: "square-es-produccion" });
+    terminar({ error: "square-fallo" });
   }
 
   terminar({ error: "desconocido" });

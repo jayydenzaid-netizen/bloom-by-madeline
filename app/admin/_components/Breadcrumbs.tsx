@@ -50,6 +50,7 @@ const SECCIONES: Record<string, string> = {
 const SUBSECCIONES: Record<string, string> = {
   nuevo: "Nuevo",
   nueva: "Nueva",
+  "nueva-prenda": "Añadir prenda",
   movimientos: "Movimientos",
 };
 

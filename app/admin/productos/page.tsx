@@ -309,7 +309,7 @@ export default async function ProductosPage({ searchParams }: { searchParams: Pr
         subtitle={resumenTexto(resumen, total, Boolean(q || estado || coleccionId || aviso))}
         actions={
           <>
-            <Button href="/admin/productos/nuevo">Nuevo producto</Button>
+            <Button href="/admin/productos/nueva-prenda">Añadir prenda</Button>
             <Button href="/admin/importar" variant="ghost">
               Importar de proveedor
             </Button>
@@ -517,7 +517,7 @@ export default async function ProductosPage({ searchParams }: { searchParams: Pr
                 action={
                   <>
                     <Button href="/admin/importar">Importar el primero</Button>
-                    <Button href="/admin/productos/nuevo" variant="ghost">
+                    <Button href="/admin/productos/nueva-prenda" variant="ghost">
                       Crearlo a mano
                     </Button>
                   </>

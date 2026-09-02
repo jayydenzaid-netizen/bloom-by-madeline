@@ -30,7 +30,11 @@ export default async function CheckoutPage() {
   // Al formulario solo viajan booleanos: las credenciales se quedan en el servidor.
   const online = metodosOnlineActivos(configPagos);
 
-  if (cart.lines.length === 0) {
+  // Las líneas agotadas siguen en el carrito para poder quitarlas (ver
+  // lib/cart.ts), pero aquí no pintan nada: no se pueden comprar.
+  const comprables = cart.lines.filter((l) => !l.soldOut);
+
+  if (comprables.length === 0) {
     return (
       <div className="shop-page section">
         <div className="cp-empty">
@@ -146,7 +150,7 @@ export default async function CheckoutPage() {
 
       {hayMetodo ? (
         <CheckoutForm
-          lines={cart.lines.map((l) => ({
+          lines={comprables.map((l) => ({
             id: l.id,
             title: l.title,
             variantTitle: l.variantTitle,

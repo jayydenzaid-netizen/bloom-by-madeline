@@ -352,6 +352,15 @@ async function registrar(
 
 /* ────────────────────── guardar un buffer ya validado ────────────────────── */
 
+/** ¿La URL es de nuestro almacén de fotos en Vercel Blob? */
+function esUrlDeBlob(url: string): boolean {
+  try {
+    return new URL(url).hostname.endsWith(".vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
+
 async function guardarBuffer(
   buffer: Buffer,
   tipo: TipoImagen,
@@ -367,18 +376,49 @@ async function guardarBuffer(
 
   const { width, height } = await medirImagen(buffer, tipo);
 
-  try {
-    await mkdir(DIR_UPLOADS, { recursive: true });
-    // "wx" falla si el fichero ya existe: preferimos un error a pisar una foto
-    // que ya estuviera publicada en la tienda.
-    await writeFile(destino, buffer, { flag: "wx" });
-  } catch (error) {
-    return { ok: false, error: `No se pudo guardar el fichero: ${mensaje(error)}.` };
+  /*
+   * DÓNDE SE GUARDA LA FOTO.
+   *
+   * En el portátil, en `public/uploads`: es cómodo y se ve al instante.
+   *
+   * En producción NO puede ser el disco. La tienda corre en funciones sin
+   * servidor: cada petición puede caer en una máquina distinta y su disco se
+   * borra al terminar. Escribir ahí significaba que Madeline subía una foto
+   * desde el móvil, la veía un momento… y al rato el producto aparecía sin
+   * foto, sin ningún error que lo explicara. Por eso en producción va a Vercel
+   * Blob (almacenamiento de verdad, servido por CDN): es lo que hace que subir
+   * fotos desde el teléfono funcione.
+   */
+  let url: string;
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      const { put } = await import("@vercel/blob");
+      const subida = await put(`productos/${nombre}`, buffer, {
+        access: "public",
+        contentType: tipo,
+        // El nombre ya lleva su parte aleatoria (ver `nombreSeguro`): sin otro
+        // sufijo encima, la URL se queda legible.
+        addRandomSuffix: false,
+      });
+      url = subida.url;
+    } catch (error) {
+      return { ok: false, error: `No se pudo guardar la foto: ${mensaje(error)}.` };
+    }
+  } else {
+    try {
+      await mkdir(DIR_UPLOADS, { recursive: true });
+      // "wx" falla si el fichero ya existe: preferimos un error a pisar una foto
+      // que ya estuviera publicada en la tienda.
+      await writeFile(destino, buffer, { flag: "wx" });
+    } catch (error) {
+      return { ok: false, error: `No se pudo guardar el fichero: ${mensaje(error)}.` };
+    }
+    url = `/uploads/${nombre}`;
   }
 
   const asset = await db.mediaAsset.create({
     data: {
-      url: `/uploads/${nombre}`,
+      url,
       filename: nombre,
       mimeType: tipo,
       bytes: buffer.byteLength,
@@ -608,8 +648,8 @@ export async function deleteAsset(
   }
 
   let ficheroBorrado = false;
-  // Solo se borra del disco lo que vive en /uploads: una imagen apuntada a un
-  // CDN externo no tiene fichero nuestro que borrar.
+  // Solo se borra lo que es NUESTRO: el disco en local, o el Blob en
+  // producción. Una imagen apuntada al CDN de un proveedor no se toca.
   if (asset.url.startsWith("/uploads/")) {
     const destino = rutaDentroDeUploads(asset.url.slice("/uploads/".length));
     if (destino) {
@@ -620,6 +660,14 @@ export async function deleteAsset(
         // Si el fichero ya no está, el registro se limpia igual: dejar la ficha
         // huérfana sería peor que no tener ninguna.
       }
+    }
+  } else if (esUrlDeBlob(asset.url) && process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      const { del } = await import("@vercel/blob");
+      await del(asset.url);
+      ficheroBorrado = true;
+    } catch {
+      // Igual que arriba: el registro se limpia aunque el borrado remoto falle.
     }
   }
 

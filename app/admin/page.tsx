@@ -138,7 +138,7 @@ export default async function AdminDashboard() {
 
   const acciones = (
     <>
-      <Button href="/admin/productos/nuevo">Nuevo producto</Button>
+      <Button href="/admin/productos/nueva-prenda">Añadir prenda</Button>
       <Button href="/admin/importar" variant="ghost">
         Importar de proveedor
       </Button>
@@ -158,7 +158,7 @@ export default async function AdminDashboard() {
             action={
               <>
                 <Button href="/admin/importar">Importar el primero</Button>
-                <Button href="/admin/productos/nuevo" variant="ghost">
+                <Button href="/admin/productos/nueva-prenda" variant="ghost">
                   Crearlo a mano
                 </Button>
               </>

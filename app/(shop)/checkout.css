@@ -78,6 +78,18 @@
 }
 .cp-line:first-child { border-top: 1px solid var(--line); }
 
+/* Línea que se agotó mientras estaba en el carrito: se ve apagada pero legible,
+   con su botón de quitar. Nunca se esconde (ver getCart en lib/cart.ts). */
+.cp-line-agotada .cp-foto { opacity: .45; }
+.cp-line-agotada h2 { text-decoration: line-through; text-decoration-thickness: 1px; }
+.cp-line-agotada .cp-total { color: var(--stone); }
+.cp-agotada-aviso {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--clay);
+  margin: 4px 0 8px;
+}
+
 .cp-foto {
   display: block;
   overflow: hidden;

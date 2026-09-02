@@ -218,11 +218,33 @@ export async function probarSquare(
       ...(coincide ? {} : { motivo: "credencial" as const }),
     };
   } catch (err) {
+    const rechazado = err instanceof ErrorPasarela && err.credencial;
+    // El error nº 1 al conectar Square: pegar el token de la pestaña «Sandbox»
+    // teniendo el entorno en «Real» (o al revés). Square solo dice
+    // «Unauthorized», que no ayuda nada. Así que se prueba el OTRO entorno: si
+    // allí funciona, se puede decir exactamente qué pasa y cómo arreglarlo.
+    if (rechazado) {
+      const otro = cfg.entorno === "production" ? "sandbox" : "production";
+      try {
+        await llamarSquare({ ...cfg, entorno: otro } as ConfigSquare, "GET", "/v2/locations", null, f);
+        return {
+          ok: false,
+          motivo: "credencial",
+          locales: [],
+          detalle:
+            otro === "sandbox"
+              ? "ese token es de PRUEBAS (Sandbox) y el entorno está en «Real»"
+              : "ese token es de PRODUCCIÓN (Real) y el entorno está en «Pruebas»",
+        };
+      } catch {
+        /* tampoco vale en el otro entorno: es un token malo a secas */
+      }
+    }
     return {
       ok: false,
       detalle: err instanceof Error ? err.message : "fallo de red",
       locales: [],
-      motivo: err instanceof ErrorPasarela && err.credencial ? "credencial" : "red",
+      motivo: rechazado ? "credencial" : "red",
     };
   }
 }
