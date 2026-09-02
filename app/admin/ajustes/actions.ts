@@ -143,37 +143,9 @@ export async function guardarEnvio(formData: FormData): Promise<void> {
   terminar("envio");
 }
 
-/* ──────────────────────────────── pagos ──────────────────────────────── */
-
-const pagosSchema = z.object({
-  payStripe: z.boolean(),
-  payDm: z.boolean(),
-  payPickup: z.boolean(),
-});
-
-export async function guardarPagos(formData: FormData): Promise<void> {
-  await exigirSesion();
-
-  // Sin llaves de Stripe no hay cobro con tarjeta posible. Se fuerza a false
-  // aunque llegue marcado: prometer un pago que no podemos procesar deja a la
-  // clienta con el carrito lleno y sin manera de pagar.
-  const hayStripe = Boolean(process.env.STRIPE_SECRET_KEY);
-
-  const datos = pagosSchema.safeParse({
-    payStripe: hayStripe && marcado(formData, "payStripe"),
-    payDm: marcado(formData, "payDm"),
-    payPickup: marcado(formData, "payPickup"),
-  });
-
-  if (!datos.success) terminar("pagos", datos.error.issues[0]?.message);
-
-  if (!datos.data.payStripe && !datos.data.payDm && !datos.data.payPickup) {
-    terminar("pagos", "Deja al menos un método de pago activo o nadie podrá terminar una compra.");
-  }
-
-  await saveSettings(datos.data);
-  terminar("pagos");
-}
+/* Los métodos de pago se gestionan en /admin/pagos (app/admin/pagos/actions.ts):
+   las credenciales de Stripe/PayPal/Square y los toggles de DM y recogida viven
+   ahí, en una sola pantalla, para que activar un cobro no exija dos sitios. */
 
 /* ───────────────────────────── importación ───────────────────────────── */
 

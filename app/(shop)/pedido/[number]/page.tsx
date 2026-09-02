@@ -11,8 +11,9 @@ import {
   paymentStatusLabel,
   trackingUrl,
 } from "@/lib/orders";
+import { esMetodoOnline, minimoOnlineCents, verificarPagoPedido } from "@/lib/payments";
 import { getSettings } from "@/lib/settings";
-import { verifyOrderAccess } from "../../checkout/actions";
+import { reintentarPago, verifyOrderAccess } from "../../checkout/actions";
 import { DmHandoff } from "../../checkout/CheckoutForm";
 import "../../checkout.css";
 
@@ -45,10 +46,10 @@ export default async function PedidoPage({
   searchParams,
 }: {
   params: Promise<{ number: string }>;
-  searchParams: Promise<{ acceso?: string }>;
+  searchParams: Promise<{ acceso?: string; pago?: string }>;
 }) {
   const { number: raw } = await params;
-  const { acceso } = await searchParams;
+  const { acceso, pago } = await searchParams;
   const number = normalizeOrderNumber(decodeURIComponent(raw));
 
   const permitido = await canViewOrder(number);
@@ -56,7 +57,22 @@ export default async function PedidoPage({
     return <Candado number={number} fallo={acceso === "fallo"} />;
   }
 
-  const [order, settings] = await Promise.all([getOrderByNumber(number), getSettings()]);
+  let [order, settings] = await Promise.all([getOrderByNumber(number), getSettings()]);
+
+  // Reconciliación al abrir: si el pedido espera un cobro online, se le pregunta
+  // al proveedor AHORA. Cubre a la clienta que pagó y cerró la pestaña antes de
+  // volver: en cuanto alguien abre el pedido, el estado se pone al día solo.
+  if (
+    order &&
+    order.paymentStatus === "pending" &&
+    esMetodoOnline(order.paymentMethod) &&
+    order.paymentAttemptsJson !== "[]"
+  ) {
+    const verificado = await verificarPagoPedido(order.id);
+    if (verificado.estado === "pagado") {
+      order = await getOrderByNumber(number);
+    }
+  }
   if (!order) {
     return (
       <div className="shop-page section">
@@ -75,8 +91,39 @@ export default async function PedidoPage({
 
   const esDm = order.paymentMethod === "dm";
   const esRecogida = order.paymentMethod === "pickup";
+  const esOnline = esMetodoOnline(order.paymentMethod);
   const pendiente = order.paymentStatus === "pending";
+  const pagado = order.paymentStatus === "paid";
   const rastreo = trackingUrl(order.trackingCarrier, order.trackingNumber);
+
+  // Aviso según de dónde viene: la vuelta de la pasarela pone ?pago=… en la URL.
+  // Solo se enseñan los que siguen siendo verdad (p.ej. «cancelado» ya no aplica
+  // si la verificación acaba de confirmar el cobro).
+  // Un total por debajo del mínimo de la pasarela nunca se va a poder cobrar
+  // online: reintentar es un callejón. Se detecta aquí (no por la URL) para que
+  // el mensaje y el botón sean coherentes también al recargar sin parámetros.
+  const bajoMinimo = esOnline && pendiente && order.totalCents < minimoOnlineCents(order.paymentMethod);
+  // Con el pago «procesándose» o «en revisión», invitar a pagar otra vez es
+  // pedir un cobro duplicado: el botón se esconde en esos estados.
+  const ofrecerPagar = esOnline && pendiente && !bajoMinimo && pago !== "procesando" && pago !== "revision";
+
+  const avisoPago = pagado
+    ? pago === "confirmado"
+      ? { tono: "ok" as const, texto: "✓ Pago recibido. ¡Gracias por tu compra!" }
+      : null
+    : pendiente && esOnline
+      ? bajoMinimo
+        ? { tono: "aviso" as const, texto: "El importe es tan pequeño que la pasarela no puede cobrarlo online. Escríbenos por Instagram y lo cerramos por ahí — tu pedido sigue apartado." }
+        : pago === "cancelado"
+          ? { tono: "aviso" as const, texto: "El pago no se completó. Puedes intentarlo otra vez cuando quieras — tu pedido sigue apartado." }
+          : pago === "sin-conexion"
+            ? { tono: "aviso" as const, texto: "No pudimos conectar con la página de pago. Tu pedido quedó registrado: inténtalo de nuevo en un momento." }
+            : pago === "procesando"
+              ? { tono: "aviso" as const, texto: "Tu pago se está procesando. Vuelve a abrir esta página en unos minutos: se actualizará en cuanto el cobro se confirme." }
+              : pago === "revision"
+                ? { tono: "aviso" as const, texto: "Recibimos la vuelta del pago pero todavía no pudimos confirmarlo. Lo estamos revisando; escríbenos si ya te cobraron. No intentes pagar de nuevo." }
+                : null
+      : null;
 
   const resumenDm = buildDmSummary({
     lines: order.items.map((i) => ({
@@ -111,6 +158,12 @@ export default async function PedidoPage({
 
       <div className="op-grid">
         <section className="op-main">
+          {avisoPago ? (
+            <p className={avisoPago.tono === "ok" ? "op-pago-ok" : "co-alert"} role="status">
+              {avisoPago.texto}
+            </p>
+          ) : null}
+
           {/* Qué pasa ahora — lo primero que ella necesita saber, no los totales. */}
           <div className="op-next">
             <h2 className="co-h">
@@ -141,7 +194,40 @@ export default async function PedidoPage({
               </p>
             ) : null}
 
-            {!esDm && !esRecogida ? (
+            {esOnline && pendiente ? (
+              <>
+                <p>
+                  Tu pago con <strong>{paymentMethodLabel(order.paymentMethod)}</strong> aún
+                  no se ha confirmado. Tu pedido está <strong>apartado</strong>
+                  {ofrecerPagar ? ": puedes completar el pago cuando quieras desde el botón." : "."}
+                </p>
+                {ofrecerPagar ? (
+                  <form action={reintentarPago}>
+                    <input type="hidden" name="number" value={order.number} />
+                    <button className="btn btn-ink op-cta" type="submit">
+                      Pagar ahora
+                    </button>
+                  </form>
+                ) : null}
+                {bajoMinimo ? (
+                  <DmHandoff
+                    dmUrl={settings.instagramDm}
+                    summary={resumenDm}
+                    label="Copiar resumen y abrir Instagram"
+                    className="btn btn-ink op-cta"
+                  />
+                ) : null}
+              </>
+            ) : null}
+
+            {esOnline && pagado ? (
+              <p>
+                Tu pago está <strong>confirmado</strong>. Estamos preparando tu pedido y te
+                escribimos a {order.email} en cuanto salga.
+              </p>
+            ) : null}
+
+            {!esDm && !esRecogida && !esOnline ? (
               <p>
                 Estamos procesando tu pedido. Te escribimos a {order.email} en cuanto haya
                 novedades.
@@ -221,7 +307,9 @@ export default async function PedidoPage({
                 {order.shipCountry}
               </address>
             )}
-            {order.note ? <p className="co-note">Tu nota: {order.note}</p> : null}
+            {notaDeClienta(order.note) ? (
+              <p className="co-note">Tu nota: {notaDeClienta(order.note)}</p>
+            ) : null}
           </div>
         </section>
 
@@ -293,6 +381,20 @@ export default async function PedidoPage({
 function primerNombre(nombre: string): string {
   const trozo = nombre.trim().split(/\s+/)[0];
   return trozo || "gracias por tu compra";
+}
+
+/**
+ * `Order.note` es a la vez la nota de la clienta y la BITÁCORA del panel (líneas
+ * que empiezan por "[dd mmm aaaa, hh:mm]" — mismo criterio que separarNota en el
+ * admin). A la clienta solo se le enseña LO SUYO: las referencias de cobro y los
+ * avisos internos no pintan nada en su confirmación.
+ */
+function notaDeClienta(note: string): string {
+  return (note || "")
+    .split("\n")
+    .filter((linea) => !/^\[\d{2}\s/.test(linea.trim()))
+    .join("\n")
+    .trim();
 }
 
 /**

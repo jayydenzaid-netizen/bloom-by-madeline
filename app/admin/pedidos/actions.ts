@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { aplicarStockEnTx } from "@/lib/inventory";
+import { anularSesionesPago, verificarPagoPedido } from "@/lib/payments";
 
 /**
  * Acciones sobre un pedido: cobrar, reembolsar, cancelar, enviar y anotar.
@@ -75,6 +76,24 @@ function volver(id: string, estado: string): never {
 }
 
 /* ───────────────────────────── cobro ───────────────────────────── */
+
+/**
+ * Pregunta a la pasarela (Stripe/PayPal/Square) si el pedido ya se cobró de
+ * verdad y, si cuadra, lo marca pagado. Es el mismo verificador que usa la
+ * vuelta de la pasarela: aquí sirve para el caso «la clienta pagó y cerró la
+ * pestaña antes de volver a la tienda».
+ */
+export async function verificarPagoAdmin(formData: FormData): Promise<void> {
+  await exigirSesion();
+  const id = idSchema.parse(String(formData.get("id") ?? ""));
+
+  const resultado = await verificarPagoPedido(id);
+
+  if (resultado.estado === "pagado") volver(id, "pago-verificado");
+  if (resultado.estado === "revisar") volver(id, "pago-revisar");
+  if (resultado.estado === "sin-verificar") volver(id, "pago-sin-intentos");
+  volver(id, "pago-sin-cobro");
+}
 
 export async function marcarPagado(formData: FormData): Promise<void> {
   await exigirSesion();
@@ -190,6 +209,13 @@ export async function marcarCancelado(formData: FormData): Promise<void> {
 
     return "cancelado" as const;
   });
+
+  // Un pedido cancelado no puede dejar una página de pago viva en la pasarela:
+  // sería un cobro fantasma esperando a que alguien reencuentre la pestaña.
+  // Best-effort fuera de la transacción (es red, no datos).
+  if (resultado === "cancelado") {
+    await anularSesionesPago(datos.id);
+  }
 
   volver(datos.id, resultado);
 }

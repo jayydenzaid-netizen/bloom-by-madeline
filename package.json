@@ -20,6 +20,7 @@
     "qa": "node --env-file-if-exists=.env qa/audit.mjs",
     "qa:compra": "node --env-file-if-exists=.env qa/compra.mjs",
     "qa:login": "node --env-file-if-exists=.env qa/login.mjs",
+    "qa:pagos": "node --env-file-if-exists=.env qa/pagos.mjs",
 
     "shopify:verificar": "tsx shopify/verificar.ts",
     "shopify:prueba": "tsx shopify/verificar.ts --prueba",

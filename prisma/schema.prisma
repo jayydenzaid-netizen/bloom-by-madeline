@@ -196,7 +196,7 @@ model Order {
   paymentStatus String @default("pending")
   // unfulfilled | fulfilled | cancelled
   fulfillStatus String @default("unfulfilled")
-  // stripe | dm | pickup | cash
+  // stripe | paypal | square | dm | pickup | cash
   paymentMethod String @default("dm")
 
   subtotalCents Int @default(0)
@@ -218,6 +218,15 @@ model Order {
   trackingCarrier String?
 
   stripeSessionId String?
+
+  // Pago online (Stripe/PayPal/Square). `paymentRef` es el id de la última sesión
+  // de cobro creada en la pasarela y `paymentUrl` su página de pago, para poder
+  // reintentar. El historial de intentos va en JSON: la clienta puede dejar una
+  // sesión abierta en otra pestaña y pagar ESA, así que se verifica contra todas.
+  // JSON: { p: "stripe"|"paypal"|"square", ref: string, at: string }[]
+  paymentRef          String?
+  paymentUrl          String?
+  paymentAttemptsJson String  @default("[]")
 
   // online = la tienda web · pos = venta en el mostrador de la boutique
   channel      String  @default("online")

@@ -88,9 +88,19 @@ const anadido = await page.evaluate(() => {
   b.click();
   return `pulsado «${b.textContent.trim()}»`;
 });
-await new Promise((r) => setTimeout(r, 2500));
-
-const contador = await page.evaluate(() => document.querySelector(".cart-count")?.textContent?.trim() ?? "0");
+// Sondeo en vez de espera fija: la acción de servidor + revalidación tardan lo
+// que tarden (compilación en frío incluida), y una espera de 2500 ms clavados
+// era la causa nº 1 de falsos rojos de este script.
+const contador = await (async () => {
+  const limite = Date.now() + 15000;
+  let ultimo = antesDeAnadir;
+  while (Date.now() < limite) {
+    ultimo = await page.evaluate(() => document.querySelector(".cart-count")?.textContent?.trim() ?? "0");
+    if (Number(ultimo) > Number(antesDeAnadir || 0)) break;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return ultimo;
+})();
 anotar("Añadir al carrito sube el contador", `más de ${antesDeAnadir}`, `${anadido} → contador = ${contador}`, Number(contador) > Number(antesDeAnadir || 0));
 
 // ── 4. Carrito ──────────────────────────────────────────────────────────────
@@ -152,15 +162,30 @@ const relleno = await page.evaluate(() => {
     input.dispatchEvent(new Event("change", { bubbles: true }));
     puestos.push(n);
   }
-  // Método de pago: el primero que esté disponible.
-  const metodo = Array.from(document.querySelectorAll('input[type="radio"]')).find((r) => !r.disabled);
+  // Método de pago: DM explícitamente. Con las pasarelas activas (Stripe/PayPal/
+  // Square) el primer radio de la página puede ser un pago por redirect, y este
+  // test debe TERMINAR en /pedido/BLM-x — un redirect a la pasarela lo rompería.
+  const metodo =
+    document.querySelector('input[name="paymentMethod"][value="dm"]:not(:disabled)') ??
+    Array.from(document.querySelectorAll('input[name="paymentMethod"]')).find((r) => !r.disabled) ??
+    Array.from(document.querySelectorAll('input[type="radio"]')).find((r) => !r.disabled);
   if (metodo) { metodo.click(); puestos.push(`pago=${metodo.value}`); }
   return puestos;
 });
 anotar("Se rellena el formulario", "campos de envío completos", relleno.join(", ") || "ningún campo reconocido", relleno.length >= 4);
 
 await page.evaluate(() => document.querySelector('form button[type="submit"]')?.click());
-await new Promise((r) => setTimeout(r, 4000));
+// Sondeo hasta aterrizar en /pedido/BLM-x: el redirect llega cuando la acción
+// termina y la página del pedido compila — con 4000 ms fijos, un arranque en
+// frío daba falso rojo con el pedido ya creado en la base de datos.
+await (async () => {
+  const limite = Date.now() + 20000;
+  while (Date.now() < limite) {
+    const url = await page.evaluate(() => location.pathname);
+    if (/\/pedido\//.test(url)) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+})();
 
 const final = await page.evaluate(() => ({
   url: location.pathname,

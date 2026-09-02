@@ -45,7 +45,9 @@ const ENVIO: Record<string, { label: string; tone: BadgeTone }> = {
 };
 
 const METODO: Record<string, string> = {
-  stripe: "Tarjeta",
+  stripe: "Tarjeta (Stripe)",
+  paypal: "PayPal",
+  square: "Tarjeta (Square)",
   dm: "DM de Instagram",
   pickup: "Recogida en tienda",
   cash: "Efectivo",

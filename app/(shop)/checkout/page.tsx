@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCart, readCartToken } from "@/lib/cart";
+import { leerConfigPagos, metodosOnlineActivos } from "@/lib/payments";
 import { getSettings } from "@/lib/settings";
 import CheckoutForm, { type CheckoutMethodOption } from "./CheckoutForm";
 import "../checkout.css";
@@ -21,7 +22,13 @@ export const metadata: Metadata = {
  */
 export default async function CheckoutPage() {
   const token = await readCartToken();
-  const [cart, settings] = await Promise.all([getCart(token), getSettings()]);
+  const [cart, settings, configPagos] = await Promise.all([
+    getCart(token),
+    getSettings(),
+    leerConfigPagos(),
+  ]);
+  // Al formulario solo viajan booleanos: las credenciales se quedan en el servidor.
+  const online = metodosOnlineActivos(configPagos);
 
   if (cart.lines.length === 0) {
     return (
@@ -42,7 +49,57 @@ export default async function CheckoutPage() {
     );
   }
 
-  const methods: CheckoutMethodOption[] = [
+  // Con algún cobro online activo se enseñan SOLO los métodos que cobran de
+  // verdad; sin ninguno, una única tarjeta apagada con «Próximamente» — la
+  // regla de la casa de enseñar lo que viene, sin llenar la caja de grises que
+  // se contradigan («Próximamente» al lado de otra tarjeta que ya funciona).
+  const hayOnline = online.stripe || online.paypal || online.square;
+  const metodosOnline: CheckoutMethodOption[] = hayOnline
+    ? [
+        ...(online.stripe
+          ? [
+              {
+                id: "stripe" as const,
+                label: "Pagar con tarjeta",
+                description:
+                  "Pago seguro con tarjeta en la página de Stripe. Te devolvemos aquí al terminar.",
+                enabled: true,
+              },
+            ]
+          : []),
+        ...(online.paypal
+          ? [
+              {
+                id: "paypal" as const,
+                label: "PayPal",
+                description: "Paga con tu cuenta de PayPal o con tarjeta, en su página segura.",
+                enabled: true,
+              },
+            ]
+          : []),
+        ...(online.square
+          ? [
+              {
+                id: "square" as const,
+                label: online.stripe ? "Pagar con tarjeta (Square)" : "Pagar con tarjeta",
+                description:
+                  "Pago seguro con tarjeta en la página de Square. Te devolvemos aquí al terminar.",
+                enabled: true,
+              },
+            ]
+          : []),
+      ]
+    : [
+        {
+          id: "stripe" as const,
+          label: "Pagar con tarjeta",
+          description:
+            "Todavía no está activo. En cuanto la pasarela esté lista podrás pagar aquí mismo.",
+          enabled: false,
+          badge: "Próximamente",
+        },
+      ];
+  const metodosManuales: CheckoutMethodOption[] = [
     {
       id: "dm",
       label: "Pedir por Instagram DM",
@@ -56,16 +113,12 @@ export default async function CheckoutPage() {
       description: "Sin envío: lo preparamos y lo recoges en la tienda cuando te avisemos.",
       enabled: settings.payPickup,
     },
-    {
-      id: "stripe",
-      label: "Pagar con tarjeta",
-      description: settings.payStripe
-        ? "Pago seguro con tarjeta."
-        : "Todavía no está activo. En cuanto la pasarela esté lista podrás pagar aquí mismo.",
-      enabled: settings.payStripe,
-      badge: settings.payStripe ? undefined : "Próximamente",
-    },
   ];
+  // Con cobro online activo, la tarjeta va primero y es la opción por defecto:
+  // el DM pasa a ser el plan B, no la caja principal.
+  const methods: CheckoutMethodOption[] = hayOnline
+    ? [...metodosOnline, ...metodosManuales]
+    : [...metodosManuales, ...metodosOnline];
 
   const hayMetodo = methods.some((m) => m.enabled);
 

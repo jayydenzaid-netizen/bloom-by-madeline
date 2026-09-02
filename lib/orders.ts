@@ -80,7 +80,7 @@ export function normalizeOrderNumber(value: string): string {
 
 // ──────────────────────────── crear el pedido ────────────────────────────
 
-export type OrderPaymentMethod = "stripe" | "dm" | "pickup" | "cash";
+export type OrderPaymentMethod = "stripe" | "paypal" | "square" | "dm" | "pickup" | "cash";
 
 /** Datos que llegan del formulario. Aquí NO viaja ningún importe: los pone la BD. */
 export type CheckoutDetails = {
@@ -714,7 +714,11 @@ export function fulfillStatusLabel(status: string): string {
 export function paymentMethodLabel(method: string): string {
   switch (method) {
     case "stripe":
-      return "Tarjeta";
+      return "Tarjeta (Stripe)";
+    case "paypal":
+      return "PayPal";
+    case "square":
+      return "Tarjeta (Square)";
     case "pickup":
       return "Recoger en la boutique";
     case "cash":

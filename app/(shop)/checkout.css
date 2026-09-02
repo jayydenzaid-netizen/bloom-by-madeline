@@ -277,6 +277,18 @@
   line-height: 1.6;
 }
 
+/* Aviso de pago en la confirmación: mismo molde que .co-alert pero en tinta,
+   porque «pago recibido» es una buena noticia, no una alarma. */
+.op-pago-ok {
+  padding: 14px 18px;
+  border-radius: var(--petal-sm);
+  border: 1px solid var(--line);
+  background: var(--cream);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 /* ── métodos de pago ── */
 
 .co-methods { display: grid; gap: 12px; }

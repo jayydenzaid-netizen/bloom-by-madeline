@@ -182,6 +182,13 @@ const I = {
       <path {...s} d="M12 7v5.3l3.2 2" />
     </svg>
   ),
+  tarjeta: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect {...s} x="3" y="6" width="18" height="13" rx="2" />
+      <path {...s} d="M3 10.5h18" />
+      <path {...s} d="M7 15h4" />
+    </svg>
+  ),
 } satisfies Record<string, ReactNode>;
 
 /* ────────────────────────────── el mapa ────────────────────────────── */
@@ -257,12 +264,8 @@ const NAV: Entrada[] = [
     soloDuena: true,
     items: [
       { href: "/admin/ajustes", label: "Ajustes", icon: I.engranaje, soloDuena: true },
-      // ⚠️ "Envíos" NO está aquí a propósito: /admin/envios devuelve 404 hoy
-      // (comprobado con node qa/audit.mjs). La pantalla no existe todavía: lo
-      // que hay de envíos vive dentro de /admin/ajustes. Enlazar una sección
-      // que da error es peor que no enlazarla — Madeline pensaría que ha roto
-      // algo. En cuanto exista app/admin/envios/page.tsx, se descomenta:
-      // { href: "/admin/envios", label: "Envíos", icon: I.camion, soloDuena: true },
+      { href: "/admin/pagos", label: "Pagos", icon: I.tarjeta, soloDuena: true },
+      { href: "/admin/envios", label: "Envíos", icon: I.camion, soloDuena: true },
       { href: "/admin/plantillas", label: "Plantillas", icon: I.sobre, soloDuena: true },
       { href: "/admin/herramientas", label: "Herramientas", icon: I.llave, soloDuena: true },
       { href: "/admin/equipo", label: "Equipo", icon: I.persona, soloDuena: true },

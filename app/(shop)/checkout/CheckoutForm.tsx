@@ -23,7 +23,14 @@ import {
  * servidor (`buildDmSummary`) para que ningún importe se formatee en el navegador.
  */
 
-export type CheckoutMethodId = "dm" | "pickup" | "stripe";
+export type CheckoutMethodId = "dm" | "pickup" | "stripe" | "paypal" | "square";
+
+const METODOS_VALIDOS: CheckoutMethodId[] = ["dm", "pickup", "stripe", "paypal", "square"];
+
+/** Métodos que se cobran en la página hosted del proveedor (redirect). */
+function esPagoOnline(metodo: CheckoutMethodId): boolean {
+  return metodo === "stripe" || metodo === "paypal" || metodo === "square";
+}
 
 /**
  * Estado inicial de la acción. Vive aquí y no en actions.ts porque un fichero
@@ -112,8 +119,9 @@ export default function CheckoutForm({
       }
       return cambio ? fusion : previos;
     });
-    if (devueltos.paymentMethod === "dm" || devueltos.paymentMethod === "pickup") {
-      setMetodo(devueltos.paymentMethod);
+    const devuelto = devueltos.paymentMethod as CheckoutMethodId;
+    if (METODOS_VALIDOS.includes(devuelto)) {
+      setMetodo(devuelto);
     }
   }, [state]);
 
@@ -352,13 +360,26 @@ export default function CheckoutForm({
         </section>
 
         <button className="btn btn-ink co-submit" type="submit" disabled={pending}>
-          {pending ? "Registrando tu pedido…" : "Confirmar pedido"}
+          {esPagoOnline(metodo)
+            ? pending
+              ? "Abriendo el pago seguro…"
+              : "Continuar al pago seguro"
+            : pending
+              ? "Registrando tu pedido…"
+              : "Confirmar pedido"}
         </button>
 
-        <p className="co-note co-legal">
-          Al confirmar se crea tu pedido como <strong>pendiente de pago</strong>. Nadie te
-          cobra nada en este paso.
-        </p>
+        {esPagoOnline(metodo) ? (
+          <p className="co-note co-legal">
+            Te llevamos a la página segura del proveedor para pagar. Tu pedido queda
+            registrado y se confirma en cuanto el cobro se complete.
+          </p>
+        ) : (
+          <p className="co-note co-legal">
+            Al confirmar se crea tu pedido como <strong>pendiente de pago</strong>. Nadie te
+            cobra nada en este paso.
+          </p>
+        )}
       </form>
 
       <aside className="co-summary">

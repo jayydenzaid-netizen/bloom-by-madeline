@@ -6,7 +6,15 @@ import { db } from "@/lib/db";
 import { formatCents } from "@/lib/money";
 import { getSettings } from "@/lib/settings";
 import { Badge, Button, Card, Field, Money, PageHeader, type BadgeTone } from "../../_components/ui";
-import { anadirNota, marcarCancelado, marcarEnviado, marcarPagado, marcarPendiente, marcarReembolsado } from "../actions";
+import {
+  anadirNota,
+  marcarCancelado,
+  marcarEnviado,
+  marcarPagado,
+  marcarPendiente,
+  marcarReembolsado,
+  verificarPagoAdmin,
+} from "../actions";
 
 /**
  * Ficha de un pedido: cobrar, preparar, enviar y anotar, todo desde una sola
@@ -42,11 +50,16 @@ const ENVIO: Record<string, { label: string; tone: BadgeTone }> = {
 };
 
 const METODO: Record<string, string> = {
-  stripe: "Tarjeta",
+  stripe: "Tarjeta (Stripe)",
+  paypal: "PayPal",
+  square: "Tarjeta (Square)",
   dm: "DM de Instagram",
   pickup: "Recogida en tienda",
   cash: "Efectivo",
 };
+
+/** Métodos cobrados por pasarela: tienen botón «Verificar pago» y referencia. */
+const METODOS_ONLINE = ["stripe", "paypal", "square"];
 
 /** Transportistas que usa una boutique de Ohio. La lista es una ayuda, no una jaula. */
 const TRANSPORTISTAS = ["USPS", "UPS", "FedEx", "DHL", "Entrega en mano"];
@@ -74,6 +87,27 @@ const AVISOS: Record<string, { tone: BadgeTone; label: string; texto: string }> 
   },
   "nota-vacia": { tone: "danger", label: "Nota vacía", texto: "Escribe algo antes de guardar la nota." },
   "no-existe": { tone: "danger", label: "Error", texto: "No se encontró el pedido al aplicar el cambio." },
+  "pago-verificado": {
+    tone: "success",
+    label: "Cobro",
+    texto: "La pasarela confirma el cobro: el pedido queda marcado como pagado.",
+  },
+  "pago-sin-cobro": {
+    tone: "warning",
+    label: "Cobro",
+    texto: "La pasarela todavía no registra ningún cobro de este pedido.",
+  },
+  "pago-revisar": {
+    tone: "danger",
+    label: "Revisar",
+    texto:
+      "La pasarela registra un cobro que NO cuadra con el pedido (importe o moneda). El detalle quedó en la bitácora: revísalo antes de marcar nada.",
+  },
+  "pago-sin-intentos": {
+    tone: "neutral",
+    label: "Cobro",
+    texto: "Este pedido no tiene ninguna sesión de pago online que verificar.",
+  },
 };
 
 /**
@@ -317,12 +351,29 @@ export default async function PedidoPage({
                 <p className="adm-muted adm-small">Cobrado el {fechaLarga.format(pedido.paidAt)}.</p>
               ) : null}
 
+              {METODOS_ONLINE.includes(pedido.paymentMethod) && pedido.paymentRef ? (
+                <p className="adm-muted adm-small">
+                  Referencia de la pasarela: <code>{pedido.paymentRef}</code>
+                </p>
+              ) : null}
+
               {cancelado ? (
                 <p className="adm-muted adm-small">
                   Pedido cancelado. No quedan acciones de cobro ni de envío; el inventario ya se devolvió.
                 </p>
               ) : (
                 <div className="ped-acciones">
+                  {pedido.paymentStatus === "pending" && METODOS_ONLINE.includes(pedido.paymentMethod) ? (
+                    // Pregunta a la pasarela por el cobro real: si la clienta pagó
+                    // y cerró la pestaña antes de volver, esto lo pone al día.
+                    <form action={verificarPagoAdmin}>
+                      <input type="hidden" name="id" value={pedido.id} />
+                      <button type="submit" className="adm-btn adm-btn-primary adm-btn-sm">
+                        Verificar pago
+                      </button>
+                    </form>
+                  ) : null}
+
                   {pedido.paymentStatus !== "paid" ? (
                     <form action={marcarPagado}>
                       <input type="hidden" name="id" value={pedido.id} />

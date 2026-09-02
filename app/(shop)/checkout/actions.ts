@@ -14,6 +14,7 @@ import {
 } from "@/lib/shipping";
 import {
   calcularTotales,
+  canViewOrder,
   createOrderFromCart,
   emailMatchesOrder,
   grantOrderAccess,
@@ -21,6 +22,12 @@ import {
   type LineaCalculo,
   type OrderPaymentMethod,
 } from "@/lib/orders";
+import {
+  esMetodoOnline,
+  iniciarPagoOnline,
+  leerConfigPagos,
+  metodosOnlineActivos,
+} from "@/lib/payments";
 
 /**
  * Server Actions del checkout.
@@ -118,7 +125,7 @@ const checkoutSchema = z
     state: z.string().trim().max(40, "Estado demasiado largo."),
     zip: z.string().trim().max(12, "Código postal demasiado largo."),
     note: z.string().trim().max(500, "La nota es demasiado larga."),
-    paymentMethod: z.enum(["dm", "pickup", "stripe"], {
+    paymentMethod: z.enum(["dm", "pickup", "stripe", "paypal", "square"], {
       errorMap: () => ({ message: "Elige cómo quieres pagar." }),
     }),
     // El código es opcional; su validez la decide `validateDiscount` en el pedido.
@@ -160,12 +167,16 @@ export async function submitCheckout(
   const data = parsed.data;
   const settings = await getSettings();
 
-  // El método de pago se comprueba contra los ajustes: que el <input> exista en el HTML
-  // no significa que Madeline lo tenga activo.
+  // El método de pago se comprueba contra los ajustes y las pasarelas REALMENTE
+  // configuradas: que el <input> exista en el HTML no significa que Madeline lo
+  // tenga activo, y un toggle encendido sin credenciales tampoco cobra nada.
+  const online = metodosOnlineActivos(await leerConfigPagos());
   const habilitado: Record<OrderPaymentMethod, boolean> = {
     dm: settings.payDm,
     pickup: settings.payPickup,
-    stripe: settings.payStripe,
+    stripe: online.stripe,
+    paypal: online.paypal,
+    square: online.square,
     cash: false,
   };
   if (!habilitado[data.paymentMethod]) {
@@ -175,25 +186,6 @@ export async function submitCheckout(
       formError: "Elige otra forma de pago.",
     };
   }
-
-  /*
-   * PAGO CON TARJETA — infraestructura lista, cobro DESHABILITADO.
-   *
-   * Aquí es donde entraría Stripe cuando Madeline tenga su cuenta. Lo que falta,
-   * para que el que lo active no tenga que adivinarlo:
-   *
-   *   1. `STRIPE_SECRET_KEY` (y `STRIPE_WEBHOOK_SECRET`) en el entorno.
-   *   2. Crear el pedido igual que ahora (queda en `paymentStatus: "pending"`), y con
-   *      su id crear la sesión de Checkout de Stripe con las líneas ya congeladas en
-   *      OrderItem — nunca con precios del navegador.
-   *   3. Guardar `session.id` en `Order.stripeSessionId` y redirigir a `session.url`.
-   *   4. Un webhook `checkout.session.completed` marca `paymentStatus: "paid"` y
-   *      `paidAt`. El pedido NO se da por pagado al volver de Stripe: la vuelta del
-   *      navegador se puede falsificar, el webhook no.
-   *
-   * Mientras `settings.payStripe` sea false esta rama ni se ofrece en la interfaz.
-   * Fingir un cobro que no ocurre sería mentirle a una clienta que ya pagó de verdad.
-   */
 
   const cartToken = await readCartToken();
   const result = await createOrderFromCart(cartToken, {
@@ -229,8 +221,51 @@ export async function submitCheckout(
   // El carrito quedó vacío dentro de la transacción; el badge del nav vive en el layout.
   revalidatePath("/", "layout");
 
-  // Fuera de cualquier try: redirect() funciona lanzando y un catch se lo tragaría.
+  /*
+   * PAGO ONLINE (Stripe / PayPal / Square): el pedido ya existe como «pendiente»
+   * con el stock reservado; ahora se abre la sesión de cobro hosted con los
+   * importes congelados en la fila Order — nunca con precios del navegador — y
+   * se manda a la clienta a la página segura del proveedor. Si la pasarela no
+   * responde, el pedido NO se pierde: aterriza en su confirmación con un aviso
+   * y el botón «Pagar ahora» para reintentar.
+   *
+   * «Pagado» solo lo pone la verificación server-side (lib/payments), jamás la
+   * vuelta del navegador: esa URL la puede escribir cualquiera.
+   */
+  if (esMetodoOnline(data.paymentMethod)) {
+    const pago = await iniciarPagoOnline(result.orderId);
+    // Fuera de cualquier try: redirect() funciona lanzando y un catch se lo tragaría.
+    if (pago.ok) redirect(pago.url);
+    redirect(`/pedido/${result.number}?pago=${pago.codigo === "minimo" ? "minimo" : "sin-conexion"}`);
+  }
+
   redirect(`/pedido/${result.number}`);
+}
+
+/**
+ * Reintenta el pago de un pedido pendiente (botón «Pagar ahora» de la página
+ * del pedido). Crea una sesión NUEVA: las de Stripe y PayPal caducan, y aquí
+ * ya no hay carrito que rearmar — el pedido guarda las líneas congeladas.
+ * Solo con la llave del pedido (cookie HMAC): el número solo es adivinable.
+ */
+export async function reintentarPago(formData: FormData): Promise<void> {
+  const number = normalizeOrderNumber(String(formData.get("number") ?? ""));
+  if (!number) redirect("/tienda");
+  if (!(await canViewOrder(number))) redirect(`/pedido/${encodeURIComponent(number)}`);
+
+  const order = await db.order.findUnique({
+    where: { number },
+    select: { id: true, paymentStatus: true, paymentMethod: true },
+  });
+  if (!order || order.paymentStatus !== "pending" || !esMetodoOnline(order.paymentMethod)) {
+    redirect(`/pedido/${encodeURIComponent(number)}`);
+  }
+
+  const pago = await iniciarPagoOnline(order.id);
+  if (pago.ok) redirect(pago.url);
+  redirect(
+    `/pedido/${encodeURIComponent(number)}?pago=${pago.codigo === "minimo" ? "minimo" : "sin-conexion"}`,
+  );
 }
 
 /* ───────────────────────── cotización en vivo ───────────────────────── */

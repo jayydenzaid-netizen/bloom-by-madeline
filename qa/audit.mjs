@@ -55,6 +55,7 @@ const PANEL = [
   "/admin/menus",
   "/admin/medios",
   "/admin/ajustes",
+  "/admin/pagos",
   "/admin/envios",
   "/admin/plantillas",
   "/admin/herramientas",

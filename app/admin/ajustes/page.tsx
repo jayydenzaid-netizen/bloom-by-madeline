@@ -4,8 +4,8 @@ import { requireOwner } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { applyPricing, formatCents, margin } from "@/lib/money";
 import { getSettings } from "@/lib/settings";
-import { Badge, Card, Field, PageHeader } from "../_components/ui";
-import { guardarEnvio, guardarPagos, guardarPrecios, guardarTienda, regenerarToken } from "./actions";
+import { Badge, Button, Card, Field, PageHeader } from "../_components/ui";
+import { guardarEnvio, guardarPrecios, guardarTienda, regenerarToken } from "./actions";
 
 /**
  * Ajustes de la tienda. Cada sección es un formulario independiente con su
@@ -32,7 +32,6 @@ const MENSAJES: Record<string, string> = {
   tienda: "Datos de la tienda guardados.",
   precios: "Regla de precios guardada. Se aplicará a las próximas importaciones.",
   envio: "Ajustes de envío guardados.",
-  pagos: "Métodos de pago guardados.",
   token: "Token nuevo generado. Vuelve a instalar el marcador en tu navegador.",
 };
 
@@ -57,10 +56,6 @@ export default async function AjustesPage({
   const host = cabeceras.get("host") ?? "localhost:4590";
   const protocolo = cabeceras.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const urlIngest = `${protocolo}://${host}/api/import/ingest`;
-
-  // Sin llaves de Stripe el cobro con tarjeta no existe, y decir lo contrario
-  // en el checkout sería dejar a la clienta sin manera de pagar.
-  const hayStripe = Boolean(process.env.STRIPE_SECRET_KEY);
 
   const regla = settings.pricing;
   const costeEjemplo = 1200;
@@ -282,39 +277,16 @@ export default async function AjustesPage({
 
       {/* ──────────────────────────── pagos ──────────────────────────── */}
       <Card title="Formas de pago">
-        <form action={guardarPagos}>
-          <label className={hayStripe ? "aju-check" : "aju-check is-off"}>
-            <input type="checkbox" name="payStripe" defaultChecked={settings.payStripe && hayStripe} disabled={!hayStripe} />
-            <span>
-              Tarjeta (Stripe)
-              <span className="adm-muted adm-small">
-                {hayStripe
-                  ? "Hay llaves de Stripe configuradas en el servidor."
-                  : "Necesita una cuenta de Stripe y sus llaves en el servidor (STRIPE_SECRET_KEY). Hasta entonces queda desactivado: no se puede ofrecer un cobro que no podemos procesar."}
-              </span>
-            </span>
-          </label>
-
-          <label className="aju-check">
-            <input type="checkbox" name="payDm" defaultChecked={settings.payDm} />
-            <span>
-              Acordar el pago por DM de Instagram
-              <span className="adm-muted adm-small">El pedido se guarda como pendiente y tú lo cobras a mano.</span>
-            </span>
-          </label>
-
-          <label className="aju-check">
-            <input type="checkbox" name="payPickup" defaultChecked={settings.payPickup} />
-            <span>
-              Pagar al recoger en la boutique
-              <span className="adm-muted adm-small">Efectivo o tarjeta en el local, sin cobro online.</span>
-            </span>
-          </label>
-
-          <button type="submit" className="adm-btn adm-btn-primary adm-btn-md">
-            Guardar formas de pago
-          </button>
-        </form>
+        <p className="adm-muted">
+          Los cobros viven ahora en su propia página: ahí conectas tus cuentas de Stripe,
+          PayPal y Square (pegando sus llaves, cifradas en la base de datos) y enciendes o
+          apagas el DM y la recogida en tienda.
+        </p>
+        <div style={{ marginTop: 12 }}>
+          <Button href="/admin/pagos" variant="primary">
+            Abrir Pagos
+          </Button>
+        </div>
       </Card>
 
       {/* ───────────────────────── importación ───────────────────────── */}

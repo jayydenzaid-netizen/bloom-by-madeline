@@ -206,6 +206,7 @@ export const ETIQUETA_SECCION: Record<string, string> = {
   informes: "Informes",
   contenido: "Contenido",
   envios: "Envíos e impuestos",
+  pagos: "Pagos",
 };
 
 /** Sesión obligatoria. Sin ella, al login. */
