@@ -1,0 +1,38 @@
+{%- comment -%} Crear cuenta. {%- endcomment -%}
+
+<div class="shop-page section cuenta">
+  <div class="cat-intro">
+    <h1 class="cat-titulo">{{ 'cuenta.crear_cuenta' | t }}</h1>
+  </div>
+
+  <div class="cuenta-form">
+    {%- form 'create_customer', novalidate: 'novalidate' -%}
+      {%- if form.errors -%}
+        <p class="co-err">{{ form.errors | default_errors }}</p>
+      {%- endif -%}
+
+      <div class="co-field">
+        <label class="co-label" for="nombre">{{ 'cuenta.nombre' | t }}</label>
+        <input id="nombre" type="text" name="customer[first_name]" autocomplete="given-name">
+      </div>
+      <div class="co-field">
+        <label class="co-label" for="apellido">{{ 'cuenta.apellido' | t }}</label>
+        <input id="apellido" type="text" name="customer[last_name]" autocomplete="family-name">
+      </div>
+      <div class="co-field">
+        <label class="co-label" for="correo-nuevo">{{ 'cuenta.correo' | t }}</label>
+        <input id="correo-nuevo" type="email" name="customer[email]" autocomplete="email" required>
+      </div>
+      <div class="co-field">
+        <label class="co-label" for="clave-nueva">{{ 'cuenta.contrasena' | t }}</label>
+        <input id="clave-nueva" type="password" name="customer[password]" autocomplete="new-password" required>
+      </div>
+
+      <button class="btn btn-ink" type="submit">{{ 'cuenta.crear_cuenta' | t }}</button>
+
+      <div class="cuenta-enlaces">
+        <a href="{{ routes.account_login_url }}">{{ 'cuenta.ya_tengo' | t }}</a>
+      </div>
+    {%- endform -%}
+  </div>
+</div>

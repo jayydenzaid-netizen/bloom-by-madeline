@@ -1,0 +1,129 @@
+{%- comment -%}
+  Página de carrito.
+
+  Existe además del cajón lateral porque no es lo mismo: el cajón sirve para
+  «acabo de añadir algo, ¿voy bien?», y esta página para revisar un pedido de
+  seis piezas antes de pagar. Además es la dirección a la que apuntan las 301
+  del carrito del sitio viejo, y la que Shopify usa cuando el JavaScript falla.
+
+  Todo funciona con formularios normales: quitar, cambiar cantidades y pasar por
+  caja no dependen de JavaScript.
+{%- endcomment -%}
+
+<div class="shop-page section">
+  {%- if cart.item_count == 0 -%}
+    <div class="cp-empty">
+      <svg class="cat-vacio-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+      <p class="cat-vacio-titulo">{{ 'carrito.vacio' | t }}</p>
+      <p class="cat-vacio-sub">{{ 'carrito.vacio_sub' | t }}</p>
+      <a class="btn btn-ink" href="{{ routes.all_products_collection_url }}">{{ 'carrito.ver_tienda' | t }}</a>
+    </div>
+  {%- else -%}
+    <div class="cp-head">
+      <h1 class="cp-title">{{ 'carrito.tu' | t }} <span class="serif-it">{{ 'carrito.carrito' | t }}</span></h1>
+      <p class="cp-count">{{ 'carrito.piezas' | t: count: cart.item_count }}</p>
+    </div>
+
+    <form action="{{ routes.cart_url }}" method="post" novalidate class="cp-grid">
+      <div class="cp-lines">
+        {%- for linea in cart.items -%}
+          <div class="cp-line">
+            <a class="cp-foto" href="{{ linea.url }}">
+              {%- if linea.image -%}
+                <img src="{{ linea.image | image_url: width: 220 }}"
+                     alt="{{ linea.image.alt | default: linea.product.title | escape }}"
+                     width="110" height="138" loading="lazy">
+              {%- else -%}
+                <span class="cd-noimg" aria-hidden="true"></span>
+              {%- endif -%}
+            </a>
+
+            <div class="cp-info">
+              <h3><a href="{{ linea.url }}">{{ linea.product.title }}</a></h3>
+              {%- unless linea.variant.title contains 'Default' -%}
+                <p class="ci-meta">{{ linea.variant.title }}</p>
+              {%- endunless -%}
+              {%- if linea.variant.sku != blank -%}
+                <p class="ci-meta">{{ 'producto.referencia' | t }}: {{ linea.variant.sku }}</p>
+              {%- endif -%}
+              {%- for descuento in linea.line_level_discount_allocations -%}
+                <p class="ci-meta ci-descuento">{{ descuento.discount_application.title }} (−{{ descuento.amount | money }})</p>
+              {%- endfor -%}
+              <p class="cp-unit">{{ linea.final_price | money }} {{ 'carrito.cada_una' | t }}</p>
+            </div>
+
+            <div class="cp-controls">
+              <div class="ci-qty">
+                <button type="submit" name="updates[{{ linea.key }}]" value="{{ linea.quantity | minus: 1 }}"
+                        aria-label="{{ 'carrito.quitar_uno' | t }}">&minus;</button>
+                <input type="number" name="updates[{{ linea.key }}]" value="{{ linea.quantity }}" min="0"
+                       inputmode="numeric" aria-label="{{ 'producto.cantidad' | t }}">
+                <button type="submit" name="updates[{{ linea.key }}]" value="{{ linea.quantity | plus: 1 }}"
+                        aria-label="{{ 'carrito.anadir_uno' | t }}">+</button>
+              </div>
+              <button class="cp-del" type="submit" name="updates[{{ linea.key }}]" value="0">
+                {{ 'carrito.quitar' | t }}
+              </button>
+            </div>
+
+            <span class="ci-precio">{{ linea.final_line_price | money }}</span>
+          </div>
+        {%- endfor -%}
+      </div>
+
+      <aside class="cp-resumen">
+        <div class="cd-row">
+          <span>{{ 'carrito.subtotal' | t }}</span>
+          <span>{{ cart.total_price | money }}</span>
+        </div>
+
+        {%- for descuento in cart.cart_level_discount_applications -%}
+          <div class="cd-row cd-row-descuento">
+            <span>{{ descuento.title }}</span>
+            <span>&minus;{{ descuento.total_allocated_amount | money }}</span>
+          </div>
+        {%- endfor -%}
+
+        <div class="cd-row">
+          <span>{{ 'carrito.envio' | t }}</span>
+          <span>{{ 'carrito.envio_en_el_pago' | t }}</span>
+        </div>
+
+        <div class="cp-total">
+          <span>{{ 'carrito.total' | t }}</span>
+          <strong>{{ cart.total_price | money }}</strong>
+        </div>
+
+        {%- if section.settings.pedir_nota -%}
+          <label class="cp-tope" for="nota-pedido">{{ 'carrito.nota' | t }}</label>
+          <textarea id="nota-pedido" name="note" rows="3" placeholder="{{ 'carrito.nota_ejemplo' | t }}">{{ cart.note }}</textarea>
+        {%- endif -%}
+
+        <button class="btn btn-ink cp-cta" type="submit" name="checkout">{{ 'carrito.finalizar' | t }}</button>
+        <button class="btn btn-ghost" type="submit" name="update">{{ 'carrito.actualizar' | t }}</button>
+
+        <a class="cp-seguir" href="{{ routes.all_products_collection_url }}">← {{ 'carrito.seguir_comprando' | t }}</a>
+
+        {%- if settings.aviso_envio != blank -%}
+          <p class="cart-note">{{ settings.aviso_envio }}</p>
+        {%- endif -%}
+      </aside>
+    </form>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "Carrito",
+  "tag": "div",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "pedir_nota",
+      "label": "Dejar que la clienta escriba una nota al pedido",
+      "default": true,
+      "info": "Útil para «es un regalo» o «me lo guardas hasta el sábado»."
+    }
+  ]
+}
+{% endschema %}

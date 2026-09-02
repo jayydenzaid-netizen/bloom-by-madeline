@@ -1,0 +1,40 @@
+{%- comment -%}
+  Índice de colecciones. Reutiliza la rejilla de producto para que las tarjetas
+  de colección tengan el mismo marco pétalo que las piezas.
+{%- endcomment -%}
+
+<div class="shop-page section">
+  <div class="cat-intro">
+    <h1 class="cat-titulo">{{ 'catalogo.colecciones' | t }}</h1>
+  </div>
+
+  <div class="product-grid">
+    {%- for coleccion in collections -%}
+      {%- unless coleccion.handle == 'frontpage' or coleccion.products_count == 0 -%}
+        <a class="product" href="{{ coleccion.url }}">
+          <figure>
+            {%- if coleccion.featured_image -%}
+              <img src="{{ coleccion.featured_image | image_url: width: 700 }}"
+                   alt="{{ coleccion.featured_image.alt | default: coleccion.title | escape }}"
+                   width="{{ coleccion.featured_image.width }}" height="{{ coleccion.featured_image.height }}"
+                   loading="lazy">
+            {%- else -%}
+              <span class="pc-noimg" aria-hidden="true"></span>
+            {%- endif -%}
+            <figcaption><span>{{ 'catalogo.ver_coleccion' | t }}</span></figcaption>
+          </figure>
+          <h3>{{ coleccion.title }}</h3>
+          <p class="product-meta">{{ 'catalogo.piezas' | t: count: coleccion.products_count }}</p>
+        </a>
+      {%- endunless -%}
+    {%- endfor -%}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Colecciones",
+  "tag": "div",
+  "settings": []
+}
+{% endschema %}

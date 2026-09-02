@@ -1,0 +1,122 @@
+{%- comment -%}
+  Tarjeta de producto para las rejillas.
+
+  Parámetros:
+    producto  (obligatorio)  el objeto product
+    ansioso   (opcional)     true para cargar la foto sin lazy (las de arriba del todo)
+
+  El marco «pétalo» de la tarjeta alterna de dirección con :nth-child(even) en el
+  CSS, así que la tarjeta tiene que ser hija DIRECTA de `.product-grid`. Envolverla
+  en un div rompe el ritmo visual de la rejilla entera.
+
+  La línea corta bajo el título («Negro · Lunares — S / M / L») se arma con las
+  etiquetas del producto y los valores de su primera opción, que es como estaba
+  escrita a mano en el sitio original.
+{%- endcomment -%}
+
+{%- liquid
+  assign agotado = false
+  unless producto.available
+    assign agotado = true
+  endunless
+
+  assign rebajado = false
+  if producto.compare_at_price > producto.price and producto.available
+    assign rebajado = true
+  endif
+
+  assign varios_precios = false
+  if producto.price_varies
+    assign varios_precios = true
+  endif
+
+  comment
+    Las etiquetas internas no se enseñan a la clienta: «importado», «origen:…» y
+    «origen-id:…» son para encontrar cosas en el panel, no para la ficha.
+  endcomment
+  assign etiquetas_visibles = ''
+  for etiqueta in producto.tags
+    assign minus = etiqueta | downcase
+    unless minus == 'importado' or minus contains 'origen:' or minus contains 'origen-id:' or minus == 'demo'
+      if etiquetas_visibles == ''
+        assign etiquetas_visibles = etiqueta
+      else
+        assign etiquetas_visibles = etiquetas_visibles | append: ' · ' | append: etiqueta
+      endif
+    endunless
+  endfor
+
+  assign valores_opcion = ''
+  assign primera_opcion = producto.options_with_values | first
+  if primera_opcion and primera_opcion.name != 'Title'
+    for valor in primera_opcion.values
+      if valores_opcion == ''
+        assign valores_opcion = valor
+      else
+        assign valores_opcion = valores_opcion | append: ' / ' | append: valor
+      endif
+    endfor
+  endif
+
+  assign linea_meta = ''
+  if etiquetas_visibles != '' and valores_opcion != ''
+    assign linea_meta = etiquetas_visibles | append: ' — ' | append: valores_opcion
+  elsif etiquetas_visibles != ''
+    assign linea_meta = etiquetas_visibles
+  elsif valores_opcion != ''
+    assign linea_meta = valores_opcion
+  endif
+
+  assign carga = 'lazy'
+  if ansioso
+    assign carga = 'eager'
+  endif
+-%}
+
+<a class="product" href="{{ producto.url }}">
+  <figure>
+    {%- if producto.featured_image -%}
+      <img
+        src="{{ producto.featured_image | image_url: width: 700 }}"
+        srcset="{{ producto.featured_image | image_url: width: 400 }} 400w,
+                {{ producto.featured_image | image_url: width: 700 }} 700w,
+                {{ producto.featured_image | image_url: width: 1000 }} 1000w"
+        sizes="(max-width: 640px) 92vw, (max-width: 1100px) 46vw, 23vw"
+        alt="{{ producto.featured_image.alt | default: producto.title | escape }}"
+        width="{{ producto.featured_image.width }}"
+        height="{{ producto.featured_image.height }}"
+        loading="{{ carga }}">
+    {%- else -%}
+      <span class="pc-noimg" aria-hidden="true"></span>
+    {%- endif -%}
+
+    {%- if agotado -%}
+      <span class="pc-flag">{{ 'producto.agotado' | t }}</span>
+    {%- elsif rebajado -%}
+      <span class="pc-flag pc-flag-sale">{{ 'producto.rebaja' | t }}</span>
+    {%- endif -%}
+
+    <figcaption><span>{{ 'producto.ver_la_pieza' | t }}</span></figcaption>
+  </figure>
+
+  <h3>{{ producto.title }}</h3>
+
+  {%- if linea_meta != '' -%}
+    <p class="product-meta">{{ linea_meta }}</p>
+  {%- endif -%}
+
+  <p class="pc-price">
+    {%- if producto.price > 0 -%}
+      {%- if varios_precios -%}
+        <strong>{{ 'producto.desde' | t }} {{ producto.price_min | money }}</strong>
+      {%- else -%}
+        <strong>{{ producto.price | money }}</strong>
+      {%- endif -%}
+      {%- if rebajado -%}
+        <s>{{ producto.compare_at_price | money }}</s>
+      {%- endif -%}
+    {%- else -%}
+      <em>{{ 'producto.precio_por_confirmar' | t }}</em>
+    {%- endif -%}
+  </p>
+</a>

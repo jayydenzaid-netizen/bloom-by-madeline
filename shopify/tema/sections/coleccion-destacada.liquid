@@ -1,0 +1,91 @@
+{%- comment -%}
+  «01 — La Colección»: la rejilla de piezas de la portada.
+
+  Las tarjetas son hijas DIRECTAS de `.product-grid` a propósito — el marco
+  pétalo alterna con :nth-child(even) y cualquier div intermedio rompería el
+  ritmo de toda la rejilla.
+
+  Si la colección elegida está vacía, la sección NO pinta una rejilla en blanco:
+  cae al remate con el enlace al DM, que es exactamente como vendía la boutique
+  antes de tener tienda. Un escaparate vacío es peor que no tener escaparate.
+{%- endcomment -%}
+
+{%- liquid
+  assign coleccion = collections[section.settings.coleccion]
+  assign cuantos = section.settings.cuantos
+  assign hay_piezas = false
+  if coleccion != blank and coleccion.products.size > 0
+    assign hay_piezas = true
+  endif
+-%}
+
+<section class="section coleccion" id="coleccion">
+  <div class="section-head">
+    <div>
+      {%- if section.settings.antetitulo != blank -%}
+        <p class="overline reveal">{{ section.settings.antetitulo }}</p>
+      {%- endif -%}
+      {%- if section.settings.titulo != blank -%}
+        <h2 class="reveal">{%- render 'con-formato', texto: section.settings.titulo, cursiva_serif: true -%}</h2>
+      {%- endif -%}
+    </div>
+    {%- if section.settings.nota != blank -%}
+      <p class="section-note reveal">{%- render 'con-formato', texto: section.settings.nota -%}</p>
+    {%- endif -%}
+  </div>
+
+  {%- if hay_piezas -%}
+    <div class="product-grid">
+      {%- for producto in coleccion.products limit: cuantos -%}
+        {%- assign ansioso = false -%}
+        {%- if forloop.index <= 4 -%}{%- assign ansioso = true -%}{%- endif -%}
+        {%- render 'tarjeta-producto', producto: producto, ansioso: ansioso -%}
+      {%- endfor -%}
+    </div>
+
+    <div class="coleccion-cta reveal">
+      {%- if section.settings.remate_nota != blank -%}
+        <p>{{ section.settings.remate_nota }}</p>
+      {%- endif -%}
+      <a class="btn btn-ink" href="{{ coleccion.url | default: routes.all_products_collection_url }}">
+        {{ section.settings.remate_boton | default: 'Ver toda la tienda' }}
+      </a>
+    </div>
+  {%- else -%}
+    <div class="coleccion-cta reveal">
+      <p>
+        {%- if coleccion == blank -%}
+          {{ 'portada.elige_coleccion' | t }}
+        {%- else -%}
+          {{ section.settings.dm_nota | default: '¿Viste algo en nuestro Instagram que te enamoró?' }}
+        {%- endif -%}
+      </p>
+      {%- if settings.url_dm != blank -%}
+        <a class="btn btn-ink" href="{{ settings.url_dm }}" target="_blank" rel="noopener">
+          {{ section.settings.dm_boton | default: 'Escríbenos por DM y te lo apartamos' }}
+        </a>
+      {%- endif -%}
+    </div>
+  {%- endif -%}
+</section>
+
+{% schema %}
+{
+  "name": "Colección destacada",
+  "tag": "div",
+  "settings": [
+    { "type": "text", "id": "antetitulo", "label": "Antetítulo", "default": "01 — La Colección" },
+    { "type": "text", "id": "titulo", "label": "Título", "default": "Nuevas *llegadas*", "info": "Lo que va entre *asteriscos* sale en la cursiva elegante." },
+    { "type": "textarea", "id": "nota", "label": "Nota lateral", "default": "Cada pieza nombrada como una flor,\nporque aquí todo florece.\n**Pedidos por DM · respuesta el mismo día.**" },
+    { "type": "collection", "id": "coleccion", "label": "Colección que se enseña" },
+    { "type": "range", "id": "cuantos", "min": 4, "max": 16, "step": 4, "label": "Cuántas piezas", "default": 8 },
+    { "type": "header", "content": "Remate" },
+    { "type": "text", "id": "remate_nota", "label": "Texto sobre el botón", "default": "Esto es solo una parte — en la tienda está todo." },
+    { "type": "text", "id": "remate_boton", "label": "Botón", "default": "Ver toda la tienda" },
+    { "type": "header", "content": "Si la colección está vacía" },
+    { "type": "text", "id": "dm_nota", "label": "Texto", "default": "¿Viste algo en nuestro Instagram que te enamoró?" },
+    { "type": "text", "id": "dm_boton", "label": "Botón", "default": "Escríbenos por DM y te lo apartamos" }
+  ],
+  "presets": [{ "name": "Colección destacada" }]
+}
+{% endschema %}

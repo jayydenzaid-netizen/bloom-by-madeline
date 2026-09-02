@@ -1,0 +1,129 @@
+{
+  "sections": {
+    "hero": {
+      "type": "hero",
+      "blocks": {
+        "dato-1": { "type": "dato", "settings": { "valor": "2,880+", "etiqueta": "seguidoras" } },
+        "dato-2": { "type": "dato", "settings": { "valor": "S · M · L", "etiqueta": "tallas disponibles" } },
+        "dato-3": { "type": "dato", "settings": { "valor": "USA", "etiqueta": "envíos a todo el país" } }
+      },
+      "block_order": ["dato-1", "dato-2", "dato-3"],
+      "settings": {
+        "antetitulo": "Boutique de moda femenina · Hamilton, Ohio",
+        "titulo": "Elevamos\ntu estilo\n*casual elegante.*",
+        "parrafo": "Tendencias exclusivas seleccionadas a mano, nuevas llegadas cada semana y una atención que se siente como ir de compras con tu mejor amiga.",
+        "boton_texto": "Ver nuevas llegadas",
+        "boton_url": "/collections/all",
+        "boton2_texto": "@bloombymadelin",
+        "boton2_url": "https://www.instagram.com/bloombymadelin/",
+        "foto_alt": "Vestido midi a rayas oliva y crema en la boutique Bloom by Madeline",
+        "foto_pequena_alt": "Vestido mini verde lima en la boutique",
+        "insignia": "ENVÍOS A TODO USA · BLOOM ·",
+        "pastilla": "Nuevas llegadas esta semana",
+        "cinta_visible": true,
+        "cinta": "Nuevas llegadas cada semana, Tallas S · M · L, Envíos a todo USA, Pedidos por Instagram DM, 1305 Grand Blvd · Hamilton · OH"
+      }
+    },
+    "coleccion": {
+      "type": "coleccion-destacada",
+      "settings": {
+        "antetitulo": "01 — La Colección",
+        "titulo": "Nuevas *llegadas*",
+        "nota": "Cada pieza nombrada como una flor,\nporque aquí todo florece.\n**Pedidos por DM · respuesta el mismo día.**",
+        "cuantos": 8,
+        "remate_nota": "Esto es solo una parte — en la tienda está todo.",
+        "remate_boton": "Ver toda la tienda",
+        "dm_nota": "¿Viste algo en nuestro Instagram que te enamoró?",
+        "dm_boton": "Escríbenos por DM y te lo apartamos"
+      }
+    },
+    "cita": {
+      "type": "cita",
+      "settings": {
+        "texto": "« Cada prenda cuenta una historia…\n*haz que la tuya brille con estilo.* »"
+      }
+    },
+    "filosofia": {
+      "type": "filosofia",
+      "blocks": {
+        "p1": { "type": "palabra", "settings": { "palabra": "Coherencia" } },
+        "p2": { "type": "palabra", "settings": { "palabra": "Identidad" } },
+        "p3": { "type": "palabra", "settings": { "palabra": "Presencia" } },
+        "p4": { "type": "palabra", "settings": { "palabra": "Intención" } }
+      },
+      "block_order": ["p1", "p2", "p3", "p4"],
+      "settings": {
+        "antetitulo": "02 — Nuestra Filosofía",
+        "titulo": "Vestir con *intención*",
+        "texto": "(No es moda… es presencia.)\n\nEn Bloom no seguimos tendencias por seguirlas. Seleccionamos cada pieza pensando en la mujer que la va a llevar: su día, su cuerpo, su momento. Porque cuando te vistes con intención, no entras a un lugar — *floreces en él*."
+      }
+    },
+    "boutique": {
+      "type": "boutique",
+      "blocks": {
+        "v1": { "type": "ventaja", "settings": { "titulo": "Atención personalizada", "texto": "Te ayudamos a encontrar tu look, sin prisa y sin presión." } },
+        "v2": { "type": "ventaja", "settings": { "titulo": "Pruébatelo antes de llevarlo", "texto": "Probador en tienda para que salgas segura de tu compra." } },
+        "v3": { "type": "ventaja", "settings": { "titulo": "Nuevas llegadas semanales", "texto": "Cada semana llegan piezas nuevas — y vuelan rápido." } },
+        "v4": { "type": "ventaja", "settings": { "titulo": "Apartados por DM", "texto": "¿La viste en Instagram? Escríbenos y te la reservamos." } }
+      },
+      "block_order": ["v1", "v2", "v3", "v4"],
+      "settings": {
+        "antetitulo": "03 — La Boutique",
+        "titulo": "Un espacio pensado *para ti*",
+        "texto": "En pleno Grand Blvd de Hamilton, nuestra boutique es ese lugar donde entras «solo a mirar» y sales sintiéndote otra. Pruébate todo, pide opinión y deja que armemos tu outfit juntas.",
+        "foto_alt": "Interior de la boutique Bloom by Madeline: logo de loto en la pared y mostrador",
+        "foto_pequena_alt": "Escaparate de Bloom by Madeline con letrero de neón OPEN"
+      }
+    },
+    "como-comprar": {
+      "type": "como-comprar",
+      "blocks": {
+        "s1": { "type": "paso", "settings": { "titulo": "Visítanos en la boutique", "texto": "1305 Grand Blvd, Hamilton, OH 45011. Pruébate todo lo que quieras — jueves a sábado, 1:00 – 8:00 PM." } },
+        "s2": { "type": "paso", "settings": { "titulo": "O pide por Instagram DM", "texto": "¿Viste una pieza en nuestro perfil? Mándanos un mensaje con la foto y tu talla, y te confirmamos al momento." } },
+        "s3": { "type": "paso", "settings": { "titulo": "Envíos a todo USA", "texto": "¿No estás en Ohio? No importa. Hacemos envíos a todo Estados Unidos — tu look llega hasta tu puerta." } }
+      },
+      "block_order": ["s1", "s2", "s3"],
+      "settings": {
+        "antetitulo": "04 — Cómo Comprar",
+        "titulo": "Tan fácil como *enamorarse*"
+      }
+    },
+    "visitanos": {
+      "type": "visitanos",
+      "settings": {
+        "antetitulo": "05 — Visítanos",
+        "titulo": "Te esperamos\nen *Hamilton*",
+        "nota": "El horario puede variar — confírmalo siempre en nuestro Instagram.",
+        "boton_mapa": "Cómo llegar",
+        "boton_dm": "Enviar DM",
+        "mapa_embed": "https://www.openstreetmap.org/export/embed.html?bbox=-84.5585%2C39.3769%2C-84.5425%2C39.3869&layer=mapnik"
+      }
+    },
+    "instagram": {
+      "type": "instagram",
+      "blocks": {
+        "f1": { "type": "foto", "settings": { "alt": "Publicación de Instagram: set de lunares", "respaldo": "post-02-tendencia.jpg" } },
+        "f2": { "type": "foto", "settings": { "alt": "Publicación de Instagram: top de plumas lila", "respaldo": "post-08-look-perfecto.jpg" } },
+        "f3": { "type": "foto", "settings": { "alt": "Publicación de Instagram: vestido naranja", "respaldo": "post-10-vestido-orange.jpg" } },
+        "f4": { "type": "foto", "settings": { "alt": "Publicación de Instagram: vestido durazno", "respaldo": "post-12-vestido-coral.jpg" } }
+      },
+      "block_order": ["f1", "f2", "f3", "f4"],
+      "settings": {
+        "antetitulo": "Síguenos",
+        "titulo": "*Enamórate* en Instagram",
+        "subtitulo": "Únete a más de **2,880 seguidoras** que ven las nuevas llegadas antes que nadie.",
+        "boton": "Seguir en Instagram"
+      }
+    }
+  },
+  "order": [
+    "hero",
+    "coleccion",
+    "cita",
+    "filosofia",
+    "boutique",
+    "como-comprar",
+    "visitanos",
+    "instagram"
+  ]
+}

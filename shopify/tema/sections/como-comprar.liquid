@@ -1,0 +1,63 @@
+{%- comment -%}
+  «04 — Cómo Comprar». Los tres caminos para llevarse una pieza.
+
+  Ojo al orden de los pasos: la tienda física va PRIMERA aunque esto sea una web.
+  Es lo que diferencia a Bloom de cualquier tienda online, y quien vive en
+  Hamilton necesita saber que puede ir a probárselo.
+{%- endcomment -%}
+
+<section class="section como-comprar">
+  <div class="section-head">
+    <div>
+      {%- if section.settings.antetitulo != blank -%}
+        <p class="overline reveal">{{ section.settings.antetitulo }}</p>
+      {%- endif -%}
+      {%- if section.settings.titulo != blank -%}
+        <h2 class="reveal">{%- render 'con-formato', texto: section.settings.titulo, cursiva_serif: true -%}</h2>
+      {%- endif -%}
+    </div>
+  </div>
+
+  <div class="pasos">
+    {%- for bloque in section.blocks -%}
+      <div class="paso reveal" {{ bloque.shopify_attributes }}>
+        <svg class="paso-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+        <span class="paso-num">{{ forloop.index | prepend: '0' | slice: -2, 2 }}</span>
+        <h3>{{ bloque.settings.titulo }}</h3>
+        <p>{%- render 'con-formato', texto: bloque.settings.texto -%}</p>
+      </div>
+    {%- endfor -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Cómo comprar",
+  "tag": "div",
+  "settings": [
+    { "type": "text", "id": "antetitulo", "label": "Antetítulo", "default": "04 — Cómo Comprar" },
+    { "type": "text", "id": "titulo", "label": "Título", "default": "Tan fácil como *enamorarse*" }
+  ],
+  "blocks": [
+    {
+      "type": "paso",
+      "name": "Paso",
+      "limit": 5,
+      "settings": [
+        { "type": "text", "id": "titulo", "label": "Título del paso", "default": "Visítanos en la boutique" },
+        { "type": "textarea", "id": "texto", "label": "Explicación", "default": "Pruébate todo lo que quieras." }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Cómo comprar",
+      "blocks": [
+        { "type": "paso", "settings": { "titulo": "Visítanos en la boutique", "texto": "1305 Grand Blvd, Hamilton, OH 45011. Pruébate todo lo que quieras — jueves a sábado, 1:00 – 8:00 PM." } },
+        { "type": "paso", "settings": { "titulo": "O pide por Instagram DM", "texto": "¿Viste una pieza en nuestro perfil? Mándanos un mensaje con la foto y tu talla, y te confirmamos al momento." } },
+        { "type": "paso", "settings": { "titulo": "Envíos a todo USA", "texto": "¿No estás en Ohio? No importa. Hacemos envíos a todo Estados Unidos — tu look llega hasta tu puerta." } }
+      ]
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,392 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   BLOOM BY MADELINE — lo que Shopify necesita encima del diseño portado
+
+   `bloom.css` es la identidad de la marca tal cual estaba en la web anterior y
+   se genera automáticamente: NO se toca. Este fichero es la capa fina que hace
+   falta porque Shopify tiene piezas que la web anterior no tenía:
+
+     · controles que aquí son <label> con un input oculto (los chips de talla y
+       los filtros) en vez de <button>, para poder filtrar y elegir variante sin
+       JavaScript;
+     · el texto enriquecido que escribe Madeline en el panel (descripciones,
+       páginas), que llega como HTML y necesita ritmo tipográfico;
+     · detalles del ecosistema: iconos de pago, cuenta de clienta, blog.
+
+   Todo lo de aquí usa las mismas variables (--bone, --ink, --clay…) que define
+   bloom.css. Ningún color escrito a mano.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────── accesibilidad y estructura ─────────────────────── */
+
+/* Visible solo para lectores de pantalla. Es lo que permite que un <label>
+   sustituya a un <button> sin perder el input real que viaja en el formulario. */
+.visualmente-oculto {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Salto al contenido: invisible hasta que alguien tabula. Sin esto, quien navega
+   con teclado tiene que recorrer el menú entero en cada página. */
+.saltar-al-contenido {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10001;
+  background: var(--ink);
+  color: var(--bone);
+  padding: 14px 22px;
+  font-size: 12px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+.saltar-al-contenido:focus { left: 12px; top: 12px; }
+
+/* La barra es `position: fixed`: sin este hueco, la primera sección de cada
+   página que no sea la portada nacería tapada. El hero sí la tapa a propósito. */
+.plantilla-index main { padding-top: 0; }
+main { padding-top: var(--nav-h); }
+
+/* Foco visible en todo lo que se pueda enfocar. El diseño original lo quitaba en
+   algunos sitios; en una tienda eso deja a la gente sin saber dónde está. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: 3px;
+}
+
+/* ─────────────────────── cursivas del editor de temas ─────────────────────── */
+
+/* Los campos de texto enriquecido de Shopify producen <em> y <i>. En un titular,
+   la cursiva de esta marca es SIEMPRE la serif grande — es el remate del diseño.
+   Sin esto, una cursiva escrita desde el panel saldría en Jost inclinada y
+   rompería la identidad. */
+h1 em, h1 i, h2 em, h2 i, h3 em, h3 i,
+.hero-title em, .hero-title i,
+blockquote em, blockquote i {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.12em;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ─────────────────────── chips: <label> + input oculto ─────────────────────── */
+
+/* En la web anterior eran <button> con JavaScript. Aquí son etiquetas de un
+   radio o un checkbox: el formulario funciona sin scripts y cada filtro tiene su
+   propia dirección compartible. Hay que recuperar a mano el centrado que el
+   <button> traía de serie. */
+label.talla-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  user-select: none;
+}
+.lb-tallas label.talla-chip { min-width: 46px; width: auto; padding: 0 14px; }
+
+/* El estado marcado se pinta desde el input, no desde una clase de JavaScript:
+   así es correcto ya en el primer pintado del servidor. */
+input[type="radio"]:checked + label.talla-chip,
+input[type="checkbox"]:checked + label.cat-op {
+  background: var(--ink);
+  color: var(--bone);
+  border-color: var(--ink);
+}
+input[type="checkbox"]:checked + label.cat-op em { color: rgba(236, 225, 205, .65); }
+
+/* El foco del input oculto tiene que verse en la etiqueta visible. */
+input[type="radio"]:focus-visible + label.talla-chip,
+input[type="checkbox"]:focus-visible + label.cat-op {
+  outline: 2px solid var(--clay);
+  outline-offset: 3px;
+}
+
+input:disabled + label.cat-op,
+input:disabled + label.talla-chip {
+  opacity: .38;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+label.cat-op { cursor: pointer; }
+
+/* Los filtros son un <form>: los checkbox van sueltos junto a sus etiquetas y
+   sin esto se apilarían mal dentro del contenedor flex. */
+.cat-chips input[type="checkbox"] { position: absolute; }
+
+/* Panel de filtros plegable en móvil. */
+@media (max-width: 900px) {
+  .cat-toggle {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border: 1px solid var(--line);
+    background: transparent;
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .cat-panel { display: none; }
+  .cat-panel.open { display: block; padding-top: 22px; }
+}
+
+.cat-precio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cat-precio input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+select.cat-chip-ancho {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.cat-buscar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.cat-buscar input[type="search"] {
+  flex: 1 1 240px;
+  padding: 13px 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--ink);
+}
+
+/* ─────────────────────── texto enriquecido ─────────────────────── */
+
+/* Lo que Madeline escribe en el panel llega como HTML suelto. Sin ritmo
+   tipográfico, una política de devoluciones se lee como un muro. */
+.rte > * + * { margin-top: 1em; }
+.rte h2, .rte h3, .rte h4 {
+  font-family: var(--sans);
+  font-weight: 300;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin-top: 1.8em;
+}
+.rte h2 { font-size: clamp(24px, 3vw, 34px); }
+.rte h3 { font-size: 19px; }
+.rte h4 { font-size: 15px; letter-spacing: .14em; }
+.rte p, .rte li { color: var(--ink-soft); }
+.rte ul, .rte ol { padding-left: 1.3em; }
+.rte li + li { margin-top: .5em; }
+.rte a { color: var(--clay); text-decoration: underline; text-underline-offset: 3px; }
+.rte img { margin: 1.4em 0; border-radius: var(--petal-card); }
+.rte blockquote {
+  border-left: 2px solid var(--clay);
+  padding-left: 20px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.2em;
+}
+.rte table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.rte th, .rte td { border-bottom: 1px solid var(--line); padding: 10px 8px; text-align: left; }
+
+.pagina-cuerpo {
+  max-width: 68ch;
+  margin: 0 auto;
+  padding: 0 clamp(0px, 2vw, 20px);
+}
+
+/* ─────────────────────── ficha de producto ─────────────────────── */
+
+/* El precio tachado y el porcentaje de ahorro se ocultan con [hidden] cuando la
+   variante elegida no está rebajada. `[hidden]` ya gana en globals.css. */
+.pf-precio s { margin-left: 10px; }
+
+/* La cantidad es un <input number> y no dos botones con un <span>: hace falta
+   para que el formulario mande la cantidad sin JavaScript. */
+.ci-qty input[type="number"] {
+  width: 46px;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--ink);
+  -moz-appearance: textfield;
+}
+.ci-qty input[type="number"]::-webkit-outer-spin-button,
+.ci-qty input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.atc-add[disabled] { opacity: .45; cursor: not-allowed; }
+.atc-add[disabled]:hover { background: var(--ink); color: var(--bone); }
+
+/* Descuentos: si no se ven en la línea, el total del carrito no cuadra con la
+   suma de las piezas y la clienta piensa que le están cobrando de más. */
+.ci-descuento, .cd-row-descuento { color: var(--clay); }
+.cd-row-descuento { font-size: 13px; }
+
+/* ─────────────────────── carrito y pie ─────────────────────── */
+
+.cp-resumen textarea {
+  width: 100%;
+  margin: 10px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--ink);
+  resize: vertical;
+}
+.cp-resumen .btn + .btn { margin-top: 10px; }
+
+/* Pie de CUATRO columnas.
+   `.footer-cols` es `repeat(3, 1fr)` fijo en bloom.css, así que con una cuarta
+   columna («Información», con las políticas) la última caía sola a una segunda
+   fila. En la web anterior esta regla vivía dentro del componente de React y por
+   eso no viajó al CSS portado; se recupera aquí con sus cortes de móvil.
+   La especificidad de dos clases gana a `.footer-cols` esté donde esté. */
+.footer-cols.footer-cols-4 { grid-template-columns: repeat(4, 1fr); gap: 34px 26px; }
+@media (max-width: 900px) { .footer-cols.footer-cols-4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .footer-cols.footer-cols-4 { grid-template-columns: 1fr; } }
+
+.footer-pagos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+}
+.icono-pago { height: 22px; width: auto; opacity: .55; }
+
+.brand-logo { height: auto; max-height: 54px; width: auto; }
+
+/* ─────────────────────── blog y cuenta ─────────────────────── */
+
+.articulo-foto {
+  margin: 28px 0;
+  border-radius: var(--petal);
+  overflow: hidden;
+}
+.articulo-foto img { width: 100%; height: auto; }
+
+.articulo-comentarios { max-width: 68ch; margin: 48px auto 0; }
+.articulo-comentarios h2 { margin-bottom: 22px; }
+
+.cuenta {
+  max-width: 900px;
+  margin: 0 auto;
+}
+.cuenta-form { max-width: 420px; margin: 0 auto; }
+.cuenta-form .co-field { margin-bottom: 18px; }
+.cuenta-form input {
+  width: 100%;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--ink);
+}
+.cuenta-form .btn { width: 100%; }
+.cuenta-enlaces {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  font-size: 13px;
+}
+.cuenta-enlaces a { color: var(--clay); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Entrar / recuperar contraseña sin JavaScript.
+   Shopify no tiene página propia para recuperar: es la misma con `#recover`
+   detrás. Se alternan con :target, y el bloque de recuperar va antes en el HTML
+   para poder esconder al de entrar con el selector de hermano posterior. */
+.cuenta-panel-recuperar { display: none; }
+.cuenta-panel-recuperar:target { display: block; }
+.cuenta-panel-recuperar:target ~ .cuenta-panel-entrar { display: none; }
+
+.cuenta-tabla { width: 100%; border-collapse: collapse; font-size: 15px; }
+.cuenta-tabla th {
+  font-family: var(--sans);
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--stone);
+  text-align: left;
+  padding-bottom: 12px;
+}
+.cuenta-tabla td { border-top: 1px solid var(--line); padding: 14px 8px 14px 0; }
+.cuenta-tabla a { color: var(--clay); text-decoration: underline; text-underline-offset: 3px; }
+
+.cuenta-direcciones { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.cuenta-direccion {
+  border: 1px solid var(--line);
+  border-radius: var(--petal-card);
+  padding: 20px 22px;
+}
+
+/* ─────────────────────── pantalla de contraseña ─────────────────────── */
+
+.password-pantalla {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 24px;
+  gap: 18px;
+}
+.password-pantalla .brand-lotus { width: 88px; }
+.password-form { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+.password-form input {
+  padding: 13px 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--sans);
+  color: var(--ink);
+}
+
+/* ─────────────────────── sin JavaScript ─────────────────────── */
+
+/* El botón del carrito NO se esconde: es un <a href="/cart">, así que sin
+   JavaScript sigue llevando al carrito. Solo se esconde lo que sin scripts no
+   haría nada en absoluto. */
+a.cart-btn { display: inline-flex; align-items: center; justify-content: center; }
+.sin-js .cat-toggle { display: none; }
+.sin-js .cat-panel { display: block; }
+/* El revelado al hacer scroll depende de un observador: sin él, todo visible. */
+.sin-js .reveal { opacity: 1; transform: none; }

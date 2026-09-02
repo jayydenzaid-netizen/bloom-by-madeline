@@ -1,0 +1,23 @@
+{%- comment -%}
+  Página de contenido: Sobre nosotros, Devoluciones, Envíos, Términos.
+
+  Sale de la migración con el contenido convertido a HTML, y Madeline lo edita
+  desde el panel de Shopify (Tienda online → Páginas) sin tocar nada de aquí.
+{%- endcomment -%}
+
+<div class="shop-page section">
+  <div class="cat-intro">
+    <h1 class="cat-titulo">{{ page.title }}</h1>
+  </div>
+  <div class="pagina-cuerpo rte">
+    {{ page.content }}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Página",
+  "tag": "div",
+  "settings": []
+}
+{% endschema %}

@@ -1,0 +1,32 @@
+{%- comment -%}
+  Franja para anunciar algo puntual: rebajas, horario especial, cierre por
+  vacaciones. Nace vacía y apagada — mientras no se escriba nada aquí, no se
+  pinta absolutamente nada en la portada.
+
+  Usa solo clases que ya existen en el CSS de la marca. Una sección con estilos
+  inventados a medias se vería peor que no tenerla.
+{%- endcomment -%}
+
+{%- if section.settings.texto != blank or section.settings.boton_texto != blank -%}
+  <section class="section banner-aviso" style="text-align:center">
+    {%- if section.settings.texto != blank -%}
+      <p class="overline reveal">{%- render 'con-formato', texto: section.settings.texto -%}</p>
+    {%- endif -%}
+    {%- if section.settings.boton_texto != blank and section.settings.boton_url != blank -%}
+      <a class="btn btn-ghost" href="{{ section.settings.boton_url }}">{{ section.settings.boton_texto }}</a>
+    {%- endif -%}
+  </section>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Franja de aviso",
+  "tag": "div",
+  "settings": [
+    { "type": "textarea", "id": "texto", "label": "Aviso", "info": "Déjalo vacío y la franja no aparece." },
+    { "type": "text", "id": "boton_texto", "label": "Botón" },
+    { "type": "url", "id": "boton_url", "label": "Enlace del botón" }
+  ],
+  "presets": [{ "name": "Franja de aviso" }]
+}
+{% endschema %}

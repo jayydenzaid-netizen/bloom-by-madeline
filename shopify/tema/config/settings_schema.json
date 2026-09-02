@@ -1,0 +1,105 @@
+[
+  {
+    "name": "theme_info",
+    "theme_name": "Bloom by Madeline",
+    "theme_version": "1.0.0",
+    "theme_author": "Bloom by Madeline",
+    "theme_documentation_url": "https://github.com/jayydenzaid-netizen/bloom-by-madeline",
+    "theme_support_url": "https://github.com/jayydenzaid-netizen/bloom-by-madeline/issues"
+  },
+  {
+    "name": "El negocio",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Estos datos salen en el pie, en el menú del móvil y en la sección «Visítanos». Se escriben una vez aquí y cambian en toda la web a la vez."
+      },
+      {
+        "type": "text",
+        "id": "direccion",
+        "label": "Dirección",
+        "default": "1305 Grand Blvd, Hamilton, OH 45011",
+        "info": "Se parte por la coma para pintarla en dos líneas."
+      },
+      {
+        "type": "text",
+        "id": "horario",
+        "label": "Horario",
+        "default": "Jueves a sábado · 1:00 – 8:00 PM",
+        "info": "Se parte por el · para pintarlo en dos líneas."
+      },
+      {
+        "type": "text",
+        "id": "instagram",
+        "label": "Usuario de Instagram",
+        "default": "bloombymadelin",
+        "info": "Sin la arroba."
+      },
+      {
+        "type": "url",
+        "id": "url_dm",
+        "label": "Enlace directo al DM de Instagram",
+        "info": "El formato es https://ig.me/m/tu-usuario"
+      },
+      {
+        "type": "text",
+        "id": "lema",
+        "label": "Lema",
+        "default": "Tendencias exclusivas · Elevamos tu estilo casual elegante"
+      }
+    ]
+  },
+  {
+    "name": "Envíos",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Esto es solo lo que se LEE en la web. Las tarifas reales que se cobran se configuran en Configuración → Envíos y entregas."
+      },
+      {
+        "type": "text",
+        "id": "aviso_envio",
+        "label": "Aviso de plazos",
+        "default": "Los pedidos salen de la boutique en 1–2 días hábiles.",
+        "info": "Sale en la ficha de producto y en el carrito. Si vendes por dropshipping, di aquí el plazo REAL: prometer 2 días y tardar 3 semanas es la principal causa de devoluciones y de reclamaciones al banco."
+      },
+      {
+        "type": "number",
+        "id": "envio_gratis_desde",
+        "label": "Envío gratis a partir de (en dólares)",
+        "default": 75,
+        "info": "Mueve la barra de progreso del carrito. Pon 0 para quitarla. Tiene que coincidir con lo que hayas puesto en Configuración → Envíos."
+      }
+    ]
+  },
+  {
+    "name": "Marca",
+    "settings": [
+      {
+        "type": "image_picker",
+        "id": "favicon",
+        "label": "Icono de la pestaña",
+        "info": "Cuadrado, 96×96 o más."
+      },
+      {
+        "type": "color",
+        "id": "color_fondo",
+        "label": "Color de la barra del navegador en el móvil",
+        "default": "#ECE1CD",
+        "info": "El champán de la marca. Cambiarlo no cambia el fondo de la web: eso vive en el CSS del tema."
+      },
+      {
+        "type": "paragraph",
+        "content": "El resto de la identidad (tipografías Cormorant Garamond, Jost y Allura, la paleta champán/tinta/burdeos y los marcos «pétalo») está en assets/bloom.css. Es el mismo CSS que se pulió en la web anterior y no se edita desde aquí a propósito."
+      }
+    ]
+  },
+  {
+    "name": "Redes sociales",
+    "settings": [
+      { "type": "url", "id": "url_facebook", "label": "Facebook" },
+      { "type": "url", "id": "url_tiktok", "label": "TikTok" },
+      { "type": "url", "id": "url_pinterest", "label": "Pinterest" }
+    ]
+  }
+]

@@ -1,0 +1,150 @@
+{%- comment -%}
+  Cajón del carrito.
+
+  Es una SECCIÓN y no un snippet por un motivo concreto: así se puede volver a
+  pintar entera desde el servidor con la Section Rendering API
+  (`fetch('/?sections=carrito-cajon')`). La alternativa —montar el HTML del
+  carrito otra vez en JavaScript— significa tener el mismo marcado escrito dos
+  veces, y en cuanto se toca uno el otro se queda atrás.
+
+  Aquí el marcado se escribe UNA vez, en Liquid, y JavaScript solo sustituye el
+  bloque por la versión nueva que devuelve Shopify.
+
+  Todos los importes salen de Shopify ya formateados con `| money`: la moneda y
+  el formato los decide la tienda, no el tema.
+{%- endcomment -%}
+
+{%- liquid
+  assign umbral = settings.envio_gratis_desde | times: 100
+  assign falta = umbral | minus: cart.total_price
+  assign progreso = 0
+  if umbral > 0 and cart.total_price > 0
+    assign progreso = cart.total_price | times: 100 | divided_by: umbral
+    if progreso > 100
+      assign progreso = 100
+    endif
+  endif
+-%}
+
+<div id="carrito-cajon" data-carrito-cajon data-cantidad="{{ cart.item_count }}">
+  <div class="cart-backdrop" data-cerrar-carrito aria-hidden="true"></div>
+
+  <aside class="cart" role="dialog" aria-modal="true" aria-label="{{ 'carrito.titulo' | t }}" tabindex="-1">
+    <header class="cart-head">
+      <h3>{{ 'carrito.tu' | t }} <em class="serif-it">{{ 'carrito.carrito' | t }}</em></h3>
+      <button class="cart-close" type="button" data-cerrar-carrito aria-label="{{ 'carrito.cerrar' | t }}">&times;</button>
+    </header>
+
+    <div class="cart-body">
+      {%- if cart.item_count == 0 -%}
+        <div class="cart-empty">
+          <svg viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+          <p>{{ 'carrito.vacio' | t }}</p>
+          <a class="btn btn-ink" href="{{ routes.all_products_collection_url }}">{{ 'carrito.ver_tienda' | t }}</a>
+        </div>
+      {%- else -%}
+        {%- for linea in cart.items -%}
+          <div class="cart-item" data-linea="{{ linea.key }}">
+            {%- if linea.image -%}
+              <img src="{{ linea.image | image_url: width: 160 }}"
+                   alt="{{ linea.image.alt | default: linea.product.title | escape }}"
+                   width="80" height="100" loading="lazy">
+            {%- else -%}
+              <span class="cd-noimg" aria-hidden="true"></span>
+            {%- endif -%}
+
+            <div class="ci-info">
+              <h4><a href="{{ linea.url }}">{{ linea.product.title }}</a></h4>
+
+              {%- unless linea.variant.title contains 'Default' -%}
+                <p class="ci-meta">{{ linea.variant.title }}</p>
+              {%- endunless -%}
+
+              {%- comment -%}
+                Descuentos automáticos y de código: si no se enseñan aquí, la
+                clienta ve un total que no cuadra con la suma de las líneas.
+              {%- endcomment -%}
+              {%- for descuento in linea.line_level_discount_allocations -%}
+                <p class="ci-meta ci-descuento">{{ descuento.discount_application.title }} (−{{ descuento.amount | money }})</p>
+              {%- endfor -%}
+
+              <div class="ci-qty">
+                <button type="button" data-cantidad="{{ linea.quantity | minus: 1 }}" data-linea-key="{{ linea.key }}"
+                        aria-label="{{ 'carrito.quitar_uno' | t }}">&minus;</button>
+                <span>{{ linea.quantity }}</span>
+                <button type="button" data-cantidad="{{ linea.quantity | plus: 1 }}" data-linea-key="{{ linea.key }}"
+                        aria-label="{{ 'carrito.anadir_uno' | t }}">+</button>
+              </div>
+            </div>
+
+            <span class="ci-precio">
+              {%- if linea.original_line_price > linea.final_line_price -%}
+                <s>{{ linea.original_line_price | money }}</s>
+              {%- endif -%}
+              {{ linea.final_line_price | money }}
+            </span>
+
+            <button class="ci-del" type="button" data-cantidad="0" data-linea-key="{{ linea.key }}"
+                    aria-label="{{ 'carrito.quitar' | t }}">&times;</button>
+          </div>
+        {%- endfor -%}
+      {%- endif -%}
+    </div>
+
+    {%- if cart.item_count > 0 -%}
+      <footer class="cart-foot">
+        {%- if umbral > 0 -%}
+          <div class="cd-ship">
+            {%- if falta > 0 -%}
+              <p>{{ 'carrito.faltan_para_envio_gratis_html' | t: importe: falta | money }}</p>
+            {%- else -%}
+              <p>{{ 'carrito.envio_gratis_conseguido' | t }}</p>
+            {%- endif -%}
+            <div class="cd-ship-bar"><span style="width: {{ progreso }}%"></span></div>
+          </div>
+        {%- endif -%}
+
+        <div class="cd-row">
+          <span>{{ 'carrito.subtotal' | t }}</span>
+          <span>{{ cart.total_price | money }}</span>
+        </div>
+
+        {%- for descuento in cart.cart_level_discount_applications -%}
+          <div class="cd-row cd-row-descuento">
+            <span>{{ descuento.title }}</span>
+            <span>&minus;{{ descuento.total_allocated_amount | money }}</span>
+          </div>
+        {%- endfor -%}
+
+        <div class="cd-row">
+          <span>{{ 'carrito.envio' | t }}</span>
+          <span>{{ 'carrito.envio_en_el_pago' | t }}</span>
+        </div>
+
+        <div class="cart-total">
+          <span>{{ 'carrito.total' | t }}</span>
+          <strong>{{ cart.total_price | money }}</strong>
+        </div>
+
+        <form action="{{ routes.cart_url }}" method="post" novalidate>
+          <button class="btn btn-ink cart-send" type="submit" name="checkout">
+            {{ 'carrito.finalizar' | t }}
+          </button>
+        </form>
+
+        <a class="btn btn-ghost cd-dm" href="{{ routes.cart_url }}">{{ 'carrito.ver_carrito' | t }}</a>
+
+        {%- if settings.aviso_envio != blank -%}
+          <p class="cart-note">{{ settings.aviso_envio }}</p>
+        {%- endif -%}
+      </footer>
+    {%- endif -%}
+  </aside>
+</div>
+
+{% schema %}
+{
+  "name": "Cajón del carrito",
+  "settings": []
+}
+{% endschema %}

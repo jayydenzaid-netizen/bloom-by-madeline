@@ -1,0 +1,259 @@
+{%- comment -%}
+  Ficha de producto.
+
+  El selector de variante funciona SIN JavaScript: es un <form> con radios, y
+  cada radio lleva su valor de opción. bloom.js lo mejora (cambia el precio y la
+  foto al vuelo, añade al carrito sin recargar), pero si el JS no carga la ficha
+  sigue vendiendo — el botón envía el formulario a /cart/add y Shopify hace el
+  resto. En una tienda real, «no se puede comprar porque falló un script» no es
+  un modo de fallo aceptable.
+
+  El `<select>` oculto con el id de variante es el que viaja en el formulario.
+  Los chips visibles son radios que lo actualizan.
+{%- endcomment -%}
+
+{%- liquid
+  assign producto = product
+  assign variante = producto.selected_or_first_available_variant
+  assign tiene_opciones_reales = true
+  if producto.has_only_default_variant
+    assign tiene_opciones_reales = false
+  endif
+
+  assign rebajado = false
+  if variante.compare_at_price > variante.price
+    assign rebajado = true
+    assign ahorro = variante.compare_at_price | minus: variante.price | times: 100 | divided_by: variante.compare_at_price
+  endif
+-%}
+
+<div class="shop-page section">
+  <nav class="pf-migas" aria-label="{{ 'general.migas' | t }}">
+    <a href="{{ routes.all_products_collection_url }}">{{ 'general.tienda' | t }}</a>
+    {%- if collection -%}
+      <i>/</i><a href="{{ collection.url }}">{{ collection.title }}</a>
+    {%- endif -%}
+    <i>/</i><span>{{ producto.title }}</span>
+  </nav>
+
+  <div class="pf-top">
+    {%- comment -%} ── Galería ────────────────────────────────────────────── {%- endcomment -%}
+    <div class="pf-galeria" data-galeria>
+      <div class="pf-foto" data-foto-grande>
+        {%- if producto.featured_image -%}
+          <img
+            src="{{ producto.featured_image | image_url: width: 1200 }}"
+            srcset="{{ producto.featured_image | image_url: width: 600 }} 600w,
+                    {{ producto.featured_image | image_url: width: 1200 }} 1200w,
+                    {{ producto.featured_image | image_url: width: 1800 }} 1800w"
+            sizes="(max-width: 900px) 94vw, 48vw"
+            alt="{{ producto.featured_image.alt | default: producto.title | escape }}"
+            width="{{ producto.featured_image.width }}" height="{{ producto.featured_image.height }}"
+            loading="eager" fetchpriority="high"
+            data-imagen-principal>
+        {%- else -%}
+          <span class="pf-foto-vacia" aria-hidden="true"></span>
+        {%- endif -%}
+      </div>
+
+      {%- if producto.images.size > 1 -%}
+        <div class="pf-thumbs">
+          {%- for imagen in producto.images -%}
+            <button
+              class="pf-thumb{% if forloop.first %} sel{% endif %}"
+              type="button"
+              data-miniatura
+              data-imagen-id="{{ imagen.id }}"
+              data-src="{{ imagen | image_url: width: 1200 }}"
+              aria-label="{{ 'producto.ver_foto' | t }} {{ forloop.index }}">
+              <img src="{{ imagen | image_url: width: 180 }}"
+                   alt="{{ imagen.alt | default: producto.title | escape }}"
+                   width="90" height="112" loading="lazy">
+            </button>
+          {%- endfor -%}
+        </div>
+      {%- endif -%}
+    </div>
+
+    {%- comment -%} ── Información y compra ───────────────────────────────── {%- endcomment -%}
+    <div class="pf-info">
+      {%- if producto.type != blank -%}
+        <p class="overline pf-tipo">{{ producto.type }}</p>
+      {%- endif -%}
+
+      <h1 class="pf-titulo">{{ producto.title }}</h1>
+
+      <p class="pf-precio" data-bloque-precio>
+        {%- if producto.price_varies and producto.selected_variant == nil -%}
+          <span class="pf-desde">{{ 'producto.desde' | t }}</span>
+        {%- endif -%}
+        <strong data-precio>{{ variante.price | money }}</strong>
+        {%- if rebajado -%}
+          <s data-precio-tachado>{{ variante.compare_at_price | money }}</s>
+          <span class="pf-ahorro" data-ahorro>{{ 'producto.ahorras' | t }} {{ ahorro }}%</span>
+        {%- else -%}
+          <s data-precio-tachado hidden></s>
+          <span class="pf-ahorro" data-ahorro hidden></span>
+        {%- endif -%}
+      </p>
+
+      {%- form 'product', producto, id: 'form-producto', novalidate: 'novalidate', data-form-producto: '' -%}
+        <select name="id" class="visualmente-oculto" data-selector-variante aria-hidden="true" tabindex="-1">
+          {%- for v in producto.variants -%}
+            <option
+              value="{{ v.id }}"
+              {% if v == variante %}selected{% endif %}
+              {% unless v.available %}disabled{% endunless %}
+              data-precio="{{ v.price | money }}"
+              data-precio-comparado="{{ v.compare_at_price | money }}"
+              data-disponible="{{ v.available }}"
+              data-imagen-id="{{ v.image.id }}"
+              data-inventario="{{ v.inventory_quantity }}"
+              data-seguimiento="{{ v.inventory_management }}">
+              {{ v.title }}
+            </option>
+          {%- endfor -%}
+        </select>
+
+        {%- if tiene_opciones_reales -%}
+          <div class="atc">
+            {%- for opcion in producto.options_with_values -%}
+              <div class="atc-group" data-grupo-opcion data-indice="{{ forloop.index0 }}">
+                <p class="lb-talla-label">{{ opcion.name }}</p>
+                <div class="lb-tallas">
+                  {%- for valor in opcion.values -%}
+                    {%- assign id_chip = section.id | append: '-' | append: forloop.parentloop.index0 | append: '-' | append: forloop.index0 -%}
+                    <input
+                      class="visualmente-oculto"
+                      type="radio"
+                      id="{{ id_chip }}"
+                      name="opcion-{{ opcion.position }}"
+                      value="{{ valor | escape }}"
+                      data-opcion-radio
+                      data-posicion="{{ opcion.position }}"
+                      {% if opcion.selected_value == valor %}checked{% endif %}>
+                    <label class="talla-chip{% if opcion.selected_value == valor %} sel{% endif %}" for="{{ id_chip }}">
+                      {{ valor }}
+                    </label>
+                  {%- endfor -%}
+                </div>
+              </div>
+            {%- endfor -%}
+          </div>
+        {%- endif -%}
+
+        <div class="atc">
+          <div class="atc-qty">
+            <span class="lb-talla-label">{{ 'producto.cantidad' | t }}</span>
+            <div class="ci-qty">
+              <button type="button" data-cantidad-menos aria-label="{{ 'carrito.quitar_uno' | t }}">&minus;</button>
+              <input type="number" name="quantity" value="1" min="1" inputmode="numeric"
+                     data-cantidad-valor aria-label="{{ 'producto.cantidad' | t }}">
+              <button type="button" data-cantidad-mas aria-label="{{ 'carrito.anadir_uno' | t }}">+</button>
+            </div>
+          </div>
+
+          <button class="btn btn-ink atc-add" type="submit" name="add" data-boton-anadir
+                  {% unless variante.available %}disabled{% endunless %}>
+            <span data-texto-anadir>
+              {%- if variante.available -%}{{ 'producto.anadir' | t }}{%- else -%}{{ 'producto.agotado' | t }}{%- endif -%}
+            </span>
+          </button>
+
+          <p class="atc-sold" data-aviso-agotado {% if variante.available %}hidden{% endif %}>
+            {{ 'producto.agotado_aviso' | t }}
+          </p>
+          <p class="atc-low" data-aviso-pocas hidden></p>
+        </div>
+      {%- endform -%}
+
+      {%- if settings.aviso_envio != blank -%}
+        <p class="pf-envio">
+          <strong>{{ 'producto.envio' | t }}:</strong> {{ settings.aviso_envio }}
+          {%- if settings.envio_gratis_desde > 0 -%}
+            {{ 'producto.envio_gratis_desde' | t }} {{ settings.envio_gratis_desde | times: 100 | money }}.
+          {%- endif -%}
+        </p>
+      {%- endif -%}
+
+      {%- if producto.description != blank -%}
+        <hr class="pf-sep">
+        <div class="pf-desc rte">{{ producto.description }}</div>
+      {%- endif -%}
+
+      {%- liquid
+        assign hay_ficha = false
+        if producto.type != blank or producto.vendor != blank
+          assign hay_ficha = true
+        endif
+      -%}
+      {%- if hay_ficha -%}
+        <dl class="pf-ficha">
+          {%- if producto.type != blank -%}
+            <div><dt>{{ 'producto.tipo' | t }}</dt><dd>{{ producto.type }}</dd></div>
+          {%- endif -%}
+          {%- for opcion in producto.options_with_values -%}
+            {%- unless opcion.name == 'Title' -%}
+              <div><dt>{{ opcion.name }}</dt><dd>{{ opcion.values | join: ' · ' }}</dd></div>
+            {%- endunless -%}
+          {%- endfor -%}
+          {%- if producto.vendor != blank -%}
+            <div><dt>{{ 'producto.marca' | t }}</dt><dd>{{ producto.vendor }}</dd></div>
+          {%- endif -%}
+          {%- if variante.sku != blank -%}
+            <div><dt>{{ 'producto.referencia' | t }}</dt><dd data-sku>{{ variante.sku }}</dd></div>
+          {%- endif -%}
+        </dl>
+      {%- endif -%}
+
+      {%- if producto.collections.size > 0 -%}
+        <div class="pf-cols">
+          {%- for col in producto.collections -%}
+            <a class="pf-col-tag" href="{{ col.url }}">{{ col.title }}</a>
+          {%- endfor -%}
+        </div>
+      {%- endif -%}
+    </div>
+  </div>
+
+  {%- comment -%} ── Piezas relacionadas ──────────────────────────────────── {%- endcomment -%}
+  {%- if recommendations.performed and recommendations.products_count > 0 -%}
+    <section class="pf-rel reveal">
+      <div class="section-head">
+        <div>
+          <p class="overline">{{ 'producto.sigue_mirando' | t }}</p>
+          <h2>{{ 'producto.tambien_te' | t }} <span class="serif-it">{{ 'producto.gustara' | t }}</span></h2>
+        </div>
+      </div>
+      <div class="product-grid">
+        {%- for recomendado in recommendations.products limit: 4 -%}
+          {%- render 'tarjeta-producto', producto: recomendado -%}
+        {%- endfor -%}
+      </div>
+    </section>
+  {%- else -%}
+    {%- comment -%}
+      Las recomendaciones de Shopify se piden por AJAX; bloom.js rellena esto.
+      Sin JavaScript, sencillamente no hay bloque de relacionados — que es una
+      degradación honesta, no una página rota.
+    {%- endcomment -%}
+    <div data-recomendaciones data-url="{{ routes.product_recommendations_url }}?section_id={{ section.id }}&product_id={{ producto.id }}&limit=4"></div>
+  {%- endif -%}
+</div>
+
+{%- comment -%}
+  Datos estructurados. Es lo que hace que la pieza salga en Google con su foto y
+  su precio. Se emite el JSON-LD que Shopify recomienda, con la disponibilidad
+  real: sin `offers`, Google ignora la ficha.
+{%- endcomment -%}
+<script type="application/ld+json">
+{{ producto | structured_data }}
+</script>
+
+{% schema %}
+{
+  "name": "Ficha de producto",
+  "tag": "div",
+  "settings": []
+}
+{% endschema %}

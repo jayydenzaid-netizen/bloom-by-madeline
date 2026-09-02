@@ -1,0 +1,156 @@
+{%- comment -%}
+  Pie del sitio.
+
+  El número de columnas manda en la rejilla: `.footer-cols` es `repeat(3, 1fr)`
+  fijo en el CSS portado, así que con cuatro columnas la última caería sola en
+  una segunda fila. Igual que en el sitio actual, se añade la clase
+  `.footer-cols-4` —dos clases, más específica— y con ella los cortes de móvil.
+
+  Los datos de contacto salen de los ajustes del tema y no del código: cuando
+  cambie el horario no hay que tocar Liquid.
+{%- endcomment -%}
+
+{%- liquid
+  assign columnas = 2
+  if section.settings.menu_tienda != blank and section.settings.menu_tienda.links.size > 0
+    assign columnas = columnas | plus: 1
+  endif
+  if section.settings.menu_info != blank and section.settings.menu_info.links.size > 0
+    assign columnas = columnas | plus: 1
+  endif
+-%}
+
+<footer class="footer">
+  <div class="footer-brand">
+    <svg class="footer-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+    <p class="footer-bloom">B&thinsp;L&thinsp;O&thinsp;O&thinsp;M</p>
+    <p class="footer-by"><em>by</em> MADELINE</p>
+  </div>
+
+  <div class="footer-cols{% if columnas == 4 %} footer-cols-4{% endif %}">
+    <div>
+      <h4>{{ section.settings.titulo_visita | default: 'Visítanos' }}</h4>
+      <p>
+        {{ settings.direccion }}<br>
+        {{ settings.horario }}
+      </p>
+    </div>
+
+    <div>
+      <h4>{{ section.settings.titulo_redes | default: 'Síguenos' }}</h4>
+      <p>
+        {%- if settings.instagram != blank -%}
+          <a href="https://www.instagram.com/{{ settings.instagram | remove: '@' }}/" target="_blank" rel="noopener">
+            Instagram — @{{ settings.instagram | remove: '@' }}
+          </a><br>
+        {%- endif -%}
+        {%- if settings.url_dm != blank -%}
+          <a href="{{ settings.url_dm }}" target="_blank" rel="noopener">{{ 'general.pedidos_por_dm' | t }}</a>
+        {%- endif -%}
+      </p>
+    </div>
+
+    {%- if section.settings.menu_tienda != blank and section.settings.menu_tienda.links.size > 0 -%}
+      <div>
+        <h4>{{ section.settings.titulo_tienda | default: 'Tienda' }}</h4>
+        <p>
+          {%- for enlace in section.settings.menu_tienda.links -%}
+            {%- unless forloop.first %}<br>{% endunless -%}
+            <a href="{{ enlace.url }}">{{ enlace.title }}</a>
+          {%- endfor -%}
+        </p>
+      </div>
+    {%- endif -%}
+
+    {%- if section.settings.menu_info != blank and section.settings.menu_info.links.size > 0 -%}
+      <div>
+        <h4>{{ section.settings.titulo_info | default: 'Información' }}</h4>
+        <p>
+          {%- for enlace in section.settings.menu_info.links -%}
+            {%- unless forloop.first %}<br>{% endunless -%}
+            <a href="{{ enlace.url }}">{{ enlace.title }}</a>
+          {%- endfor -%}
+        </p>
+      </div>
+    {%- endif -%}
+  </div>
+
+  <div class="footer-bottom">
+    <p>&copy; {{ 'now' | date: '%Y' }} {{ shop.name }}{% if section.settings.ciudad != blank %} &middot; {{ section.settings.ciudad }}{% endif %}</p>
+    {%- if settings.lema != blank -%}
+      <p class="footer-tag">{{ settings.lema }}</p>
+    {%- endif -%}
+
+    {%- if section.settings.mostrar_pagos and shop.enabled_payment_types.size > 0 -%}
+      <div class="footer-pagos" role="list" aria-label="{{ 'general.formas_de_pago' | t }}">
+        {%- for tipo in shop.enabled_payment_types -%}
+          <span role="listitem">{{ tipo | payment_type_svg_tag: class: 'icono-pago' }}</span>
+        {%- endfor -%}
+      </div>
+    {%- endif -%}
+  </div>
+</footer>
+
+{% schema %}
+{
+  "name": "Pie de página",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Columnas"
+    },
+    {
+      "type": "text",
+      "id": "titulo_visita",
+      "label": "Título de la columna de dirección",
+      "default": "Visítanos"
+    },
+    {
+      "type": "text",
+      "id": "titulo_redes",
+      "label": "Título de la columna de redes",
+      "default": "Síguenos"
+    },
+    {
+      "type": "text",
+      "id": "titulo_tienda",
+      "label": "Título de la columna de tienda",
+      "default": "Tienda"
+    },
+    {
+      "type": "link_list",
+      "id": "menu_tienda",
+      "label": "Menú de la columna «Tienda»",
+      "default": "footer"
+    },
+    {
+      "type": "text",
+      "id": "titulo_info",
+      "label": "Título de la columna de información",
+      "default": "Información"
+    },
+    {
+      "type": "link_list",
+      "id": "menu_info",
+      "label": "Menú de la columna «Información»",
+      "info": "Aquí van las políticas: devoluciones, envíos, términos."
+    },
+    {
+      "type": "header",
+      "content": "Línea final"
+    },
+    {
+      "type": "text",
+      "id": "ciudad",
+      "label": "Ciudad",
+      "default": "Hamilton, Ohio"
+    },
+    {
+      "type": "checkbox",
+      "id": "mostrar_pagos",
+      "label": "Mostrar las formas de pago aceptadas",
+      "default": true
+    }
+  ]
+}
+{% endschema %}

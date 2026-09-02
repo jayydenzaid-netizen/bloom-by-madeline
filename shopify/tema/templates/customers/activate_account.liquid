@@ -1,0 +1,26 @@
+{%- comment -%} Activar la cuenta desde la invitación que manda Shopify. {%- endcomment -%}
+
+<div class="shop-page section cuenta">
+  <div class="cat-intro">
+    <h1 class="cat-titulo">{{ 'cuenta.activar_titulo' | t }}</h1>
+    <p class="cat-pista">{{ 'cuenta.activar_texto' | t }}</p>
+  </div>
+
+  <div class="cuenta-form">
+    {%- form 'activate_customer_password' -%}
+      {%- if form.errors -%}
+        <p class="co-err">{{ form.errors | default_errors }}</p>
+      {%- endif -%}
+      <div class="co-field">
+        <label class="co-label" for="act-1">{{ 'cuenta.nueva_contrasena' | t }}</label>
+        <input id="act-1" type="password" name="customer[password]" autocomplete="new-password" required>
+      </div>
+      <div class="co-field">
+        <label class="co-label" for="act-2">{{ 'cuenta.repetir_contrasena' | t }}</label>
+        <input id="act-2" type="password" name="customer[password_confirmation]" autocomplete="new-password" required>
+      </div>
+      <button class="btn btn-ink" type="submit">{{ 'cuenta.activar' | t }}</button>
+      <button class="btn btn-ghost" type="submit" name="decline" style="margin-top:10px">{{ 'cuenta.rechazar' | t }}</button>
+    {%- endform -%}
+  </div>
+</div>

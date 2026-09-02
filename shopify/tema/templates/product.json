@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "principal": {
+      "type": "main-producto",
+      "settings": {}
+    }
+  },
+  "order": ["principal"]
+}

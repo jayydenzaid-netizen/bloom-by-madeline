@@ -1,0 +1,18 @@
+{
+  "name": "Pie de página",
+  "type": "footer",
+  "sections": {
+    "pie": {
+      "type": "pie",
+      "settings": {
+        "titulo_visita": "Visítanos",
+        "titulo_redes": "Síguenos",
+        "titulo_tienda": "Tienda",
+        "titulo_info": "Información",
+        "ciudad": "Hamilton, Ohio",
+        "mostrar_pagos": true
+      }
+    }
+  },
+  "order": ["pie"]
+}

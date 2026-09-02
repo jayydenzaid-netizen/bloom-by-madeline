@@ -1,0 +1,65 @@
+{%- comment -%}
+  Buscador. Sale de la caja del propio Shopify (`search.performed`), con la misma
+  rejilla y la misma paginación que el catálogo para que buscar no parezca otra
+  web.
+{%- endcomment -%}
+
+{%- paginate search.results by 24 -%}
+  <div class="shop-page section">
+    <div class="cat-intro">
+      <h1 class="cat-titulo">{{ 'catalogo.buscar' | t }}</h1>
+      <form class="cat-buscar" action="{{ routes.search_url }}" method="get" role="search">
+        <label class="visualmente-oculto" for="campo-busqueda">{{ 'catalogo.buscar' | t }}</label>
+        <input id="campo-busqueda" type="search" name="q" value="{{ search.terms | escape }}"
+               placeholder="{{ 'catalogo.buscar_ejemplo' | t }}" autocomplete="off">
+        <input type="hidden" name="type" value="product">
+        <button class="btn btn-ink btn-sm" type="submit">{{ 'catalogo.buscar_boton' | t }}</button>
+      </form>
+    </div>
+
+    {%- if search.performed -%}
+      <p class="cat-conteo">{{ 'catalogo.resultados' | t: count: search.results_count }}</p>
+
+      {%- if search.results_count > 0 -%}
+        <div class="product-grid cat-lista">
+          {%- for resultado in search.results -%}
+            {%- if resultado.object_type == 'product' -%}
+              {%- render 'tarjeta-producto', producto: resultado -%}
+            {%- endif -%}
+          {%- endfor -%}
+        </div>
+
+        {%- if paginate.pages > 1 -%}
+          <nav class="cat-pag" aria-label="{{ 'catalogo.paginacion' | t }}">
+            {%- if paginate.previous -%}<a class="cat-pag-flecha" href="{{ paginate.previous.url }}">←</a>{%- endif -%}
+            <span class="cat-pag-nums">
+              {%- for parte in paginate.parts -%}
+                {%- if parte.is_link -%}
+                  <a class="cat-pag-num" href="{{ parte.url }}">{{ parte.title }}</a>
+                {%- else -%}
+                  <span class="cat-pag-num sel">{{ parte.title }}</span>
+                {%- endif -%}
+              {%- endfor -%}
+            </span>
+            {%- if paginate.next -%}<a class="cat-pag-flecha" href="{{ paginate.next.url }}">→</a>{%- endif -%}
+          </nav>
+        {%- endif -%}
+      {%- else -%}
+        <div class="cat-vacio">
+          <svg class="cat-vacio-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+          <p class="cat-vacio-titulo">{{ 'catalogo.sin_resultados' | t }}</p>
+          <p class="cat-vacio-sub">{{ 'catalogo.sin_resultados_sub' | t }}</p>
+          <a class="btn btn-ink" href="{{ routes.all_products_collection_url }}">{{ 'carrito.ver_tienda' | t }}</a>
+        </div>
+      {%- endif -%}
+    {%- endif -%}
+  </div>
+{%- endpaginate -%}
+
+{% schema %}
+{
+  "name": "Búsqueda",
+  "tag": "div",
+  "settings": []
+}
+{% endschema %}

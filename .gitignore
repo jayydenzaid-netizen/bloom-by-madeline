@@ -27,3 +27,6 @@ shopify/.puente-token
 shopify/.capacidades.json
 shopify/tema-bloom.zip
 shopify/resenas-para-importar.csv
+# Capturas de la vista previa del tema: las regenera `npm run tema:vista` y
+# pesan 6 MB. Al repositorio va el tema, no sus fotos de prueba.
+shopify/vista-previa/

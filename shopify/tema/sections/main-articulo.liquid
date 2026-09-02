@@ -1,0 +1,65 @@
+{%- comment -%}
+  Una entrada del blog.
+{%- endcomment -%}
+
+<div class="shop-page section">
+  <article>
+    <div class="cat-intro">
+      <p class="overline">{{ article.published_at | date: '%-d de %B de %Y' }}</p>
+      <h1 class="cat-titulo">{{ article.title }}</h1>
+    </div>
+
+    {%- if article.image -%}
+      <figure class="articulo-foto">
+        <img src="{{ article.image | image_url: width: 1400 }}"
+             alt="{{ article.image.alt | default: article.title | escape }}" loading="eager">
+      </figure>
+    {%- endif -%}
+
+    <div class="pagina-cuerpo rte">{{ article.content }}</div>
+
+    {%- if blog.comments_enabled? -%}
+      <div class="articulo-comentarios">
+        {%- if article.comments_count > 0 -%}
+          <h2>{{ 'blog.comentarios' | t: count: article.comments_count }}</h2>
+          {%- for comentario in article.comments -%}
+            <div class="rs-card">
+              <p class="rs-card-autora">{{ comentario.author }}</p>
+              <p class="rs-card-fecha">{{ comentario.created_at | date: '%-d de %B de %Y' }}</p>
+              <div class="rs-card-texto">{{ comentario.content }}</div>
+            </div>
+          {%- endfor -%}
+        {%- endif -%}
+
+        {%- form 'new_comment', article -%}
+          {%- if form.errors -%}
+            <p class="co-err">{{ 'blog.error_comentario' | t }}</p>
+          {%- elsif form.posted_successfully? -%}
+            <p class="cart-hint">{{ 'blog.comentario_enviado' | t }}</p>
+          {%- endif -%}
+          <div class="co-field">
+            <label class="co-label" for="comentario-autor">{{ 'blog.tu_nombre' | t }}</label>
+            <input id="comentario-autor" type="text" name="comment[author]" required>
+          </div>
+          <div class="co-field">
+            <label class="co-label" for="comentario-email">{{ 'blog.tu_email' | t }}</label>
+            <input id="comentario-email" type="email" name="comment[email]" required>
+          </div>
+          <div class="co-field">
+            <label class="co-label" for="comentario-cuerpo">{{ 'blog.tu_comentario' | t }}</label>
+            <textarea id="comentario-cuerpo" name="comment[body]" rows="4" required></textarea>
+          </div>
+          <button class="btn btn-ink" type="submit">{{ 'blog.enviar' | t }}</button>
+        {%- endform -%}
+      </div>
+    {%- endif -%}
+  </article>
+</div>
+
+{% schema %}
+{
+  "name": "Artículo",
+  "tag": "div",
+  "settings": []
+}
+{% endschema %}

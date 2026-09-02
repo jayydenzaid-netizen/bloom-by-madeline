@@ -1,0 +1,170 @@
+{%- comment -%}
+  Barra superior. Es el mismo marcado que el sitio actual (`.nav`, `.nav-brand`,
+  `.nav-links`…) porque el CSS portado depende de esas clases exactas.
+
+  El contador del carrito se pinta desde `cart.item_count` en el servidor, no
+  desde JavaScript: así llega ya correcto en el HTML y no se ve el parpadeo de
+  «0 y luego 3» al cargar. Cuando algo cambia el carrito por AJAX, bloom.js
+  actualiza el número en su sitio.
+
+  Los enlaces salen del menú de navegación de Shopify (Tienda online →
+  Navegación), para que se editen sin tocar código.
+{%- endcomment -%}
+
+<header class="nav" id="nav">
+  <a class="nav-brand" href="{{ routes.root_url }}" aria-label="{{ shop.name }} — {{ 'general.inicio' | t }}">
+    {%- if section.settings.logo != blank -%}
+      <img
+        class="brand-logo"
+        src="{{ section.settings.logo | image_url: width: 200 }}"
+        alt="{{ shop.name | escape }}"
+        width="{{ section.settings.ancho_logo }}"
+        loading="eager">
+    {%- else -%}
+      <svg class="brand-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+      <span class="brand-text">
+        <span class="brand-bloom">{{ section.settings.marca | default: 'BLOOM' }}</span>
+        <span class="brand-by"><em>{{ section.settings.marca_by_cursiva | default: 'by' }}</em> {{ section.settings.marca_by | default: 'MADELINE' }}</span>
+      </span>
+    {%- endif -%}
+  </a>
+
+  <nav class="nav-links" aria-label="{{ 'general.navegacion_principal' | t }}">
+    {%- for enlace in section.settings.menu.links -%}
+      <a href="{{ enlace.url }}"{% if enlace.current %} aria-current="page"{% endif %}>{{ enlace.title }}</a>
+    {%- endfor -%}
+  </nav>
+
+  <div class="nav-actions">
+    {%- if section.settings.url_dm != blank -%}
+      <a class="btn btn-ink btn-sm nav-dm" href="{{ section.settings.url_dm }}" target="_blank" rel="noopener">
+        {{ section.settings.texto_dm | default: 'Pedir por DM' }}
+      </a>
+    {%- endif -%}
+
+    {%- comment -%}
+      Es un ENLACE a /cart, no un botón: sin JavaScript sigue llevando al
+      carrito de verdad. Con JavaScript, bloom.js le hace preventDefault y abre
+      el cajón lateral. Un <button> aquí dejaría el carrito inalcanzable si el
+      script no carga.
+    {%- endcomment -%}
+    <a
+      class="cart-btn"
+      href="{{ routes.cart_url }}"
+      data-abrir-carrito
+      aria-label="{{ 'carrito.abrir' | t }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+           stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 8V6.5a4 4 0 0 1 8 0V8"/>
+        <path d="M4.8 8h14.4l-1.1 11.1a2 2 0 0 1-2 1.9H7.9a2 2 0 0 1-2-1.9L4.8 8z"/>
+      </svg>
+      <span class="cart-count" data-contador-carrito{% if cart.item_count == 0 %} hidden{% endif %}>{{ cart.item_count }}</span>
+    </a>
+
+    <button class="nav-burger" type="button" data-abrir-menu
+            aria-label="{{ 'general.abrir_menu' | t }}" aria-expanded="false">
+      <span></span><span></span>
+    </button>
+  </div>
+</header>
+
+{%- comment -%}
+  El menú móvil va FUERA del <header>: dentro heredaría su contexto de apilado y
+  taparía la propia hamburguesa al abrirse.
+{%- endcomment -%}
+<div class="mobile-menu" id="menu-movil" aria-hidden="true">
+  <nav aria-label="{{ 'general.menu_movil' | t }}">
+    {%- for enlace in section.settings.menu.links -%}
+      <a href="{{ enlace.url }}" style="--i: {{ forloop.index0 }}" tabindex="-1">{{ enlace.title }}</a>
+    {%- endfor -%}
+    {%- if section.settings.url_dm != blank -%}
+      <a class="mm-cta" href="{{ section.settings.url_dm }}" target="_blank" rel="noopener"
+         style="--i: {{ section.settings.menu.links.size }}" tabindex="-1">
+        {{ section.settings.texto_dm_movil | default: 'Pedir por Instagram DM →' }}
+      </a>
+    {%- endif -%}
+  </nav>
+  <p class="mm-foot">
+    {{ settings.direccion }}<br>
+    {{ settings.horario }}
+  </p>
+</div>
+
+{% schema %}
+{
+  "name": "Cabecera",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Marca"
+    },
+    {
+      "type": "image_picker",
+      "id": "logo",
+      "label": "Logo",
+      "info": "Si lo dejas vacío se usa el loto dibujado y el nombre en texto, que es como está hoy la web."
+    },
+    {
+      "type": "range",
+      "id": "ancho_logo",
+      "min": 60,
+      "max": 260,
+      "step": 10,
+      "unit": "px",
+      "label": "Ancho del logo",
+      "default": 140
+    },
+    {
+      "type": "text",
+      "id": "marca",
+      "label": "Nombre grande",
+      "default": "BLOOM"
+    },
+    {
+      "type": "text",
+      "id": "marca_by_cursiva",
+      "label": "Palabra en cursiva",
+      "default": "by",
+      "info": "Se pinta con la letra manuscrita de la marca."
+    },
+    {
+      "type": "text",
+      "id": "marca_by",
+      "label": "Nombre pequeño",
+      "default": "MADELINE"
+    },
+    {
+      "type": "header",
+      "content": "Navegación"
+    },
+    {
+      "type": "link_list",
+      "id": "menu",
+      "label": "Menú",
+      "default": "main-menu"
+    },
+    {
+      "type": "header",
+      "content": "Botón de Instagram"
+    },
+    {
+      "type": "url",
+      "id": "url_dm",
+      "label": "Enlace al DM de Instagram",
+      "info": "Déjalo vacío para quitar el botón."
+    },
+    {
+      "type": "text",
+      "id": "texto_dm",
+      "label": "Texto del botón",
+      "default": "Pedir por DM"
+    },
+    {
+      "type": "text",
+      "id": "texto_dm_movil",
+      "label": "Texto en el menú móvil",
+      "default": "Pedir por Instagram DM →"
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,85 @@
+{%- comment -%}
+  La rejilla de Instagram.
+
+  NO es un feed en vivo, y es una decisión, no una limitación que se nos haya
+  pasado: la API de Instagram exige una app revisada por Meta y un token que
+  caduca cada 60 días. Una rejilla que se rompe sola cada dos meses en la portada
+  de una tienda es peor que cuatro fotos elegidas a mano.
+
+  Las fotos se suben desde el editor de temas y llevan al perfil.
+{%- endcomment -%}
+
+{%- assign perfil = 'https://www.instagram.com/' | append: settings.instagram | remove: '@' | append: '/' -%}
+
+<section class="section instagram">
+  <div class="ig-head reveal">
+    {%- if section.settings.antetitulo != blank -%}
+      <p class="overline">{{ section.settings.antetitulo }}</p>
+    {%- endif -%}
+    {%- if section.settings.titulo != blank -%}
+      <h2>{%- render 'con-formato', texto: section.settings.titulo, cursiva_serif: true -%}</h2>
+    {%- endif -%}
+    {%- if section.settings.subtitulo != blank -%}
+      <p class="ig-sub">{%- render 'con-formato', texto: section.settings.subtitulo -%}</p>
+    {%- endif -%}
+  </div>
+
+  <div class="ig-grid">
+    {%- for bloque in section.blocks -%}
+      <a class="reveal" href="{{ perfil }}" target="_blank" rel="noopener" {{ bloque.shopify_attributes }}>
+        {%- if bloque.settings.foto != blank -%}
+          <img src="{{ bloque.settings.foto | image_url: width: 600 }}"
+               alt="{{ bloque.settings.alt | escape }}"
+               width="{{ bloque.settings.foto.width }}" height="{{ bloque.settings.foto.height }}"
+               loading="lazy">
+        {%- else -%}
+          {%- comment -%} Respaldo: las fotos reales viajan como recursos del tema. {%- endcomment -%}
+          <img src="{{ bloque.settings.respaldo | default: 'post-02-tendencia.jpg' | asset_url }}"
+               alt="{{ bloque.settings.alt | escape }}" loading="lazy">
+        {%- endif -%}
+      </a>
+    {%- endfor -%}
+  </div>
+
+  {%- if section.settings.boton != blank -%}
+    <div class="ig-cta reveal">
+      <a class="btn btn-ink" href="{{ perfil }}" target="_blank" rel="noopener">{{ section.settings.boton }}</a>
+    </div>
+  {%- endif -%}
+</section>
+
+{% schema %}
+{
+  "name": "Instagram",
+  "tag": "div",
+  "settings": [
+    { "type": "text", "id": "antetitulo", "label": "Antetítulo", "default": "Síguenos" },
+    { "type": "text", "id": "titulo", "label": "Título", "default": "*Enamórate* en Instagram" },
+    { "type": "textarea", "id": "subtitulo", "label": "Subtítulo", "default": "Únete a más de **2,880 seguidoras** que ven las nuevas llegadas antes que nadie." },
+    { "type": "text", "id": "boton", "label": "Botón", "default": "Seguir en Instagram" }
+  ],
+  "blocks": [
+    {
+      "type": "foto",
+      "name": "Foto",
+      "limit": 8,
+      "settings": [
+        { "type": "image_picker", "id": "foto", "label": "Foto" },
+        { "type": "text", "id": "alt", "label": "Descripción de la foto", "default": "Publicación de Instagram de Bloom by Madeline" },
+        { "type": "text", "id": "respaldo", "label": "Foto de respaldo del tema", "info": "Solo si no eliges foto. Nombre del archivo dentro de assets/." }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Instagram",
+      "blocks": [
+        { "type": "foto", "settings": { "alt": "Publicación de Instagram: set de lunares", "respaldo": "post-02-tendencia.jpg" } },
+        { "type": "foto", "settings": { "alt": "Publicación de Instagram: top de plumas lila", "respaldo": "post-08-look-perfecto.jpg" } },
+        { "type": "foto", "settings": { "alt": "Publicación de Instagram: vestido naranja", "respaldo": "post-10-vestido-orange.jpg" } },
+        { "type": "foto", "settings": { "alt": "Publicación de Instagram: vestido durazno", "respaldo": "post-12-vestido-coral.jpg" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

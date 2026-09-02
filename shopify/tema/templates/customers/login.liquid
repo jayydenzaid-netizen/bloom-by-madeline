@@ -1,0 +1,81 @@
+{%- comment -%}
+  Entrar a la cuenta, y recuperar la contraseña.
+
+  Las dos cosas viven en la MISMA plantilla porque Shopify no tiene una página
+  aparte para recuperar: `routes.account_recover_url` es esta misma dirección con
+  `#recover` detrás. Por eso los dos bloques se alternan con `:target` en CSS y no
+  con JavaScript — quien llegue con el enlace del correo ve el formulario
+  correcto aunque el script no haya cargado.
+
+  Ojo: si la tienda usa las cuentas NUEVAS de Shopify (entrar con un código por
+  correo, que es lo que viene activado por defecto), esta plantilla no se pinta
+  nunca. Está para cuando se usan las cuentas clásicas.
+{%- endcomment -%}
+
+<div class="shop-page section cuenta">
+  {%- comment -%}
+    El bloque de recuperar va PRIMERO en el HTML a propósito: así puede esconder
+    al de entrar con un selector de hermano posterior (`~`), que solo mira hacia
+    abajo. Al revés no habría forma de hacerlo sin JavaScript.
+  {%- endcomment -%}
+  <div id="recuperar" class="cuenta-panel-recuperar">
+    <div class="cat-intro">
+      <h1 class="cat-titulo">{{ 'cuenta.recuperar' | t }}</h1>
+      <p class="cat-pista">{{ 'cuenta.recuperar_texto' | t }}</p>
+    </div>
+
+    <div class="cuenta-form">
+      {%- form 'recover_customer_password' -%}
+        {%- if form.errors -%}
+          <p class="co-err">{{ form.errors | default_errors }}</p>
+        {%- elsif form.posted_successfully? -%}
+          <p class="cart-hint">{{ 'cuenta.recuperar_texto' | t }}</p>
+        {%- endif -%}
+
+        <div class="co-field">
+          <label class="co-label" for="correo-recuperar">{{ 'cuenta.correo' | t }}</label>
+          <input id="correo-recuperar" type="email" name="email" autocomplete="email" required>
+        </div>
+
+        <button class="btn btn-ink" type="submit">{{ 'cuenta.enviar_enlace' | t }}</button>
+
+        <div class="cuenta-enlaces">
+          <a href="{{ routes.account_login_url }}#entrar">{{ 'cuenta.volver_a_entrar' | t }}</a>
+        </div>
+      {%- endform -%}
+    </div>
+  </div>
+
+  <div id="entrar" class="cuenta-panel-entrar">
+    <div class="cat-intro">
+      <h1 class="cat-titulo">{{ 'cuenta.entrar' | t }}</h1>
+    </div>
+
+    <div class="cuenta-form">
+      {%- form 'customer_login', novalidate: 'novalidate' -%}
+        {%- if form.errors -%}
+          <p class="co-err">{{ form.errors | default_errors }}</p>
+        {%- endif -%}
+
+        <div class="co-field">
+          <label class="co-label" for="correo">{{ 'cuenta.correo' | t }}</label>
+          <input id="correo" type="email" name="customer[email]" autocomplete="email" required>
+        </div>
+
+        {%- if form.password_needed -%}
+          <div class="co-field">
+            <label class="co-label" for="clave">{{ 'cuenta.contrasena' | t }}</label>
+            <input id="clave" type="password" name="customer[password]" autocomplete="current-password" required>
+          </div>
+        {%- endif -%}
+
+        <button class="btn btn-ink" type="submit">{{ 'cuenta.entrar' | t }}</button>
+
+        <div class="cuenta-enlaces">
+          <a href="#recuperar">{{ 'cuenta.olvide' | t }}</a>
+          <a href="{{ routes.account_register_url }}">{{ 'cuenta.crear_cuenta' | t }}</a>
+        </div>
+      {%- endform -%}
+    </div>
+  </div>
+</div>

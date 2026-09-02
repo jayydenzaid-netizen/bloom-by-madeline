@@ -1,0 +1,44 @@
+{%- comment -%}
+  El titular grande del hero: un <span class="line"> por renglón.
+
+  Parámetros:
+    texto  (obligatorio)  con un salto de línea por renglón
+
+  Los `.line` no son decoración: el CSS los usa para la animación de entrada
+  escalonada (cada renglón sube con un retardo distinto). Meter el titular en un
+  solo span mataría ese efecto, que es el remate visual de la portada.
+
+  Una línea marcada ENTERA entre asteriscos («*casual elegante.*») se pinta en la
+  cursiva serif dentro de su propio span, que es como está hoy en producción.
+{%- endcomment -%}
+
+{%- assign renglones = texto | split: '
+' -%}
+{%- for renglon in renglones -%}
+  {%- liquid
+    assign limpio = renglon | strip
+    assign entera = false
+    if limpio.size > 2
+      assign primero = limpio | slice: 0, 1
+      assign ultimo = limpio | slice: -1, 1
+      comment
+        El largo se calcula APARTE. Encadenado (`slice: 1, limpio.size | minus: 2`)
+        Liquid aplicaría el `minus` al resultado del slice, no al tamaño.
+      endcomment
+      assign largo_interior = limpio.size | minus: 2
+      assign interior = limpio | slice: 1, largo_interior
+      if primero == '*' and ultimo == '*'
+        unless interior contains '*'
+          assign entera = true
+        endunless
+      endif
+    endif
+  -%}
+  <span class="line">
+    {%- if entera -%}
+      <span class="serif-it">{{ interior | escape }}</span>
+    {%- else -%}
+      <span>{%- render 'con-formato', texto: renglon, cursiva_serif: true -%}</span>
+    {%- endif -%}
+  </span>
+{%- endfor -%}

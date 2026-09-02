@@ -1,0 +1,55 @@
+{%- comment -%}
+  Índice del blog. Existe para que las direcciones /blogs/... no den 404 y para
+  que Madeline pueda escribir si quiere (guías de tallas, cómo combinar una
+  pieza). Usa la misma rejilla que el catálogo.
+{%- endcomment -%}
+
+{%- paginate blog.articles by 12 -%}
+  <div class="shop-page section">
+    <div class="cat-intro">
+      <h1 class="cat-titulo">{{ blog.title }}</h1>
+    </div>
+
+    <div class="product-grid">
+      {%- for articulo in blog.articles -%}
+        <a class="product" href="{{ articulo.url }}">
+          <figure>
+            {%- if articulo.image -%}
+              <img src="{{ articulo.image | image_url: width: 700 }}"
+                   alt="{{ articulo.image.alt | default: articulo.title | escape }}" loading="lazy">
+            {%- else -%}
+              <span class="pc-noimg" aria-hidden="true"></span>
+            {%- endif -%}
+            <figcaption><span>{{ 'blog.leer' | t }}</span></figcaption>
+          </figure>
+          <h3>{{ articulo.title }}</h3>
+          <p class="product-meta">{{ articulo.published_at | date: '%-d de %B de %Y' }}</p>
+        </a>
+      {%- endfor -%}
+    </div>
+
+    {%- if paginate.pages > 1 -%}
+      <nav class="cat-pag" aria-label="{{ 'catalogo.paginacion' | t }}">
+        {%- if paginate.previous -%}<a class="cat-pag-flecha" href="{{ paginate.previous.url }}">←</a>{%- endif -%}
+        <span class="cat-pag-nums">
+          {%- for parte in paginate.parts -%}
+            {%- if parte.is_link -%}
+              <a class="cat-pag-num" href="{{ parte.url }}">{{ parte.title }}</a>
+            {%- else -%}
+              <span class="cat-pag-num sel">{{ parte.title }}</span>
+            {%- endif -%}
+          {%- endfor -%}
+        </span>
+        {%- if paginate.next -%}<a class="cat-pag-flecha" href="{{ paginate.next.url }}">→</a>{%- endif -%}
+      </nav>
+    {%- endif -%}
+  </div>
+{%- endpaginate -%}
+
+{% schema %}
+{
+  "name": "Blog",
+  "tag": "div",
+  "settings": []
+}
+{% endschema %}

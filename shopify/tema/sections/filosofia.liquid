@@ -1,0 +1,91 @@
+{%- comment -%}
+  «02 — Nuestra Filosofía». Sección oscura: el CSS le da fondo `--ink`, por eso
+  el antetítulo lleva `overline-light` en vez de `overline`.
+
+  El texto son dos párrafos en un solo campo, separados por una línea en blanco:
+  la frase corta entre paréntesis arriba y el párrafo largo debajo. Se parte aquí
+  y no en dos campos para que quien escriba vea el bloque completo tal cual se
+  lee en la página.
+{%- endcomment -%}
+
+{%- liquid
+  assign parrafos = section.settings.texto | strip | split: '
+
+'
+  assign intro = parrafos[0]
+  assign resto = ''
+  for p in parrafos offset: 1
+    if resto == ''
+      assign resto = p
+    else
+      assign resto = resto | append: '
+' | append: p
+    endif
+  endfor
+-%}
+
+<section class="section filosofia" id="filosofia">
+  <div class="filosofia-grid">
+    <div class="filosofia-copy">
+      {%- if section.settings.antetitulo != blank -%}
+        <p class="overline overline-light reveal">{{ section.settings.antetitulo }}</p>
+      {%- endif -%}
+      {%- if section.settings.titulo != blank -%}
+        <h2 class="reveal">{%- render 'con-formato', texto: section.settings.titulo, cursiva_serif: true -%}</h2>
+      {%- endif -%}
+      {%- if intro != blank -%}
+        <p class="filosofia-sub reveal">{%- render 'con-formato', texto: intro -%}</p>
+      {%- endif -%}
+      {%- if resto != blank -%}
+        <p class="filosofia-text reveal">{%- render 'con-formato', texto: resto -%}</p>
+      {%- endif -%}
+    </div>
+
+    {%- if section.blocks.size > 0 -%}
+      <ol class="filosofia-list">
+        {%- for bloque in section.blocks -%}
+          <li class="reveal" {{ bloque.shopify_attributes }}>
+            <span>{{ forloop.index | prepend: '0' | slice: -2, 2 }}</span>{{ bloque.settings.palabra }}
+          </li>
+        {%- endfor -%}
+      </ol>
+    {%- endif -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Filosofía",
+  "tag": "div",
+  "settings": [
+    { "type": "text", "id": "antetitulo", "label": "Antetítulo", "default": "02 — Nuestra Filosofía" },
+    { "type": "text", "id": "titulo", "label": "Título", "default": "Vestir con *intención*" },
+    {
+      "type": "textarea",
+      "id": "texto",
+      "label": "Texto",
+      "default": "(No es moda… es presencia.)\n\nEn Bloom no seguimos tendencias por seguirlas. Seleccionamos cada pieza pensando en la mujer que la va a llevar: su día, su cuerpo, su momento. Porque cuando te vistes con intención, no entras a un lugar — *floreces en él*.",
+      "info": "Deja una línea en blanco entre la frase corta y el párrafo largo."
+    }
+  ],
+  "blocks": [
+    {
+      "type": "palabra",
+      "name": "Palabra",
+      "limit": 6,
+      "settings": [{ "type": "text", "id": "palabra", "label": "Palabra", "default": "Intención" }]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Filosofía",
+      "blocks": [
+        { "type": "palabra", "settings": { "palabra": "Coherencia" } },
+        { "type": "palabra", "settings": { "palabra": "Identidad" } },
+        { "type": "palabra", "settings": { "palabra": "Presencia" } },
+        { "type": "palabra", "settings": { "palabra": "Intención" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

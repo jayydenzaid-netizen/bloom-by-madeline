@@ -1,0 +1,29 @@
+{%- comment -%}
+  Tarjeta de regalo. Shopify la genera sola cuando se vende una; esta plantilla
+  solo la presenta con la cara de la marca.
+{%- endcomment -%}
+{% layout 'password' %}
+
+<div class="password-pantalla">
+  <svg class="brand-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+  <p class="footer-bloom">B&thinsp;L&thinsp;O&thinsp;O&thinsp;M</p>
+  <p class="footer-by"><em>by</em> MADELINE</p>
+
+  <h1 style="margin-top:24px">Tarjeta de regalo</h1>
+  <p style="font-size:34px;font-family:var(--serif);font-style:italic">
+    {{ gift_card.balance | money }}
+  </p>
+
+  {%- if gift_card.enabled == false or gift_card.expired -%}
+    <p class="co-err">Esta tarjeta ya no está activa.</p>
+  {%- else -%}
+    <img src="{{ gift_card.qr_identifier | default: gift_card.code }}" alt="" hidden>
+    <p style="letter-spacing:.28em;font-size:19px;border:1px solid var(--line);padding:14px 22px">
+      {{ gift_card.code | format_code }}
+    </p>
+    {%- if gift_card.expires_on -%}
+      <p style="color:var(--stone);font-size:14px">Válida hasta el {{ gift_card.expires_on | date: '%-d/%-m/%Y' }}</p>
+    {%- endif -%}
+    <a class="btn btn-ink" href="{{ shop.url }}">Usarla en la tienda</a>
+  {%- endif -%}
+</div>

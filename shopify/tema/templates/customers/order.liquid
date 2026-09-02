@@ -1,0 +1,60 @@
+{%- comment -%} Un pedido concreto de la clienta, con su seguimiento. {%- endcomment -%}
+
+<div class="shop-page section cuenta">
+  <div class="cat-intro">
+    <h1 class="cat-titulo">{{ order.name }}</h1>
+    <p class="cat-pista">{{ order.created_at | date: '%-d de %B de %Y' }}</p>
+  </div>
+
+  <table class="cuenta-tabla">
+    <thead>
+      <tr>
+        <th>{{ 'cuenta.articulo' | t }}</th>
+        <th>{{ 'cuenta.cantidad' | t }}</th>
+        <th>{{ 'cuenta.precio' | t }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {%- for linea in order.line_items -%}
+        <tr>
+          <td>
+            {{ linea.title }}
+            {%- if linea.fulfillment -%}
+              <br><small>
+                {{ linea.fulfillment.tracking_company }}
+                {%- if linea.fulfillment.tracking_url -%}
+                  — <a href="{{ linea.fulfillment.tracking_url }}" target="_blank" rel="noopener">{{ linea.fulfillment.tracking_number }}</a>
+                {%- endif -%}
+              </small>
+            {%- elsif order.fulfillment_status != 'fulfilled' -%}
+              <br><small style="color:var(--stone)">{{ 'cuenta.sin_seguimiento' | t }}</small>
+            {%- endif -%}
+          </td>
+          <td>{{ linea.quantity }}</td>
+          <td>{{ linea.final_line_price | money }}</td>
+        </tr>
+      {%- endfor -%}
+    </tbody>
+    <tfoot>
+      <tr><td colspan="2">{{ 'cuenta.subtotal' | t }}</td><td>{{ order.line_items_subtotal_price | money }}</td></tr>
+      {%- for envio in order.shipping_methods -%}
+        <tr><td colspan="2">{{ envio.title }}</td><td>{{ envio.price | money }}</td></tr>
+      {%- endfor -%}
+      <tr><td colspan="2">{{ 'cuenta.impuestos' | t }}</td><td>{{ order.tax_price | money }}</td></tr>
+      <tr><td colspan="2"><strong>{{ 'cuenta.total' | t }}</strong></td><td><strong>{{ order.total_price | money }}</strong></td></tr>
+    </tfoot>
+  </table>
+
+  <div class="cuenta-direcciones" style="margin-top:36px">
+    <div class="cuenta-direccion">
+      <h3>{{ 'cuenta.direccion_envio' | t }}</h3>
+      {{ order.shipping_address | format_address }}
+    </div>
+    <div class="cuenta-direccion">
+      <h3>{{ 'cuenta.direccion_facturacion' | t }}</h3>
+      {{ order.billing_address | format_address }}
+    </div>
+  </div>
+
+  <p style="margin-top:28px"><a href="{{ routes.account_url }}">← {{ 'cuenta.mis_pedidos' | t }}</a></p>
+</div>

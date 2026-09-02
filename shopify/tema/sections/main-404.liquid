@@ -1,0 +1,29 @@
+{%- comment -%}
+  Página no encontrada.
+
+  No es un callejón sin salida: lleva de vuelta a la tienda y ofrece el DM. Que
+  alguien llegue aquí desde un enlace viejo de Instagram es lo normal, no la
+  excepción — y una de esas visitas todavía puede acabar en venta.
+{%- endcomment -%}
+
+<div class="shop-page section">
+  <div class="cat-vacio">
+    <svg class="cat-vacio-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+    <p class="cat-vacio-titulo">{{ 'errores.404_titulo' | t }}</p>
+    <p class="cat-vacio-sub">{{ 'errores.404_sub' | t }}</p>
+    <div class="visitanos-ctas">
+      <a class="btn btn-ink" href="{{ routes.all_products_collection_url }}">{{ 'carrito.ver_tienda' | t }}</a>
+      {%- if settings.url_dm != blank -%}
+        <a class="btn btn-ghost" href="{{ settings.url_dm }}" target="_blank" rel="noopener">{{ 'errores.404_dm' | t }}</a>
+      {%- endif -%}
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Página no encontrada",
+  "tag": "div",
+  "settings": []
+}
+{% endschema %}

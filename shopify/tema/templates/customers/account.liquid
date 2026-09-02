@@ -1,0 +1,52 @@
+{%- comment -%} Mis pedidos. {%- endcomment -%}
+
+<div class="shop-page section cuenta">
+  <div class="cat-intro">
+    <h1 class="cat-titulo">{{ 'cuenta.titulo' | t }}</h1>
+    <p class="cat-pista">{{ customer.name }} · {{ customer.email }}</p>
+  </div>
+
+  <div class="cuenta-enlaces" style="margin-bottom:32px">
+    <a href="{{ routes.account_addresses_url }}">{{ 'cuenta.direcciones' | t }}</a>
+    <a href="{{ routes.account_logout_url }}">{{ 'cuenta.salir' | t }}</a>
+  </div>
+
+  <h2 style="margin-bottom:20px">{{ 'cuenta.mis_pedidos' | t }}</h2>
+
+  {%- if customer.orders.size > 0 -%}
+    {%- paginate customer.orders by 20 -%}
+      <table class="cuenta-tabla">
+        <thead>
+          <tr>
+            <th>{{ 'cuenta.pedido' | t }}</th>
+            <th>{{ 'cuenta.fecha' | t }}</th>
+            <th>{{ 'cuenta.pago' | t }}</th>
+            <th>{{ 'cuenta.envio' | t }}</th>
+            <th>{{ 'cuenta.total' | t }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {%- for pedido in customer.orders -%}
+            <tr>
+              <td><a href="{{ pedido.customer_url }}">{{ pedido.name }}</a></td>
+              <td>{{ pedido.created_at | date: '%-d/%-m/%Y' }}</td>
+              <td>{{ pedido.financial_status_label }}</td>
+              <td>{{ pedido.fulfillment_status_label }}</td>
+              <td>{{ pedido.total_price | money }}</td>
+            </tr>
+          {%- endfor -%}
+        </tbody>
+      </table>
+
+      {%- if paginate.pages > 1 -%}
+        <nav class="cat-pag">
+          {%- if paginate.previous -%}<a class="cat-pag-flecha" href="{{ paginate.previous.url }}">←</a>{%- endif -%}
+          {%- if paginate.next -%}<a class="cat-pag-flecha" href="{{ paginate.next.url }}">→</a>{%- endif -%}
+        </nav>
+      {%- endif -%}
+    {%- endpaginate -%}
+  {%- else -%}
+    <p class="cat-vacio-sub">{{ 'cuenta.sin_pedidos' | t }}</p>
+    <a class="btn btn-ink" href="{{ routes.all_products_collection_url }}" style="margin-top:18px">{{ 'carrito.ver_tienda' | t }}</a>
+  {%- endif -%}
+</div>

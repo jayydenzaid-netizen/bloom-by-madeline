@@ -1,0 +1,57 @@
+{%- comment -%}
+  El mini-formato de los textos del escaparate.
+
+    salto de línea  →  renglón nuevo (<br>)
+    *algo*          →  cursiva  (la serif de la marca si es un titular)
+    **algo**        →  negrita
+
+  Parámetros:
+    texto           (obligatorio)
+    cursiva_serif   (opcional) true en titulares: la cursiva sale con la serif grande
+
+  POR QUÉ EXISTE teniendo Shopify campos de texto enriquecido: los titulares de
+  esta portada llevan un salto de línea deliberado por renglón («Elevamos / tu
+  estilo / casual elegante») y el editor de texto enriquecido de Shopify no
+  permite controlarlos. Con un textarea y estas tres marcas, quien escriba
+  controla exactamente dónde parte cada línea.
+
+  SEGURIDAD: el texto se escapa ANTES de tocar nada. Lo que se escriba en el
+  panel se pinta como texto, nunca como HTML, así que pegar algo desde otra web
+  no puede meter etiquetas en la página. El único HTML que sale de aquí es el
+  <br>, el <em> y el <strong> que genera este propio fichero.
+{%- endcomment -%}
+
+{%- liquid
+  assign fuente = texto | escape | newline_to_br
+
+  comment
+    Marcas internas: se usan caracteres que no aparecen en un texto normal de la
+    tienda. Si alguien los escribiera, lo peor que pasa es que se le pierda esa
+    marca — nunca se rompe el HTML, porque el texto ya está escapado.
+  endcomment
+  assign fuente = fuente | replace: '**', '‖N‖'
+  assign fuente = fuente | replace: '*', '‖C‖'
+
+  assign clase_cursiva = ''
+  if cursiva_serif
+    assign clase_cursiva = ' class="serif-it"'
+  endif
+-%}
+
+{%- assign bloques = fuente | split: '‖N‖' -%}
+{%- for bloque in bloques -%}
+  {%- assign en_negrita = forloop.index0 | modulo: 2 -%}
+  {%- if en_negrita == 1 -%}<strong>{%- endif -%}
+
+  {%- assign trozos = bloque | split: '‖C‖' -%}
+  {%- for trozo in trozos -%}
+    {%- assign en_cursiva = forloop.index0 | modulo: 2 -%}
+    {%- if en_cursiva == 1 -%}
+      <em{{ clase_cursiva }}>{{ trozo }}</em>
+    {%- else -%}
+      {{- trozo -}}
+    {%- endif -%}
+  {%- endfor -%}
+
+  {%- if en_negrita == 1 -%}</strong>{%- endif -%}
+{%- endfor -%}

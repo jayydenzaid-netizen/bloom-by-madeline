@@ -1,0 +1,172 @@
+{%- comment -%}
+  Catálogo: la rejilla de una colección con sus filtros y su paginación.
+
+  Los filtros son los de Shopify (Tienda online → Navegación → Filtros, o la app
+  Search & Discovery). Se pintan como un <form> normal con GET: se puede filtrar
+  sin JavaScript y cada combinación de filtros tiene su propia dirección, que es
+  lo que permite compartir «vestidos talla M» por DM.
+
+  La rejilla usa la misma tarjeta que la portada, así que las piezas se ven igual
+  en los dos sitios sin duplicar marcado.
+{%- endcomment -%}
+
+{%- paginate collection.products by section.settings.por_pagina -%}
+  <div class="shop-page section">
+    <div class="cat-intro">
+      <h1 class="cat-titulo">
+        {%- if collection.handle == 'all' -%}
+          {{ 'catalogo.toda_la' | t }} <span class="serif-it">{{ 'catalogo.tienda' | t }}</span>
+        {%- else -%}
+          {{ collection.title }}
+        {%- endif -%}
+      </h1>
+      {%- if collection.description != blank -%}
+        <div class="cat-pista rte">{{ collection.description }}</div>
+      {%- endif -%}
+    </div>
+
+    <div class="cat-layout">
+      {%- comment -%} ── Filtros ─────────────────────────────────────────── {%- endcomment -%}
+      <aside class="cat-filtros">
+        <button class="cat-toggle" type="button" data-abrir-filtros aria-expanded="false">
+          {{ 'catalogo.filtrar' | t }}
+        </button>
+
+        <form class="cat-panel" data-panel-filtros>
+          {%- comment -%}
+            El orden actual se conserva al filtrar: sin este campo oculto, tocar
+            un filtro devolvería la lista al orden por defecto y parecería que se
+            ha perdido lo que la clienta había elegido.
+          {%- endcomment -%}
+          {%- if collection.sort_by != blank -%}
+            <input type="hidden" name="sort_by" value="{{ collection.sort_by }}">
+          {%- endif -%}
+
+          {%- for filtro in collection.filters -%}
+            <div class="cat-bloque">
+              <p class="lb-talla-label">{{ filtro.label }}</p>
+
+              {%- case filtro.type -%}
+                {%- when 'list' -%}
+                  <div class="cat-chips">
+                    {%- for valor in filtro.values -%}
+                      <input class="visualmente-oculto" type="checkbox"
+                             id="f-{{ filtro.param_name | escape }}-{{ forloop.index }}"
+                             name="{{ valor.param_name }}" value="{{ valor.value | escape }}"
+                             {% if valor.active %}checked{% endif %}
+                             {% if valor.count == 0 and valor.active == false %}disabled{% endif %}>
+                      <label class="cat-op{% if valor.active %} sel{% endif %}"
+                             for="f-{{ filtro.param_name | escape }}-{{ forloop.index }}">
+                        {{ valor.label }} <em>{{ valor.count }}</em>
+                      </label>
+                    {%- endfor -%}
+                  </div>
+
+                {%- when 'price_range' -%}
+                  <div class="cat-precio">
+                    <label>
+                      <span class="visualmente-oculto">{{ 'catalogo.precio_min' | t }}</span>
+                      <input type="number" name="{{ filtro.min_value.param_name }}" inputmode="decimal"
+                             placeholder="{{ 'catalogo.min' | t }}"
+                             {% if filtro.min_value.value %}value="{{ filtro.min_value.value | money_without_currency | replace: ',', '' }}"{% endif %}
+                             min="0" max="{{ filtro.range_max | money_without_currency | replace: ',', '' }}">
+                    </label>
+                    <span aria-hidden="true">—</span>
+                    <label>
+                      <span class="visualmente-oculto">{{ 'catalogo.precio_max' | t }}</span>
+                      <input type="number" name="{{ filtro.max_value.param_name }}" inputmode="decimal"
+                             placeholder="{{ 'catalogo.max' | t }}"
+                             {% if filtro.max_value.value %}value="{{ filtro.max_value.value | money_without_currency | replace: ',', '' }}"{% endif %}
+                             min="0" max="{{ filtro.range_max | money_without_currency | replace: ',', '' }}">
+                    </label>
+                  </div>
+              {%- endcase -%}
+            </div>
+          {%- endfor -%}
+
+          <div class="cat-bloque">
+            <p class="lb-talla-label">{{ 'catalogo.ordenar' | t }}</p>
+            <select class="cat-chip-ancho" name="sort_by" data-orden>
+              {%- for opcion in collection.sort_options -%}
+                <option value="{{ opcion.value }}" {% if opcion.value == collection.sort_by %}selected{% endif %}>
+                  {{ opcion.name }}
+                </option>
+              {%- endfor -%}
+            </select>
+          </div>
+
+          <button class="btn btn-ink btn-sm cat-aplicar" type="submit">{{ 'catalogo.aplicar' | t }}</button>
+          {%- if collection.filters.size > 0 -%}
+            <a class="cat-limpiar" href="{{ collection.url }}">{{ 'catalogo.limpiar' | t }}</a>
+          {%- endif -%}
+        </form>
+      </aside>
+
+      {%- comment -%} ── Resultados ──────────────────────────────────────── {%- endcomment -%}
+      <div class="cat-resultados">
+        <p class="cat-conteo">
+          {{ 'catalogo.piezas' | t: count: collection.products_count }}
+        </p>
+
+        {%- if collection.products.size > 0 -%}
+          <div class="product-grid cat-lista">
+            {%- for producto in collection.products -%}
+              {%- assign ansioso = false -%}
+              {%- if forloop.index <= 4 and paginate.current_page == 1 -%}{%- assign ansioso = true -%}{%- endif -%}
+              {%- render 'tarjeta-producto', producto: producto, ansioso: ansioso -%}
+            {%- endfor -%}
+          </div>
+
+          {%- if paginate.pages > 1 -%}
+            <nav class="cat-pag" aria-label="{{ 'catalogo.paginacion' | t }}">
+              {%- if paginate.previous -%}
+                <a class="cat-pag-flecha" href="{{ paginate.previous.url }}" aria-label="{{ 'catalogo.anterior' | t }}">←</a>
+              {%- endif -%}
+
+              <span class="cat-pag-nums">
+                {%- for parte in paginate.parts -%}
+                  {%- if parte.is_link -%}
+                    <a class="cat-pag-num" href="{{ parte.url }}">{{ parte.title }}</a>
+                  {%- elsif parte.title == '&hellip;' -%}
+                    <span class="cat-pag-hueco">…</span>
+                  {%- else -%}
+                    <span class="cat-pag-num sel" aria-current="page">{{ parte.title }}</span>
+                  {%- endif -%}
+                {%- endfor -%}
+              </span>
+
+              {%- if paginate.next -%}
+                <a class="cat-pag-flecha" href="{{ paginate.next.url }}" aria-label="{{ 'catalogo.siguiente' | t }}">→</a>
+              {%- endif -%}
+            </nav>
+          {%- endif -%}
+        {%- else -%}
+          <div class="cat-vacio">
+            <svg class="cat-vacio-lotus" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+            <p class="cat-vacio-titulo">{{ 'catalogo.vacio_titulo' | t }}</p>
+            <p class="cat-vacio-sub">{{ 'catalogo.vacio_sub' | t }}</p>
+            <a class="btn btn-ink" href="{{ collection.url }}">{{ 'catalogo.limpiar' | t }}</a>
+          </div>
+        {%- endif -%}
+      </div>
+    </div>
+  </div>
+{%- endpaginate -%}
+
+{% schema %}
+{
+  "name": "Catálogo",
+  "tag": "div",
+  "settings": [
+    {
+      "type": "range",
+      "id": "por_pagina",
+      "min": 8,
+      "max": 48,
+      "step": 4,
+      "label": "Piezas por página",
+      "default": 24
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,123 @@
+{%- comment -%}
+  «05 — Visítanos»: la ficha de la tienda física con su mapa.
+
+  La dirección y el horario se parten por su separador (coma y punto medio) para
+  conservar las dos líneas del diseño original sin obligar a escribirlos con un
+  formato concreto en los ajustes.
+
+  El mapa es un iframe de OpenStreetMap y no de Google Maps por una razón
+  práctica: el embed de Google necesita una clave de API con facturación activada.
+  El botón «Cómo llegar» SÍ abre Google Maps, que es lo que la gente usa para
+  conducir.
+{%- endcomment -%}
+
+{%- liquid
+  assign partes_dir = settings.direccion | split: ','
+  assign dir_1 = partes_dir[0] | strip
+  assign dir_2 = ''
+  for parte in partes_dir offset: 1
+    if dir_2 == ''
+      assign dir_2 = parte | strip
+    else
+      assign dir_2 = dir_2 | append: ', ' | append: parte | strip
+    endif
+  endfor
+
+  assign partes_hora = settings.horario | split: '·'
+  assign hora_1 = partes_hora[0] | strip
+  assign hora_2 = ''
+  for parte in partes_hora offset: 1
+    if hora_2 == ''
+      assign hora_2 = parte | strip
+    else
+      assign hora_2 = hora_2 | append: ' · ' | append: parte | strip
+    endif
+  endfor
+
+  assign consulta_mapa = settings.direccion | url_encode
+  assign url_google = 'https://www.google.com/maps/search/?api=1&query=' | append: consulta_mapa
+-%}
+
+<section class="section visitanos" id="visitanos">
+  <div class="visitanos-grid">
+    <div class="visitanos-card reveal">
+      {%- if section.settings.antetitulo != blank -%}
+        <p class="overline">{{ section.settings.antetitulo }}</p>
+      {%- endif -%}
+      {%- if section.settings.titulo != blank -%}
+        <h2>{%- render 'con-formato', texto: section.settings.titulo, cursiva_serif: true -%}</h2>
+      {%- endif -%}
+
+      <dl class="visitanos-info">
+        <div>
+          <dt>{{ 'portada.direccion' | t }}</dt>
+          <dd>{{ dir_1 }}{% if dir_2 != '' %}<br>{{ dir_2 }}{% endif %}</dd>
+        </div>
+        <div>
+          <dt>{{ 'portada.horario' | t }}</dt>
+          <dd>{{ hora_1 }}{% if hora_2 != '' %}<br>{{ hora_2 }}{% endif %}</dd>
+        </div>
+        {%- if settings.instagram != blank -%}
+          <div>
+            <dt>{{ 'portada.pedidos_envios' | t }}</dt>
+            <dd>Instagram DM<br>@{{ settings.instagram | remove: '@' }}</dd>
+          </div>
+        {%- endif -%}
+      </dl>
+
+      <div class="visitanos-ctas">
+        <a class="btn btn-ink" href="{{ url_google }}" target="_blank" rel="noopener">
+          {{ section.settings.boton_mapa | default: 'Cómo llegar' }}
+        </a>
+        {%- if settings.url_dm != blank -%}
+          <a class="btn btn-ghost" href="{{ settings.url_dm }}" target="_blank" rel="noopener">
+            {{ section.settings.boton_dm | default: 'Enviar DM' }}
+          </a>
+        {%- endif -%}
+      </div>
+
+      {%- if section.settings.nota != blank -%}
+        <p class="visitanos-note">{%- render 'con-formato', texto: section.settings.nota -%}</p>
+      {%- endif -%}
+    </div>
+
+    {%- if section.settings.mapa_embed != blank -%}
+      <a class="visitanos-map reveal" href="{{ url_google }}" target="_blank" rel="noopener"
+         aria-label="{{ 'portada.abrir_en_mapas' | t }}: {{ settings.direccion | escape }}">
+        <iframe
+          title="{{ 'portada.mapa_de' | t }} {{ shop.name | escape }}"
+          src="{{ section.settings.mapa_embed }}"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"></iframe>
+        <span class="map-pin" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/>
+          </svg>
+        </span>
+        <span class="map-cta">{{ 'portada.ver_en_el_mapa' | t }} →</span>
+      </a>
+    {%- endif -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Visítanos",
+  "tag": "div",
+  "settings": [
+    { "type": "text", "id": "antetitulo", "label": "Antetítulo", "default": "05 — Visítanos" },
+    { "type": "text", "id": "titulo", "label": "Título", "default": "Te esperamos\nen *Hamilton*" },
+    { "type": "textarea", "id": "nota", "label": "Nota", "default": "El horario puede variar — confírmalo siempre en nuestro Instagram." },
+    { "type": "text", "id": "boton_mapa", "label": "Botón del mapa", "default": "Cómo llegar" },
+    { "type": "text", "id": "boton_dm", "label": "Botón del DM", "default": "Enviar DM" },
+    {
+      "type": "textarea",
+      "id": "mapa_embed",
+      "label": "Dirección del mapa incrustado",
+      "default": "https://www.openstreetmap.org/export/embed.html?bbox=-84.5585%2C39.3769%2C-84.5425%2C39.3869&layer=mapnik",
+      "info": "Déjalo vacío para quitar el mapa. Si cambias de local, sácalo de openstreetmap.org → Compartir → HTML. Un mapa que apunta a otra calle es peor que no tener mapa."
+    }
+  ],
+  "presets": [{ "name": "Visítanos" }]
+}
+{% endschema %}

@@ -1,0 +1,26 @@
+{%- comment -%}
+  La cita a pantalla completa entre secciones. Es puro respiro visual: rompe el
+  ritmo de rejillas y deja al ojo descansar antes de la siguiente sección.
+{%- endcomment -%}
+
+<section class="quote">
+  <svg class="quote-lotus reveal" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+  <blockquote class="reveal">{%- render 'con-formato', texto: section.settings.texto -%}</blockquote>
+</section>
+
+{% schema %}
+{
+  "name": "Cita",
+  "tag": "div",
+  "settings": [
+    {
+      "type": "textarea",
+      "id": "texto",
+      "label": "La cita",
+      "default": "« Cada prenda cuenta una historia…\n*haz que la tuya brille con estilo.* »",
+      "info": "Lo que va entre *asteriscos* sale en la cursiva elegante."
+    }
+  ],
+  "presets": [{ "name": "Cita" }]
+}
+{% endschema %}

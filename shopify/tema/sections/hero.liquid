@@ -1,0 +1,188 @@
+{%- comment -%}
+  El hero de la portada, portado renglón a renglón del sitio actual.
+
+  Detalles que parecen menores y no lo son:
+
+  · Los hijos de `.hero-copy` NO se pueden envolver en más divs. En móvil
+    `.hero-copy` es `display: contents` y sus hijos se reordenan para que la FOTO
+    aparezca antes del párrafo largo; un div intermedio rompe ese orden.
+  · La cinta va DENTRO de este mismo <section>, como en el original.
+  · El texto de la cinta se duplica exacto: la animación desplaza el carril un
+    50%, y sin la lista repetida el bucle daría un salto visible al reiniciarse.
+  · La insignia circular necesita un id único por sección para el <textPath>; si
+    se repitiera, todas las insignias de la página seguirían al primer círculo.
+{%- endcomment -%}
+
+{%- liquid
+  assign foto_principal = section.settings.foto
+  assign foto_polaroid = section.settings.foto_pequena
+  assign id_circulo = 'circulo-' | append: section.id
+-%}
+
+<section class="hero">
+  <svg class="hero-watermark" viewBox="0 0 120 104" aria-hidden="true"><use href="#lotus"/></svg>
+
+  <div class="hero-grid">
+    <div class="hero-copy">
+      {%- if section.settings.antetitulo != blank -%}
+        <p class="overline reveal">{{ section.settings.antetitulo }}</p>
+      {%- endif -%}
+
+      <h1 class="hero-title">{%- render 'titular-lineas', texto: section.settings.titulo -%}</h1>
+
+      {%- if section.settings.parrafo != blank -%}
+        <p class="hero-sub reveal">{%- render 'con-formato', texto: section.settings.parrafo -%}</p>
+      {%- endif -%}
+
+      <div class="hero-ctas reveal">
+        {%- if section.settings.boton_texto != blank -%}
+          <a class="btn btn-ink" href="{{ section.settings.boton_url | default: routes.all_products_collection_url }}">
+            {{ section.settings.boton_texto }}
+          </a>
+        {%- endif -%}
+        {%- if section.settings.boton2_texto != blank and section.settings.boton2_url != blank -%}
+          <a class="btn btn-ghost" href="{{ section.settings.boton2_url }}" target="_blank" rel="noopener">
+            {{ section.settings.boton2_texto }}
+          </a>
+        {%- endif -%}
+      </div>
+
+      {%- if section.blocks.size > 0 -%}
+        <ul class="hero-stats reveal">
+          {%- for bloque in section.blocks -%}
+            {%- if bloque.type == 'dato' -%}
+              <li {{ bloque.shopify_attributes }}>
+                <strong>{{ bloque.settings.valor }}</strong>
+                <span>{{ bloque.settings.etiqueta }}</span>
+              </li>
+            {%- endif -%}
+          {%- endfor -%}
+        </ul>
+      {%- endif -%}
+    </div>
+
+    <div class="hero-visual">
+      <figure class="hero-arch" data-parallax="0.06">
+        {%- if foto_principal != blank -%}
+          <img src="{{ foto_principal | image_url: width: 1200 }}"
+               srcset="{{ foto_principal | image_url: width: 600 }} 600w,
+                       {{ foto_principal | image_url: width: 1200 }} 1200w"
+               sizes="(max-width: 900px) 92vw, 46vw"
+               alt="{{ section.settings.foto_alt | escape }}"
+               width="{{ foto_principal.width }}" height="{{ foto_principal.height }}"
+               loading="eager" fetchpriority="high">
+        {%- else -%}
+          <img src="{{ 'post-03-vestido-negro-olivo.jpg' | asset_url }}"
+               alt="{{ section.settings.foto_alt | escape }}" loading="eager" fetchpriority="high">
+        {%- endif -%}
+      </figure>
+
+      <figure class="hero-polaroid" data-parallax="0.12">
+        {%- if foto_polaroid != blank -%}
+          <img src="{{ foto_polaroid | image_url: width: 600 }}"
+               alt="{{ section.settings.foto_pequena_alt | escape }}"
+               width="{{ foto_polaroid.width }}" height="{{ foto_polaroid.height }}" loading="eager">
+        {%- else -%}
+          <img src="{{ 'post-05-vestido-blanco.jpg' | asset_url }}"
+               alt="{{ section.settings.foto_pequena_alt | escape }}" loading="eager">
+        {%- endif -%}
+      </figure>
+
+      {%- if section.settings.insignia != blank -%}
+        <div class="hero-badge" aria-hidden="true">
+          <svg viewBox="0 0 100 100">
+            <defs>
+              <path id="{{ id_circulo }}" d="M50,50 m-37,0 a37,37 0 1,1 74,0 a37,37 0 1,1 -74,0"/>
+            </defs>
+            <text><textPath href="#{{ id_circulo }}">{{ section.settings.insignia }}</textPath></text>
+          </svg>
+          <svg class="badge-lotus" viewBox="0 0 120 104"><use href="#lotus"/></svg>
+        </div>
+      {%- endif -%}
+
+      {%- if section.settings.pastilla != blank -%}
+        <span class="hero-pill"><i aria-hidden="true">✿</i> {{ section.settings.pastilla }}</span>
+      {%- endif -%}
+    </div>
+  </div>
+
+  {%- if section.settings.cinta_visible and section.settings.cinta != blank -%}
+    {%- assign frases = section.settings.cinta | split: ',' -%}
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        {%- comment -%} Dos vueltas exactas: el bucle de la animación lo exige. {%- endcomment -%}
+        {%- for vuelta in (1..2) -%}
+          {%- for frase in frases -%}
+            <span>{{ frase | strip }}</span><i>✿</i>
+          {%- endfor -%}
+        {%- endfor -%}
+      </div>
+    </div>
+  {%- endif -%}
+</section>
+
+{% schema %}
+{
+  "name": "Hero",
+  "tag": "div",
+  "settings": [
+    { "type": "text", "id": "antetitulo", "label": "Antetítulo", "default": "Boutique de moda femenina · Hamilton, Ohio" },
+    {
+      "type": "textarea",
+      "id": "titulo",
+      "label": "Titular",
+      "default": "Elevamos\ntu estilo\n*casual elegante.*",
+      "info": "Un renglón por línea. Una línea entera entre *asteriscos* sale en la cursiva elegante."
+    },
+    {
+      "type": "textarea",
+      "id": "parrafo",
+      "label": "Párrafo",
+      "default": "Tendencias exclusivas seleccionadas a mano, nuevas llegadas cada semana y una atención que se siente como ir de compras con tu mejor amiga."
+    },
+    { "type": "header", "content": "Botones" },
+    { "type": "text", "id": "boton_texto", "label": "Botón principal", "default": "Ver nuevas llegadas" },
+    { "type": "url", "id": "boton_url", "label": "Enlace del botón principal" },
+    { "type": "text", "id": "boton2_texto", "label": "Botón secundario", "default": "@bloombymadelin" },
+    { "type": "url", "id": "boton2_url", "label": "Enlace del botón secundario" },
+    { "type": "header", "content": "Fotos" },
+    { "type": "image_picker", "id": "foto", "label": "Foto grande" },
+    { "type": "text", "id": "foto_alt", "label": "Descripción de la foto grande", "default": "Vestido midi a rayas oliva y crema en la boutique Bloom by Madeline", "info": "Es lo que oye quien no puede ver la imagen. No lo dejes vacío." },
+    { "type": "image_picker", "id": "foto_pequena", "label": "Foto pequeña (polaroid)" },
+    { "type": "text", "id": "foto_pequena_alt", "label": "Descripción de la foto pequeña", "default": "Vestido mini verde lima en la boutique" },
+    { "type": "header", "content": "Adornos" },
+    { "type": "text", "id": "insignia", "label": "Texto del sello circular", "default": "ENVÍOS A TODO USA · BLOOM ·" },
+    { "type": "text", "id": "pastilla", "label": "Etiqueta flotante", "default": "Nuevas llegadas esta semana" },
+    { "type": "header", "content": "Cinta que corre" },
+    { "type": "checkbox", "id": "cinta_visible", "label": "Mostrar la cinta", "default": true },
+    {
+      "type": "textarea",
+      "id": "cinta",
+      "label": "Frases de la cinta",
+      "default": "Nuevas llegadas cada semana, Tallas S · M · L, Envíos a todo USA, Pedidos por Instagram DM",
+      "info": "Separadas por comas."
+    }
+  ],
+  "blocks": [
+    {
+      "type": "dato",
+      "name": "Cifra",
+      "limit": 4,
+      "settings": [
+        { "type": "text", "id": "valor", "label": "Cifra", "default": "2,880+" },
+        { "type": "text", "id": "etiqueta", "label": "Debajo", "default": "seguidoras" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Hero",
+      "blocks": [
+        { "type": "dato", "settings": { "valor": "2,880+", "etiqueta": "seguidoras" } },
+        { "type": "dato", "settings": { "valor": "S · M · L", "etiqueta": "tallas disponibles" } },
+        { "type": "dato", "settings": { "valor": "USA", "etiqueta": "envíos a todo el país" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

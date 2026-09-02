@@ -1,0 +1,47 @@
+{%- comment -%} Direcciones guardadas de la clienta. {%- endcomment -%}
+
+<div class="shop-page section cuenta">
+  <div class="cat-intro">
+    <h1 class="cat-titulo">{{ 'cuenta.direcciones' | t }}</h1>
+  </div>
+
+  <div class="cuenta-direcciones">
+    {%- for direccion in customer.addresses -%}
+      <div class="cuenta-direccion">
+        {{ direccion | format_address }}
+        {%- form 'customer_address', direccion -%}
+          <input type="hidden" name="_method" value="delete">
+          <button class="cp-del" type="submit"
+                  data-confirmar="{{ 'cuenta.confirmar_borrado' | t | escape }}">{{ 'cuenta.borrar' | t }}</button>
+        {%- endform -%}
+      </div>
+    {%- endfor -%}
+  </div>
+
+  <div class="cuenta-form" style="margin-top:40px">
+    <h2>{{ 'cuenta.anadir_direccion' | t }}</h2>
+    {%- form 'customer_address', customer.new_address -%}
+      <div class="co-field"><label class="co-label" for="d-nombre">{{ 'cuenta.nombre' | t }}</label>
+        <input id="d-nombre" type="text" name="address[first_name]" autocomplete="given-name"></div>
+      <div class="co-field"><label class="co-label" for="d-apellido">{{ 'cuenta.apellido' | t }}</label>
+        <input id="d-apellido" type="text" name="address[last_name]" autocomplete="family-name"></div>
+      <div class="co-field"><label class="co-label" for="d-calle">Dirección</label>
+        <input id="d-calle" type="text" name="address[address1]" autocomplete="address-line1"></div>
+      <div class="co-field"><label class="co-label" for="d-calle2">Apartamento, suite…</label>
+        <input id="d-calle2" type="text" name="address[address2]" autocomplete="address-line2"></div>
+      <div class="co-field"><label class="co-label" for="d-ciudad">Ciudad</label>
+        <input id="d-ciudad" type="text" name="address[city]" autocomplete="address-level2"></div>
+      <div class="co-field"><label class="co-label" for="d-estado">Estado</label>
+        <input id="d-estado" type="text" name="address[province]" autocomplete="address-level1"></div>
+      <div class="co-field"><label class="co-label" for="d-cp">Código postal</label>
+        <input id="d-cp" type="text" name="address[zip]" autocomplete="postal-code"></div>
+      <div class="co-field"><label class="co-label" for="d-pais">País</label>
+        <input id="d-pais" type="text" name="address[country]" autocomplete="country-name" value="United States"></div>
+      <div class="co-field"><label class="co-label" for="d-tel">Teléfono</label>
+        <input id="d-tel" type="tel" name="address[phone]" autocomplete="tel"></div>
+      <button class="btn btn-ink" type="submit">{{ 'cuenta.guardar' | t }}</button>
+    {%- endform -%}
+  </div>
+
+  <p style="margin-top:28px"><a href="{{ routes.account_url }}">← {{ 'cuenta.titulo' | t }}</a></p>
+</div>

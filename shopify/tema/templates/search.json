@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "principal": {
+      "type": "main-busqueda",
+      "settings": {}
+    }
+  },
+  "order": ["principal"]
+}

@@ -1,0 +1,104 @@
+{%- comment -%}
+  «03 — La Boutique»: la tienda física. Dos fotos superpuestas a la izquierda y
+  el texto con las cuatro ventajas a la derecha.
+
+  Esta sección es la que convierte visitas de Instagram en gente que cruza la
+  puerta, así que la dirección y el «pruébatelo antes de llevarlo» no son relleno.
+{%- endcomment -%}
+
+<section class="section boutique" id="boutique">
+  <div class="boutique-grid">
+    <div class="boutique-visual">
+      <figure class="boutique-main reveal" data-parallax="0.05">
+        {%- if section.settings.foto != blank -%}
+          <img src="{{ section.settings.foto | image_url: width: 1200 }}"
+               srcset="{{ section.settings.foto | image_url: width: 600 }} 600w,
+                       {{ section.settings.foto | image_url: width: 1200 }} 1200w"
+               sizes="(max-width: 900px) 92vw, 46vw"
+               alt="{{ section.settings.foto_alt | escape }}"
+               width="{{ section.settings.foto.width }}" height="{{ section.settings.foto.height }}"
+               loading="lazy">
+        {%- else -%}
+          <img src="{{ 'boutique-interior.jpg' | asset_url }}" alt="{{ section.settings.foto_alt | escape }}" loading="lazy">
+        {%- endif -%}
+      </figure>
+
+      <figure class="boutique-small reveal">
+        {%- if section.settings.foto_pequena != blank -%}
+          <img src="{{ section.settings.foto_pequena | image_url: width: 600 }}"
+               alt="{{ section.settings.foto_pequena_alt | escape }}"
+               width="{{ section.settings.foto_pequena.width }}" height="{{ section.settings.foto_pequena.height }}"
+               loading="lazy">
+        {%- else -%}
+          <img src="{{ 'post-09-coleccion-exclusiva.jpg' | asset_url }}" alt="{{ section.settings.foto_pequena_alt | escape }}" loading="lazy">
+        {%- endif -%}
+      </figure>
+    </div>
+
+    <div class="boutique-copy">
+      {%- if section.settings.antetitulo != blank -%}
+        <p class="overline reveal">{{ section.settings.antetitulo }}</p>
+      {%- endif -%}
+      {%- if section.settings.titulo != blank -%}
+        <h2 class="reveal">{%- render 'con-formato', texto: section.settings.titulo, cursiva_serif: true -%}</h2>
+      {%- endif -%}
+      {%- if section.settings.texto != blank -%}
+        <p class="reveal">{%- render 'con-formato', texto: section.settings.texto -%}</p>
+      {%- endif -%}
+
+      {%- if section.blocks.size > 0 -%}
+        <ul class="boutique-features">
+          {%- for bloque in section.blocks -%}
+            <li class="reveal" {{ bloque.shopify_attributes }}>
+              <strong>{{ bloque.settings.titulo }}</strong>{{ bloque.settings.texto }}
+            </li>
+          {%- endfor -%}
+        </ul>
+      {%- endif -%}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "La boutique",
+  "tag": "div",
+  "settings": [
+    { "type": "text", "id": "antetitulo", "label": "Antetítulo", "default": "03 — La Boutique" },
+    { "type": "text", "id": "titulo", "label": "Título", "default": "Un espacio pensado *para ti*" },
+    {
+      "type": "textarea",
+      "id": "texto",
+      "label": "Texto",
+      "default": "En pleno Grand Blvd de Hamilton, nuestra boutique es ese lugar donde entras «solo a mirar» y sales sintiéndote otra. Pruébate todo, pide opinión y deja que armemos tu outfit juntas."
+    },
+    { "type": "header", "content": "Fotos" },
+    { "type": "image_picker", "id": "foto", "label": "Foto grande" },
+    { "type": "text", "id": "foto_alt", "label": "Descripción de la foto grande", "default": "Interior de la boutique Bloom by Madeline: logo de loto en la pared y mostrador" },
+    { "type": "image_picker", "id": "foto_pequena", "label": "Foto pequeña" },
+    { "type": "text", "id": "foto_pequena_alt", "label": "Descripción de la foto pequeña", "default": "Escaparate de Bloom by Madeline con letrero de neón OPEN" }
+  ],
+  "blocks": [
+    {
+      "type": "ventaja",
+      "name": "Ventaja",
+      "limit": 6,
+      "settings": [
+        { "type": "text", "id": "titulo", "label": "Título", "default": "Atención personalizada" },
+        { "type": "textarea", "id": "texto", "label": "Explicación", "default": "Te ayudamos a encontrar tu look, sin prisa y sin presión." }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "La boutique",
+      "blocks": [
+        { "type": "ventaja", "settings": { "titulo": "Atención personalizada", "texto": "Te ayudamos a encontrar tu look, sin prisa y sin presión." } },
+        { "type": "ventaja", "settings": { "titulo": "Pruébatelo antes de llevarlo", "texto": "Probador en tienda para que salgas segura de tu compra." } },
+        { "type": "ventaja", "settings": { "titulo": "Nuevas llegadas semanales", "texto": "Cada semana llegan piezas nuevas — y vuelan rápido." } },
+        { "type": "ventaja", "settings": { "titulo": "Apartados por DM", "texto": "¿La viste en Instagram? Escríbenos y te la reservamos." } }
+      ]
+    }
+  ]
+}
+{% endschema %}

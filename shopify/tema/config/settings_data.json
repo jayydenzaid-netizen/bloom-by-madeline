@@ -1,0 +1,37 @@
+{
+  "current": {
+    "direccion": "1305 Grand Blvd, Hamilton, OH 45011",
+    "horario": "Jueves a sábado · 1:00 – 8:00 PM",
+    "instagram": "bloombymadelin",
+    "url_dm": "https://ig.me/m/bloombymadelin",
+    "lema": "Tendencias exclusivas · Elevamos tu estilo casual elegante",
+    "aviso_envio": "Los pedidos salen de la boutique en 1–2 días hábiles.",
+    "envio_gratis_desde": 75,
+    "color_fondo": "#ECE1CD",
+    "sections": {
+      "cabecera": {
+        "type": "cabecera",
+        "settings": {
+          "marca": "BLOOM",
+          "marca_by_cursiva": "by",
+          "marca_by": "MADELINE",
+          "ancho_logo": 140,
+          "url_dm": "https://ig.me/m/bloombymadelin",
+          "texto_dm": "Pedir por DM",
+          "texto_dm_movil": "Pedir por Instagram DM →"
+        }
+      },
+      "pie": {
+        "type": "pie",
+        "settings": {
+          "titulo_visita": "Visítanos",
+          "titulo_redes": "Síguenos",
+          "titulo_tienda": "Tienda",
+          "titulo_info": "Información",
+          "ciudad": "Hamilton, Ohio",
+          "mostrar_pagos": true
+        }
+      }
+    }
+  }
+}
