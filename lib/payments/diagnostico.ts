@@ -107,7 +107,10 @@ export function explicarDiagnostico(
       return {
         titulo: `No pudimos hablar con ${marca}.`,
         queHacer:
-          "Puede ser un bajón suyo o de la red. Tus llaves NO se han tocado y el cobro sigue encendido: vuelve a comprobar en un rato.",
+          // No se afirma si el cobro está encendido: este texto no sabe si lo
+          // estaba, y decirlo cuando no lo está contradice a los botones de su
+          // propia tarjeta.
+          "Puede ser un bajón suyo o de la red. No se ha tocado nada —ni tus llaves ni si se ofrece o no—: vuelve a comprobar en un rato.",
         urgente: false,
       };
 

@@ -11,6 +11,8 @@ import {
   stripeConfigurado,
 } from "@/lib/payments/config";
 import { minimoOnlineCents } from "@/lib/payments";
+import { activacionTrasSondeo } from "@/lib/payments/activacion";
+import { esDePruebas } from "@/lib/payments/entorno";
 import { diasDesde, limpiarSalud, saludPermiteCobrar } from "@/lib/payments/estado";
 import {
   limpiarPegado,
@@ -742,4 +744,60 @@ test("⭐ pegar el bloque de Stripe con las DOS llaves se queda la que cobra", (
   const sola = reconocerConValores(`Publishable key\n${pk}`);
   assert.equal(sola.length, 1);
   assert.equal(sola[0].problema, "llave-no-secreta");
+});
+
+/* ══════════ encender o no, después de preguntarle a la pasarela ══════════
+ *
+ * Esta regla la encontró rota una revisión adversarial DESPUÉS de desplegar, y
+ * es de las caras: al reescribir el panel se perdió el caso de la red caída y un
+ * bajón ajeno de treinta segundos dejaba a la tienda sin cobro con tarjeta —
+ * mientras la pantalla decía «tus llaves están guardadas y sin tocar».
+ */
+
+test("⭐ un fallo de RED deja el cobro COMO ESTABA, no apagado", () => {
+  const red = { ok: false, motivo: "red" as const };
+
+  // Estaba cobrando y la pasarela no contesta: sigue cobrando. De un timeout no
+  // se concluye nada, y apagarlo cierra la tienda por un problema ajeno.
+  assert.equal(activacionTrasSondeo(true, true, red), true);
+  // Estaba apagado: sigue apagado. Tampoco se enciende sin confirmación.
+  assert.equal(activacionTrasSondeo(true, false, red), false);
+  // Y si ella pidió apagarlo, se respeta.
+  assert.equal(activacionTrasSondeo(false, true, red), true, "sin respuesta manda el estado previo");
+});
+
+test("un RECHAZO explícito sí apaga, aunque estuviera cobrando", () => {
+  const rechazo = { ok: false, motivo: "credencial" as const };
+  assert.equal(activacionTrasSondeo(true, true, rechazo), false);
+  assert.equal(activacionTrasSondeo(true, false, rechazo), false);
+  // Ofrecer una tarjeta que la pasarela rechaza deja a la clienta con el pedido
+  // hecho, su talla apartada y sin forma de pagar: eso no se ofrece.
+});
+
+test("con la pasarela diciendo que sí, manda lo que pidió la dueña", () => {
+  const bien = { ok: true };
+  assert.equal(activacionTrasSondeo(true, false, bien), true);
+  assert.equal(activacionTrasSondeo(false, true, bien), false);
+});
+
+test("⭐ una llave RESTRINGIDA de pruebas no se puede presentar como real", () => {
+  const base = CONFIG_PAGOS_VACIA;
+  // El fallo: solo se miraba `sk_test_`, así que una `rk_test_` pasaba por real
+  // y la insignia «En pruebas» —el único aviso de la pantalla— no salía nunca.
+  const rkTest = { ...base, stripe: { activo: true, secretKey: "rk_test_" + "x".repeat(20) } };
+  assert.equal(esDePruebas("stripe", rkTest), true);
+
+  const skTest = { ...base, stripe: { activo: true, secretKey: "sk_test_" + "x".repeat(20) } };
+  assert.equal(esDePruebas("stripe", skTest), true);
+
+  const skLive = { ...base, stripe: { activo: true, secretKey: "sk_live_" + "x".repeat(20) } };
+  assert.equal(esDePruebas("stripe", skLive), false);
+  const rkLive = { ...base, stripe: { activo: true, secretKey: "rk_live_" + "x".repeat(20) } };
+  assert.equal(esDePruebas("stripe", rkLive), false);
+
+  // PayPal y Square salen del entorno ya resuelto por la sonda.
+  assert.equal(esDePruebas("paypal", { ...base, paypal: { ...base.paypal, entorno: "sandbox" } }), true);
+  assert.equal(esDePruebas("paypal", { ...base, paypal: { ...base.paypal, entorno: "live" } }), false);
+  assert.equal(esDePruebas("square", { ...base, square: { ...base.square, entorno: "sandbox" } }), true);
+  assert.equal(esDePruebas("square", { ...base, square: { ...base.square, entorno: "production" } }), false);
 });

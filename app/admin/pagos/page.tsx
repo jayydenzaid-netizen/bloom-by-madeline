@@ -98,11 +98,11 @@ const ERRORES: Record<string, string> = {
   "square-fallo": "Square rechazó el token. Mira el detalle en su tarjeta.",
   // Un fallo de red NO es culpa de las llaves y no puede sonar como si lo fuera.
   "stripe-sin-respuesta":
-    "No pudimos hablar con Stripe (puede estar de bajón). Tus llaves están guardadas y sin tocar: vuelve a comprobar en un rato.",
+    "No pudimos hablar con Stripe (puede estar de bajón). No se ha tocado nada: ni tus llaves ni si se ofrece o no. Vuelve a comprobar en un rato.",
   "paypal-sin-respuesta":
-    "No pudimos hablar con PayPal (puede estar de bajón). Tus credenciales están guardadas y sin tocar: vuelve a comprobar en un rato.",
+    "No pudimos hablar con PayPal (puede estar de bajón). No se ha tocado nada: ni tus credenciales ni si se ofrece o no. Vuelve a comprobar en un rato.",
   "square-sin-respuesta":
-    "No pudimos hablar con Square (puede estar de bajón). Tu token está guardado y sin tocar: vuelve a comprobar en un rato.",
+    "No pudimos hablar con Square (puede estar de bajón). No se ha tocado nada: ni tu token ni si se ofrece o no. Vuelve a comprobar en un rato.",
   // Se intentó ENCENDER un cobro que la pasarela rechaza. Se guarda apagado a
   // propósito: ofrecer una tarjeta que no cobra deja a la clienta con el pedido
   // hecho, su talla apartada y sin forma de pagar.
@@ -159,6 +159,13 @@ type EstadoProveedor = {
   salud: SaludProveedor | undefined;
   /** Existen llaves guardadas (aunque no se puedan leer). */
   hayLlaves: boolean;
+  /**
+   * Lo que el checkout ofrece DE VERDAD (interruptor + credenciales completas +
+   * el veto por salud). El interruptor crudo no vale para la pantalla: con la
+   * insignia en «Rechazada» seguía saliendo «Dejar de ofrecer» para un método
+   * que ya no se ofrecía.
+   */
+  seOfrece: boolean;
   completo: boolean;
   activo: boolean;
   guardadoEl: Date | null;
@@ -355,7 +362,7 @@ function Acciones({ e }: { e: EstadoProveedor }) {
       {/* Solo si de verdad hay algo que dejar de ofrecer: «apagar» junto a una
           insignia de «Sin conectar» es la clase de contradicción que tenía esta
           pantalla y que este rediseño existe para quitar. */}
-      {e.activo && e.completo ? (
+      {e.seOfrece ? (
         <form action={apagarProveedor}>
           <input type="hidden" name="proveedor" value={e.proveedor} />
           <button type="submit" className="adm-btn adm-btn-ghost adm-btn-sm">
@@ -379,7 +386,7 @@ function Acciones({ e }: { e: EstadoProveedor }) {
 function Encender({ e, texto: descripcion }: { e: EstadoProveedor; texto: string }) {
   return (
     <label className="pag-check">
-      <input type="checkbox" name="activo" defaultChecked={e.activo} />
+      <input type="checkbox" name="activo" defaultChecked={e.seOfrece} />
       <span>
         Ofrecer en el checkout
         <span className="adm-muted adm-small">{descripcion}</span>
@@ -434,6 +441,7 @@ export default async function PagosPage({
       fase: faseDe(proveedor, config, ilegible[proveedor], salud[proveedor], online[proveedor]),
       salud: salud[proveedor],
       hayLlaves: algoPegado || ilegible[proveedor],
+      seOfrece: online[proveedor],
       completo,
       activo,
       guardadoEl: actualizado[proveedor],
@@ -449,6 +457,11 @@ export default async function PagosPage({
   >;
 
   const activos = todos.filter((e) => online[e.proveedor]);
+  // Una pasarela en PRUEBAS activa es el estado más caro que existe: el panel
+  // dice «cobrando» y la clienta llega a una página donde toda tarjeta real se
+  // rechaza. Se saca del verde y se avisa aparte.
+  const enPruebas = activos.filter((e) => e.salud?.entornoReal === "pruebas");
+  const cobranDeVerdad = activos.filter((e) => e.salud?.entornoReal !== "pruebas");
   const conProblema = todos.filter((e) => e.fase === "rechazada" || e.fase === "ilegible");
   const comprobaciones = todos.map((e) => e.salud?.en).filter((x): x is string => !!x);
   const ultima = comprobaciones.sort().at(-1);
@@ -499,13 +512,15 @@ export default async function PagosPage({
         />
         <StatCard
           label="Cobro con tarjeta"
-          value={activos.length > 0 ? "Activo" : "Sin activar"}
+          value={enPruebas.length > 0 && cobranDeVerdad.length === 0 ? "En pruebas" : activos.length > 0 ? "Activo" : "Sin activar"}
           hint={
-            activos.length > 0
-              ? "Los pedidos se marcan pagados solos"
-              : "Hoy los cobras a mano, uno por uno"
+            enPruebas.length > 0 && cobranDeVerdad.length === 0
+              ? "No entra dinero: es una cuenta de pruebas"
+              : activos.length > 0
+                ? "Los pedidos se marcan pagados solos"
+                : "Hoy los cobras a mano, uno por uno"
           }
-          tone={activos.length > 0 ? "success" : "warning"}
+          tone={enPruebas.length > 0 && cobranDeVerdad.length === 0 ? "danger" : activos.length > 0 ? "success" : "warning"}
         />
         <StatCard
           label="Última comprobación"
@@ -520,6 +535,17 @@ export default async function PagosPage({
           tone={conProblema.length > 0 ? "danger" : "default"}
         />
       </div>
+
+      {enPruebas.length > 0 ? (
+        <p className="pag-aviso is-error" role="alert">
+          <strong>
+            {enPruebas.map((e) => ETIQUETA_PROVEEDOR[e.proveedor]).join(" y ")}{" "}
+            {enPruebas.length === 1 ? "está conectada en PRUEBAS" : "están conectadas en PRUEBAS"}.
+          </strong>{" "}
+          Eso no cobra dinero: a tus clientas les rechazarán la tarjeta. Pega la credencial de
+          producción (la que NO lleva «test») y vuelve a comprobar.
+        </p>
+      ) : null}
 
       {/* Aviso de tienda coja: sin pasarela y sin DM, lo único que queda es la
           recogida en la boutique, o sea que NADIE de fuera de Hamilton puede

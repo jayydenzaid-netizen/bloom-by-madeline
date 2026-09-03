@@ -14,6 +14,8 @@ import {
   type ConfigPagos,
   type MetodoOnline,
 } from "@/lib/payments/config";
+import { activacionTrasSondeo } from "@/lib/payments/activacion";
+import { esDePruebas } from "@/lib/payments/entorno";
 import { anotarSalud, leerSalud, olvidarSalud, type SaludProveedor } from "@/lib/payments/estado";
 import { probarPaypal } from "@/lib/payments/paypal";
 import { probarSquare } from "@/lib/payments/square";
@@ -153,16 +155,11 @@ function saludDe(proveedor: MetodoOnline, r: ResultadoPrueba, cfg: ConfigPagos):
     en: new Date().toISOString(),
   };
   if (r.cuenta) salud.cuenta = r.cuenta;
-  // El entorno se deduce de lo que se está usando de verdad, no del desplegable.
-  if (proveedor === "stripe" && r.ok) {
-    salud.entornoReal = cfg.stripe.secretKey.startsWith("sk_test_") ? "pruebas" : "real";
-  }
-  if (proveedor === "paypal" && r.ok) {
-    salud.entornoReal = cfg.paypal.entorno === "sandbox" ? "pruebas" : "real";
-  }
-  if (proveedor === "square" && r.ok) {
-    salud.entornoReal = cfg.square.entorno === "sandbox" ? "pruebas" : "real";
-  }
+  // El entorno sale de las credenciales que se usan de verdad, no de un
+  // desplegable (que ya no existe). Ver lib/payments/entorno.ts. Se anota
+  // SIEMPRE, no solo cuando la conexión va bien: una pasarela en pruebas y
+  // rechazada sigue siendo una pasarela en pruebas, y hay que poder decirlo.
+  salud.entornoReal = esDePruebas(proveedor, cfg) ? "pruebas" : "real";
   return salud;
 }
 
@@ -186,6 +183,9 @@ export async function conectarProveedor(formData: FormData): Promise<void> {
   const proveedor = proveedorDe(formData);
   const previa = await leerConfigPagos();
   const quiereActivo = marcado(formData, "activo");
+  // Cómo estaba el interruptor ANTES. Si la pasarela no contesta hay que
+  // devolverlo a esto: no se ha aprendido nada como para cambiarlo.
+  const activoAntes = previa[proveedor].activo;
 
   /* ── 1. Armar la configuración con lo pegado (vacío = conservar) ── */
   let cfg: ConfigPagos;
@@ -254,6 +254,7 @@ export async function conectarProveedor(formData: FormData): Promise<void> {
 
   /* ── 4. Encender solo si la pasarela ha dicho que sí ── */
   if (!quiereActivo) {
+    // Ella desmarcó la casilla: apagar es lo que pidió, y ya está guardado así.
     await registrarActividad({
       admin,
       action: "update",
@@ -264,13 +265,19 @@ export async function conectarProveedor(formData: FormData): Promise<void> {
   }
 
   if (!r.ok) {
+    // ⚠️ Sin respuesta ≠ rechazo. Con la pasarela caída se devuelve el
+    // interruptor a como estaba: si el cobro estaba encendido, sigue encendido.
+    // Sin esto, un bajón de treinta segundos apagaba la tarjeta de una tienda
+    // viva mientras la pantalla decía «tus llaves están guardadas y sin tocar»,
+    // que era mentira. Un rechazo explícito SÍ deja apagado: ofrecer una tarjeta
+    // que no cobra es peor que no ofrecerla.
+    await guardar(proveedor, comoEstaba(proveedor, cfg, activacionTrasSondeo(quiereActivo, activoAntes, r)));
     await registrarActividad({
       admin,
       action: "update",
       entityType: "setting",
-      summary: `${proveedor}: no se pudo activar (${r.motivo === "red" ? "sin respuesta" : "rechazado"}).`,
+      summary: `${proveedor}: no se pudo activar (${r.motivo === "red" ? "sin respuesta; se deja como estaba" : "rechazado"}).`,
     });
-    // Un fallo de red no es culpa de las llaves, así que el mensaje es otro.
     terminar({ error: r.motivo === "red" ? `${proveedor}-sin-respuesta` : `${proveedor}-fallo-activar` });
   }
 
@@ -282,6 +289,22 @@ export async function conectarProveedor(formData: FormData): Promise<void> {
     summary: `${proveedor} conectado y ACTIVO en el checkout.`,
   });
   terminar({ hecho: `${proveedor}-activo` });
+}
+
+/**
+ * Deja el interruptor de un proveedor como estaba antes de tocar nada.
+ *
+ * Se usa cuando la pasarela NO CONTESTA. Guardar apagado antes de sondear
+ * protege la credencial recién pegada, pero si luego no se puede preguntar hay
+ * que deshacerlo: de un fallo de red no se concluye nada, y dejarlo apagado
+ * significa que un bajón ajeno de treinta segundos deja a la tienda sin cobro
+ * con tarjeta por tiempo indefinido. La regla está escrita arriba y este es el
+ * único sitio donde puede romperse.
+ */
+function comoEstaba(proveedor: MetodoOnline, cfg: ConfigPagos, activo: boolean): ConfigPagos {
+  if (proveedor === "stripe") return { ...cfg, stripe: { ...cfg.stripe, activo } };
+  if (proveedor === "paypal") return { ...cfg, paypal: { ...cfg.paypal, activo } };
+  return { ...cfg, square: { ...cfg.square, activo } };
 }
 
 function encender(proveedor: MetodoOnline, cfg: ConfigPagos): ConfigPagos {
@@ -499,12 +522,16 @@ export async function pegarCredencial(formData: FormData): Promise<void> {
 
   /* ── Meter cada valor en su sitio, sin tocar lo que no venga ── */
   const previa = await leerConfigPagos();
+  // Igual que en `conectarProveedor`: si la pasarela no contesta, el interruptor
+  // vuelve a como estaba. Un bajón ajeno no puede apagar un cobro que funciona.
+  const activoAntes = previa[proveedor].activo;
   let cfg = aplicarPistas(previa, proveedor, pistas);
 
   if (!hayCredenciales(proveedor, cfg)) {
     // Reconocido pero incompleto: PayPal sin su Secret, por ejemplo. Se guarda
-    // lo que hay (no se pierde) y se dice qué falta.
-    await guardar(proveedor, cfg);
+    // lo que hay (no se pierde) y se dice qué falta — conservando el
+    // interruptor: media credencial nueva no es motivo para apagar el cobro.
+    await guardar(proveedor, comoEstaba(proveedor, cfg, activoAntes));
     terminar({ error: `${proveedor}-sin-llaves` });
   }
 
@@ -533,6 +560,7 @@ export async function pegarCredencial(formData: FormData): Promise<void> {
   });
 
   if (!sonda.r.ok) {
+    await guardar(proveedor, comoEstaba(proveedor, cfg, activacionTrasSondeo(true, activoAntes, sonda.r)));
     terminar({ error: sonda.r.motivo === "red" ? `${proveedor}-sin-respuesta` : `${proveedor}-fallo-activar` });
   }
 
