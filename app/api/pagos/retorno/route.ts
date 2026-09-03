@@ -36,7 +36,11 @@ export async function GET(req: NextRequest) {
     revalidatePath("/admin");
   } else if (resultado.estado === "revisar") {
     destino.searchParams.set("pago", "revision");
-  } else if (resultado.estado === "pendiente") {
+  } else if (resultado.estado === "pendiente" || resultado.estado === "sin-respuesta") {
+    // «No pudimos preguntar» viaja como «procesando» a propósito: el mensaje que
+    // ya existe («vuelve a abrir esta página en unos minutos») es exactamente lo
+    // que hay que decirle a alguien que quizá acaba de pagar. Lo que NO se puede
+    // hacer es mandarla a pagar otra vez.
     destino.searchParams.set("pago", "procesando");
   }
 

@@ -1,6 +1,14 @@
 import { randomUUID } from "node:crypto";
 import type { ConfigSquare } from "./config";
-import { ErrorPasarela, type DatosPago, type FetchLike, type SesionPago, type Verificacion } from "./tipos";
+import {
+  ErrorPasarela,
+  type CodigoDiagnostico,
+  type DatosPago,
+  type FetchLike,
+  type ResultadoPrueba,
+  type SesionPago,
+  type Verificacion,
+} from "./tipos";
 
 /**
  * Square Payment Links (página de cobro hosted), por REST puro.
@@ -47,16 +55,48 @@ async function llamarSquare(
   });
   const json = (await res.json().catch(() => ({}))) as RespuestaSquare;
   if (!res.ok) {
-    const detalle = json.errors?.[0]?.detail ?? json.errors?.[0]?.code ?? `HTTP ${res.status}`;
+    const fallo = json.errors?.[0];
+    const detalle = fallo?.detail ?? fallo?.code ?? `HTTP ${res.status}`;
     // Square contestó: 401 = token inválido/caducado, 403 = sin permiso.
     // Su categoría AUTHENTICATION_ERROR lo dice explícitamente.
-    const categoria = json.errors?.[0]?.category ?? "";
+    const categoria = fallo?.category ?? "";
+    // El `code` viaja aparte del texto A PROPÓSITO. El `detail` de Square para
+    // TODOS los fallos de autorización es la misma frase genérica («This request
+    // could not be authorized»), así que quedarse solo con él es quedarse sin
+    // diagnóstico: no se puede distinguir un token caducado de uno revocado, de
+    // uno sin permisos o de una aplicación desactivada. El `code` sí lo dice.
     throw new ErrorPasarela(
       `Square: ${String(detalle).slice(0, 200)}`,
       res.status === 401 || res.status === 403 || categoria === "AUTHENTICATION_ERROR",
+      fallo?.code,
+      categoria,
     );
   }
   return json;
+}
+
+/**
+ * El código de Square traducido a nuestro diagnóstico.
+ *
+ * Los valores de la izquierda son los que documenta Square para los fallos de
+ * autorización. Lo que se gana traduciéndolos: poder decirle a la dueña «ese
+ * token está caducado, saca uno nuevo» en vez de «Square rechazó el token»,
+ * que es verdad y no sirve de nada.
+ */
+export function diagnosticoSquare(codigo: string | undefined): CodigoDiagnostico {
+  switch ((codigo ?? "").toUpperCase()) {
+    case "ACCESS_TOKEN_EXPIRED":
+      return "token-caducado";
+    case "ACCESS_TOKEN_REVOKED":
+      return "token-revocado";
+    case "INSUFFICIENT_SCOPES":
+    case "FORBIDDEN":
+      return "permisos-insuficientes";
+    case "APPLICATION_DISABLED":
+      return "aplicacion-desactivada";
+    default:
+      return "credencial-invalida";
+  }
 }
 
 /** Cuerpo JSON del payment link, como función pura para poder testearlo. */
@@ -144,8 +184,24 @@ type OrdenSquare = {
   reference_id?: string;
   total_money?: { amount?: number; currency?: string };
   net_amount_due_money?: { amount?: number };
-  tenders?: { id?: string; amount_money?: { amount?: number } }[];
+  tenders?: { id?: string; amount_money?: { amount?: number }; card_details?: { status?: string } }[];
 };
+
+/**
+ * ¿Este tender es dinero de verdad?
+ *
+ * Un tender de tarjeta puede estar CAPTURED (cobrado), AUTHORIZED (retenido, aún
+ * no cobrado), VOIDED (anulado) o FAILED. Antes se sumaban TODOS por igual, así
+ * que un cobro anulado seguía contando y podía llevar la suma por encima del
+ * total: el pedido se marcaba «pagado» sin que existiera el dinero. Sin
+ * `card_details` (efectivo, tarjeta regalo) se cuenta, que es como se comportaba
+ * hasta ahora y es correcto: esos tenders no tienen estado intermedio.
+ */
+function tenderCobrado(t: { card_details?: { status?: string } }): boolean {
+  const estado = t.card_details?.status;
+  if (!estado) return true;
+  return estado === "CAPTURED";
+}
 
 export async function verificarOrdenSquare(
   cfg: ConfigSquare,
@@ -157,13 +213,19 @@ export async function verificarOrdenSquare(
   try {
     json = await llamarSquare(cfg, "GET", `/v2/orders/${encodeURIComponent(ref)}`, null, f);
   } catch (err) {
-    return { estado: "error", detalle: err instanceof Error ? err.message : "fallo de red" };
+    return {
+      estado: "error",
+      detalle: err instanceof Error ? err.message : "fallo de red",
+      credencial: err instanceof ErrorPasarela && err.credencial,
+    };
   }
   const orden = (json.order ?? {}) as OrdenSquare;
 
   // ¿Hay dinero de verdad? O la orden quedó saldada (no debe nada y tiene
   // tenders), o los tenders cubren el total. Sin tenders no ha pagado nadie.
-  const tenders = orden.tenders ?? [];
+  // Solo cuentan los tenders efectivamente cobrados: uno anulado o fallido no
+  // es dinero, y sumándolo se podía marcar pagado un pedido que nadie pagó.
+  const tenders = (orden.tenders ?? []).filter(tenderCobrado);
   const cobrado = tenders.reduce((suma, t) => suma + (t.amount_money?.amount ?? 0), 0);
   const saldada =
     tenders.length > 0 &&
@@ -187,15 +249,14 @@ export async function verificarOrdenSquare(
 
 export type LocalSquare = { id: string; nombre: string };
 
+export type PruebaSquare = ResultadoPrueba & { locales: LocalSquare[] };
+
 /** «Probar conexión»: valida el token listando los locales de la cuenta. */
-export async function probarSquare(
-  cfg: ConfigSquare,
-  f: FetchLike = fetch,
-): Promise<{ ok: boolean; detalle: string; locales: LocalSquare[]; motivo?: "credencial" | "red" }> {
+export async function probarSquare(cfg: ConfigSquare, f: FetchLike = fetch): Promise<PruebaSquare> {
   try {
     const json = await llamarSquare(cfg, "GET", "/v2/locations", null, f);
     const crudos = Array.isArray(json.locations)
-      ? (json.locations as { id?: string; name?: string; status?: string }[])
+      ? (json.locations as { id?: string; name?: string; status?: string; business_name?: string }[])
       : [];
     const locales = crudos
       .filter((l) => l.id && l.status !== "INACTIVE")
@@ -206,8 +267,12 @@ export async function probarSquare(
         detalle: "el token vale pero la cuenta no tiene locales activos",
         locales: [],
         motivo: "credencial",
+        codigo: "sin-locales",
       };
     }
+    // El nombre del negocio según Square. Se enseña en el panel para que la
+    // dueña confirme de un vistazo que conectó SU cuenta y no otra.
+    const cuenta = crudos.find((l) => l.business_name)?.business_name || locales[0].nombre;
     const coincide = !cfg.locationId || locales.some((l) => l.id === cfg.locationId);
     return {
       ok: coincide,
@@ -215,7 +280,8 @@ export async function probarSquare(
         ? `${locales.length} ${locales.length === 1 ? "local activo" : "locales activos"}`
         : "el Location ID guardado no es de esta cuenta",
       locales,
-      ...(coincide ? {} : { motivo: "credencial" as const }),
+      cuenta,
+      ...(coincide ? { codigo: "ok" as const } : { motivo: "credencial" as const, codigo: "local-ajeno" as const }),
     };
   } catch (err) {
     const rechazado = err instanceof ErrorPasarela && err.credencial;
@@ -230,6 +296,7 @@ export async function probarSquare(
         return {
           ok: false,
           motivo: "credencial",
+          codigo: "entorno-cruzado",
           locales: [],
           detalle:
             otro === "sandbox"
@@ -245,6 +312,12 @@ export async function probarSquare(
       detalle: err instanceof Error ? err.message : "fallo de red",
       locales: [],
       motivo: rechazado ? "credencial" : "red",
+      // Con el token rechazado, el `code` de Square dice EXACTAMENTE qué pasa
+      // (caducado / revocado / sin permisos / aplicación desactivada). Sin él,
+      // lo único honesto que se puede decir es «no se pudo preguntar».
+      codigo: rechazado
+        ? diagnosticoSquare(err instanceof ErrorPasarela ? err.codigo : undefined)
+        : "sin-respuesta",
     };
   }
 }

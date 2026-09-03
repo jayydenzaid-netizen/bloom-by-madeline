@@ -130,7 +130,11 @@ export async function verificarSesionStripe(
   try {
     s = await llamarStripe(cfg, "GET", `/v1/checkout/sessions/${encodeURIComponent(ref)}`, null, f);
   } catch (err) {
-    return { estado: "error", detalle: err instanceof Error ? err.message : "fallo de red" };
+    return {
+      estado: "error",
+      detalle: err instanceof Error ? err.message : "fallo de red",
+      credencial: err instanceof ErrorPasarela && err.credencial,
+    };
   }
 
   const pagado = s.payment_status === "paid" || s.payment_status === "no_payment_required";
@@ -162,21 +166,31 @@ export async function probarStripe(cfg: ConfigStripe, f: FetchLike = fetch): Pro
     const settings = cuenta.settings as { dashboard?: { display_name?: string } } | undefined;
     const nombre = settings?.dashboard?.display_name || (cuenta.email as string) || "cuenta conectada";
     const modo = cfg.secretKey.startsWith("sk_test_") ? " (modo prueba)" : "";
-    return { ok: true, detalle: `${nombre}${modo}` };
+    return { ok: true, detalle: `${nombre}${modo}`, codigo: "ok", cuenta: nombre };
   } catch (err) {
     // Una llave restringida (rk_) puede no tener permiso de Account y aun así
     // cobrar perfectamente: antes de declarar el fallo se prueba con Balance,
     // que casi cualquier rk_ puede leer.
     try {
       await llamarStripe(cfg, "GET", "/v1/balance", null, f);
-      return { ok: true, detalle: "llave válida (restringida, sin permiso de cuenta)" };
+      return { ok: true, detalle: "llave válida (restringida, sin permiso de cuenta)", codigo: "ok" };
     } catch (err2) {
-      const rechazo = err instanceof ErrorPasarela ? err.credencial : false;
-      const alcanzada = err instanceof ErrorPasarela || err2 instanceof ErrorPasarela;
+      // Solo un RECHAZO EXPLÍCITO de la llave (401/403) es culpa de la llave.
+      //
+      // Antes bastaba con que Stripe contestara cualquier cosa: `alcanzada` era
+      // cierto para todo `ErrorPasarela`, y `llamarStripe` lanza uno también en
+      // un 429 o un 500. O sea que un bajón de Stripe se traducía en «tu llave
+      // está mal» y el guardia de activación apagaba el cobro con tarjeta de una
+      // tienda cuya llave era perfecta. Un fallo de la pasarela no puede apagar
+      // el negocio de nadie.
+      const rechazo =
+        (err instanceof ErrorPasarela && err.credencial) ||
+        (err2 instanceof ErrorPasarela && err2.credencial);
       return {
         ok: false,
         detalle: err instanceof Error ? err.message : "fallo de red",
-        motivo: rechazo || alcanzada ? "credencial" : "red",
+        motivo: rechazo ? "credencial" : "red",
+        codigo: rechazo ? "credencial-invalida" : "sin-respuesta",
       };
     }
   }

@@ -62,14 +62,21 @@ export default async function PedidoPage({
   // Reconciliación al abrir: si el pedido espera un cobro online, se le pregunta
   // al proveedor AHORA. Cubre a la clienta que pagó y cerró la pestaña antes de
   // volver: en cuanto alguien abre el pedido, el estado se pone al día solo.
+  //
+  // El resultado se GUARDA para decidir con él lo que se enseña. Antes solo se
+  // usaba para recargar el pedido si había cobro, y el resto de estados se leían
+  // del `?pago=` de la URL: bastaba con recargar sin parámetros para que el aviso
+  // de «no vuelvas a pagar» desapareciera y volviera el botón de pagar. Sobre un
+  // cobro en revisión, eso es un segundo cargo esperando a ocurrir.
+  let verificacion: Awaited<ReturnType<typeof verificarPagoPedido>> | null = null;
   if (
     order &&
     order.paymentStatus === "pending" &&
     esMetodoOnline(order.paymentMethod) &&
     order.paymentAttemptsJson !== "[]"
   ) {
-    const verificado = await verificarPagoPedido(order.id);
-    if (verificado.estado === "pagado") {
+    verificacion = await verificarPagoPedido(order.id);
+    if (verificacion.estado === "pagado") {
       order = await getOrderByNumber(number);
     }
   }
@@ -103,9 +110,13 @@ export default async function PedidoPage({
   // online: reintentar es un callejón. Se detecta aquí (no por la URL) para que
   // el mensaje y el botón sean coherentes también al recargar sin parámetros.
   const bajoMinimo = esOnline && pendiente && order.totalCents < minimoOnlineCents(order.paymentMethod);
-  // Con el pago «procesándose» o «en revisión», invitar a pagar otra vez es
-  // pedir un cobro duplicado: el botón se esconde en esos estados.
-  const ofrecerPagar = esOnline && pendiente && !bajoMinimo && pago !== "procesando" && pago !== "revision";
+  // Con el pago «en revisión» o sin poder confirmarlo, invitar a pagar otra vez
+  // es pedir un cobro duplicado. Sale de la VERIFICACIÓN que se acaba de hacer,
+  // no del parámetro de la URL, para que siga siendo cierto al recargar.
+  const sinConfirmar =
+    verificacion?.estado === "revisar" || verificacion?.estado === "sin-respuesta";
+  const ofrecerPagar =
+    esOnline && pendiente && !bajoMinimo && !sinConfirmar && pago !== "procesando" && pago !== "revision";
 
   const avisoPago = pagado
     ? pago === "confirmado"
@@ -114,6 +125,8 @@ export default async function PedidoPage({
     : pendiente && esOnline
       ? bajoMinimo
         ? { tono: "aviso" as const, texto: "El importe es tan pequeño que la pasarela no puede cobrarlo online. Escríbenos por Instagram y lo cerramos por ahí — tu pedido sigue apartado." }
+        : sinConfirmar
+        ? { tono: "aviso" as const, texto: "Todavía no pudimos confirmar tu pago con la pasarela. Tu pedido sigue apartado y lo estamos revisando: escríbenos si ya te cobraron. No intentes pagar de nuevo." }
         : pago === "cancelado"
           ? { tono: "aviso" as const, texto: "El pago no se completó. Puedes intentarlo otra vez cuando quieras — tu pedido sigue apartado." }
           : pago === "sin-conexion"

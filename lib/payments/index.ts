@@ -265,7 +265,20 @@ export async function iniciarPagoOnline(orderId: string): Promise<InicioPago> {
 /* ────────────────────────────── verificar ────────────────────────────── */
 
 export type ResultadoPago = {
-  estado: "pagado" | "pendiente" | "sin-verificar" | "revisar";
+  /**
+   * · pagado        — el proveedor confirma el cobro y cuadra.
+   * · pendiente     — le preguntamos y aún no hay cobro.
+   * · sin-verificar — no hay nada que preguntar (sin intentos, o no es online).
+   * · revisar       — hay un cobro que no debería ser así: no cuadra, o cayó
+   *                   sobre un pedido cancelado. Lo decide Madeline.
+   * · sin-respuesta — NO PUDIMOS PREGUNTAR (red, pasarela caída, llaves rotas).
+   *                   Es distinto de «pendiente» y la diferencia vale dinero:
+   *                   antes esto se devolvía como «pendiente», o sea «la clienta
+   *                   no pagó», y con un token caducado TODOS los pedidos
+   *                   cobrados de verdad se quedaban así para siempre mientras
+   *                   la web invitaba a pagar otra vez.
+   */
+  estado: "pagado" | "pendiente" | "sin-verificar" | "revisar" | "sin-respuesta";
   detalle?: string;
 };
 
@@ -275,7 +288,7 @@ export type ResultadoPago = {
  * las APIs del proveedor. Por instancia serverless (best-effort): suficiente
  * para que un bucle de curl no se convierta en un bombardeo a Stripe.
  */
-const ultimaVerificacion = new Map<string, number>();
+const ultimaVerificacion = new Map<string, { at: number; resultado: ResultadoPago }>();
 const FRENO_MS = 5_000;
 
 async function consultarIntento(
@@ -329,10 +342,21 @@ export async function verificarPagoPedido(orderId: string): Promise<ResultadoPag
     // alguien tiene que enterarse — pero el pedido no revive solo.
     const cancelado = order.paymentStatus !== "pending";
 
+    // Dentro del freno se devuelve EL ÚLTIMO RESULTADO, no «pendiente».
+    //
+    // Antes se devolvía «pendiente» a secas, y eso abría un agujero de cobro
+    // duplicado: si la clienta recargaba la página del pedido dentro de los 5
+    // segundos, el aviso de «no vuelvas a pagar» desaparecía y reaparecía el
+    // botón de pagar. El freno está para no bombardear a la pasarela, no para
+    // olvidar lo que ya sabíamos.
     const ahora = Date.now();
-    const previa = ultimaVerificacion.get(order.id) ?? 0;
-    if (ahora - previa < FRENO_MS) return { estado: cancelado ? "sin-verificar" : "pendiente" };
-    ultimaVerificacion.set(order.id, ahora);
+    const previa = ultimaVerificacion.get(order.id);
+    if (previa && ahora - previa.at < FRENO_MS) return previa.resultado;
+
+    const recordar = (r: ResultadoPago): ResultadoPago => {
+      ultimaVerificacion.set(order.id, { at: Date.now(), resultado: r });
+      return r;
+    };
 
     const [cfg, settings] = await Promise.all([leerConfigPagos(), getSettings()]);
     const esperado = {
@@ -342,15 +366,31 @@ export async function verificarPagoPedido(orderId: string): Promise<ResultadoPag
     };
 
     let sospecha: string | null = null;
+    /** Algún intento no se pudo consultar, y por qué. Ver más abajo. */
+    let muda: { detalle: string; credencial: boolean } | null = null;
     for (const [indice, intento] of intentos.entries()) {
       const v = await consultarIntento(cfg, intento, esperado, { capturar: !cancelado }).catch(() => null);
-      if (!v) continue;
+      if (!v) {
+        muda = muda ?? { detalle: "No se pudo consultar el cobro.", credencial: false };
+        continue;
+      }
+
+      // La pasarela no contestó (o rechazó las llaves). Esto NO significa que la
+      // clienta no haya pagado: significa que no lo sabemos. Se recuerda y se
+      // sigue con los demás intentos, porque puede haber otro que sí responda.
+      if (v.estado === "error") {
+        muda = {
+          detalle: v.detalle,
+          credencial: v.credencial === true || (muda?.credencial ?? false),
+        };
+        continue;
+      }
 
       if (v.estado === "pagado") {
         if (cancelado) {
           const aviso = `Cobro recibido vía ${ETIQUETA_PROVEEDOR[intento.p]} (${v.referencia}) sobre un pedido CANCELADO: hay que reembolsarlo.`;
           await anotarAviso(order.id, order.number, v.referencia, aviso);
-          return { estado: "revisar", detalle: aviso };
+          return recordar({ estado: "revisar", detalle: aviso });
         }
         await marcarPagadoVerificado(order.id, order.number, intento.p, v.referencia);
         // Vistazo único al resto de intentos: si otra sesión también aparece
@@ -366,19 +406,39 @@ export async function verificarPagoPedido(orderId: string): Promise<ResultadoPag
             );
           }
         }
-        return { estado: "pagado" };
+        return recordar({ estado: "pagado" });
       }
       if (v.estado === "no-coincide") sospecha = v.detalle;
     }
 
     if (sospecha) {
       await anotarAviso(order.id, order.number, sospecha, `Revisar cobro: ${sospecha}`);
-      return { estado: "revisar", detalle: sospecha };
+      return recordar({ estado: "revisar", detalle: sospecha });
     }
-    return { estado: cancelado ? "sin-verificar" : "pendiente" };
+
+    // Ningún intento pagado, y alguno se quedó sin respuesta: no se puede decir
+    // «no ha pagado». Si además fue la pasarela rechazando las llaves, el fallo
+    // no se va a arreglar solo y queda escrito en la bitácora una vez: mientras
+    // duren esas llaves, NINGÚN cobro se va a poder confirmar.
+    if (muda) {
+      if (muda.credencial) {
+        await anotarAviso(
+          order.id,
+          order.number,
+          "no-se-pudo-preguntar-credencial",
+          "La pasarela rechazó las llaves de la tienda, así que no se puede confirmar si este pedido se cobró. Revisa Pagos en el panel.",
+        );
+      }
+      console.error(`[pagos] pedido ${order.number}: no se pudo confirmar el cobro — ${muda.detalle}`);
+      return recordar({ estado: "sin-respuesta", detalle: muda.detalle });
+    }
+
+    return recordar({ estado: cancelado ? "sin-verificar" : "pendiente" });
   } catch (err) {
     console.error("[pagos] fallo al verificar el pago:", err);
-    return { estado: "pendiente" };
+    // Aquí tampoco se sabe si pagó: este catch cubre fallos nuestros (base de
+    // datos, un tipo inesperado), no una respuesta de la pasarela.
+    return { estado: "sin-respuesta", detalle: "No se pudo comprobar el cobro." };
   }
 }
 

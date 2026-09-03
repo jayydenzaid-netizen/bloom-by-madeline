@@ -9,9 +9,9 @@ import {
   stripeConfigurado,
 } from "@/lib/payments/config";
 import { minimoOnlineCents } from "@/lib/payments";
-import { armarOrdenPaypal, verificarOrdenPaypal } from "@/lib/payments/paypal";
-import { armarLinkSquare, verificarOrdenSquare } from "@/lib/payments/square";
-import { armarParamsSesionStripe, verificarSesionStripe } from "@/lib/payments/stripe";
+import { armarOrdenPaypal, probarPaypal, verificarOrdenPaypal } from "@/lib/payments/paypal";
+import { armarLinkSquare, diagnosticoSquare, probarSquare, verificarOrdenSquare } from "@/lib/payments/square";
+import { armarParamsSesionStripe, probarStripe, verificarSesionStripe } from "@/lib/payments/stripe";
 import { centavosADecimales, type DatosPago, type FetchLike } from "@/lib/payments/tipos";
 
 /**
@@ -348,4 +348,155 @@ test("Square: pagado solo con tenders que cubren el total exacto", async () => {
     { url: "/v2/orders/SQORDER", cuerpo: orden({ total_money: { amount: 100, currency: "USD" } }) },
   ]));
   assert.equal(descuadrado.estado, "no-coincide");
+});
+
+/* ══════════════════ diagnóstico: por qué falló la conexión ══════════════════
+ *
+ * Estos cinco tests cubren los cuatro fallos que se cazaron el 3 de septiembre.
+ * Todos tenían la misma forma: el código sabía la verdad y la tiraba a la basura
+ * justo antes de que sirviera para algo.
+ */
+
+test("Square: el `code` del error sobrevive y dice si el token caducó o lo revocaron", async () => {
+  const cfg = { activo: true, accessToken: "EAAA" + "x".repeat(20), locationId: "L123", entorno: "production" as const };
+
+  // Square manda el MISMO `detail` genérico para todos los fallos de
+  // autorización; el `code` es lo único que distingue los casos. Antes se
+  // quedaba solo con `detail` y el diagnóstico se perdía por el camino.
+  const conCodigo = (code: string) => ({
+    errors: [{ code, category: "AUTHENTICATION_ERROR", detail: "This request could not be authorized." }],
+  });
+
+  const caducado = await probarSquare(cfg, fetchFalso([
+    { url: "connect.squareup.com/v2/locations", status: 401, cuerpo: conCodigo("ACCESS_TOKEN_EXPIRED") },
+    { url: "squareupsandbox.com/v2/locations", status: 401, cuerpo: conCodigo("UNAUTHORIZED") },
+  ]));
+  assert.equal(caducado.ok, false);
+  assert.equal(caducado.codigo, "token-caducado");
+
+  const revocado = await probarSquare(cfg, fetchFalso([
+    { url: "connect.squareup.com/v2/locations", status: 401, cuerpo: conCodigo("ACCESS_TOKEN_REVOKED") },
+    { url: "squareupsandbox.com/v2/locations", status: 401, cuerpo: conCodigo("UNAUTHORIZED") },
+  ]));
+  assert.equal(revocado.codigo, "token-revocado");
+
+  const sinPermisos = await probarSquare(cfg, fetchFalso([
+    { url: "connect.squareup.com/v2/locations", status: 403, cuerpo: conCodigo("INSUFFICIENT_SCOPES") },
+    { url: "squareupsandbox.com/v2/locations", status: 401, cuerpo: conCodigo("UNAUTHORIZED") },
+  ]));
+  assert.equal(sinPermisos.codigo, "permisos-insuficientes");
+
+  assert.equal(diagnosticoSquare("APPLICATION_DISABLED"), "aplicacion-desactivada");
+  // Un código que no conocemos no se inventa: cae al genérico.
+  assert.equal(diagnosticoSquare("ALGO_NUEVO_DE_SQUARE"), "credencial-invalida");
+  assert.equal(diagnosticoSquare(undefined), "credencial-invalida");
+});
+
+test("Square: el token del OTRO entorno se detecta y se marca como entorno-cruzado", async () => {
+  const cfg = { activo: true, accessToken: "EAAA" + "x".repeat(20), locationId: "", entorno: "production" as const };
+  const r = await probarSquare(cfg, fetchFalso([
+    { url: "connect.squareup.com/v2/locations", status: 401, cuerpo: { errors: [{ code: "UNAUTHORIZED", category: "AUTHENTICATION_ERROR" }] } },
+    // En sandbox SÍ funciona: entonces el token es de pruebas.
+    { url: "squareupsandbox.com/v2/locations", cuerpo: { locations: [{ id: "LSANDBOX", name: "Pruebas", status: "ACTIVE" }] } },
+  ]));
+  assert.equal(r.ok, false);
+  assert.equal(r.codigo, "entorno-cruzado");
+  assert.match(r.detalle, /PRUEBAS/);
+});
+
+test("Square: un tender anulado NO es dinero y no marca el pedido como pagado", async () => {
+  const cfg = { activo: true, accessToken: "EAAA" + "x".repeat(20), locationId: "L123", entorno: "sandbox" as const };
+  const esperado = { numero: "BLM-1042", totalCents: 6020, currency: "USD" };
+  const orden = (tender: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
+    order: {
+      reference_id: "BLM-1042",
+      state: "OPEN",
+      total_money: { amount: 6020, currency: "USD" },
+      net_amount_due_money: { amount: 0 },
+      tenders: [tender],
+      ...extra,
+    },
+  });
+
+  // El agujero: se sumaban TODOS los tenders sin mirar su estado, así que un
+  // cobro anulado llevaba la suma hasta el total y el pedido se daba por pagado
+  // sin que el dinero existiera.
+  const anulado = await verificarOrdenSquare(cfg, "SQORDER", esperado, fetchFalso([
+    { url: "/v2/orders/SQORDER", cuerpo: orden({ id: "T1", amount_money: { amount: 6020 }, card_details: { status: "VOIDED" } }) },
+  ]));
+  assert.equal(anulado.estado, "pendiente");
+
+  // Uno solo retenido (autorizado) tampoco: el dinero aún no se ha movido.
+  const retenido = await verificarOrdenSquare(cfg, "SQORDER", esperado, fetchFalso([
+    { url: "/v2/orders/SQORDER", cuerpo: orden({ id: "T1", amount_money: { amount: 6020 }, card_details: { status: "AUTHORIZED" } }) },
+  ]));
+  assert.equal(retenido.estado, "pendiente");
+
+  // Y el capturado sí, como siempre.
+  const capturado = await verificarOrdenSquare(cfg, "SQORDER", esperado, fetchFalso([
+    { url: "/v2/orders/SQORDER", cuerpo: orden({ id: "T1", amount_money: { amount: 6020 }, card_details: { status: "CAPTURED" } }, { state: "COMPLETED" }) },
+  ]));
+  assert.deepEqual(capturado, { estado: "pagado", referencia: "T1" });
+
+  // Efectivo o tarjeta regalo no traen card_details y siguen contando.
+  const efectivo = await verificarOrdenSquare(cfg, "SQORDER", esperado, fetchFalso([
+    { url: "/v2/orders/SQORDER", cuerpo: orden({ id: "T1", amount_money: { amount: 6020 } }) },
+  ]));
+  assert.equal(efectivo.estado, "pagado");
+});
+
+test("un bajón de la pasarela NO se clasifica como llave mala", async () => {
+  // Este era el fallo más silencioso de todos: `probarStripe` daba «credencial»
+  // ante CUALQUIER respuesta de Stripe, y `llamarStripe` lanza también en un 429
+  // o un 500. Resultado: un bajón de Stripe apagaba el cobro con tarjeta de una
+  // tienda cuya llave era perfecta.
+  const stripe = { activo: true, secretKey: "sk_live_" + "x".repeat(20) };
+  const caida = await probarStripe(stripe, fetchFalso([
+    { url: "/v1/account", status: 500, cuerpo: { error: { message: "Internal server error" } } },
+    { url: "/v1/balance", status: 500, cuerpo: { error: { message: "Internal server error" } } },
+  ]));
+  assert.equal(caida.ok, false);
+  assert.equal(caida.motivo, "red", "un 500 de Stripe no dice nada sobre la llave");
+  assert.equal(caida.codigo, "sin-respuesta");
+
+  // Un rechazo de verdad sí es de la llave.
+  const rechazada = await probarStripe(stripe, fetchFalso([
+    { url: "/v1/account", status: 401, cuerpo: { error: { message: "Invalid API Key provided" } } },
+    { url: "/v1/balance", status: 401, cuerpo: { error: { message: "Invalid API Key provided" } } },
+  ]));
+  assert.equal(rechazada.motivo, "credencial");
+  assert.equal(rechazada.codigo, "credencial-invalida");
+
+  // Y lo mismo en PayPal, donde pedir el token marcaba SIEMPRE «credencial».
+  const paypal = { activo: true, clientId: "A".repeat(20), clientSecret: "E".repeat(20), entorno: "live" as const };
+  const ppCaida = await probarPaypal(paypal, fetchFalso([
+    { url: "/v1/oauth2/token", status: 503, cuerpo: { error_description: "Service Unavailable" } },
+  ]));
+  assert.equal(ppCaida.motivo, "red");
+  const ppMal = await probarPaypal(paypal, fetchFalso([
+    { url: "/v1/oauth2/token", status: 401, cuerpo: { error_description: "Client Authentication failed" } },
+  ]));
+  assert.equal(ppMal.motivo, "credencial");
+});
+
+test("la verificación distingue «no pagó» de «no pudimos preguntar»", async () => {
+  const cfg = { activo: true, secretKey: "sk_live_" + "x".repeat(20) };
+  const esperado = { numero: "BLM-1042", totalCents: 6020, currency: "USD" };
+
+  // Con las llaves rechazadas hay que decir «error» Y que fue la CREDENCIAL.
+  // Antes se devolvía un error sin más y el orquestador lo convertía en
+  // «pendiente», o sea «la clienta no pagó»: con un token muerto, todos los
+  // pedidos cobrados de verdad se quedaban así para siempre.
+  const rota = await verificarSesionStripe(cfg, "cs_test_1", esperado, fetchFalso([
+    { url: "/v1/checkout/sessions/cs_test_1", status: 401, cuerpo: { error: { message: "Invalid API Key" } } },
+  ]));
+  assert.equal(rota.estado, "error");
+  assert.equal(rota.estado === "error" && rota.credencial, true);
+
+  // Un timeout o un 500 también es «error», pero NO por la credencial.
+  const caida = await verificarSesionStripe(cfg, "cs_test_1", esperado, fetchFalso([
+    { url: "/v1/checkout/sessions/cs_test_1", status: 503, cuerpo: { error: { message: "down" } } },
+  ]));
+  assert.equal(caida.estado, "error");
+  assert.equal(caida.estado === "error" && caida.credencial, false);
 });

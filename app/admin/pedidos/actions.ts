@@ -92,6 +92,9 @@ export async function verificarPagoAdmin(formData: FormData): Promise<void> {
   if (resultado.estado === "pagado") volver(id, "pago-verificado");
   if (resultado.estado === "revisar") volver(id, "pago-revisar");
   if (resultado.estado === "sin-verificar") volver(id, "pago-sin-intentos");
+  // «No pudimos preguntar» no es «la clienta no pagó»: decirle lo segundo a
+  // Madeline la lleva a cancelar un pedido que quizá está cobrado.
+  if (resultado.estado === "sin-respuesta") volver(id, "pago-sin-respuesta");
   volver(id, "pago-sin-cobro");
 }
 

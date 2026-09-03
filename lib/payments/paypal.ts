@@ -46,12 +46,21 @@ async function tokenPaypal(cfg: ConfigPaypal, f: FetchLike): Promise<string> {
     cache: "no-store",
     signal: AbortSignal.timeout(15_000),
   });
-  const json = (await res.json().catch(() => ({}))) as { access_token?: string; error_description?: string };
+  const json = (await res.json().catch(() => ({}))) as {
+    access_token?: string;
+    error?: string;
+    error_description?: string;
+  };
   if (!res.ok || !json.access_token) {
-    // PayPal contestó y no dio token: las credenciales no valen (401 típico).
+    // Solo un 401/403 significa «esas credenciales no valen». Antes se marcaba
+    // TODO como fallo de credencial, así que un 500 o un 429 de PayPal —que no
+    // dicen nada sobre el Client ID— acababan apagando el método de pago de una
+    // tienda cuyas credenciales eran correctas.
+    const rechazo = res.status === 401 || res.status === 403;
     throw new ErrorPasarela(
       `PayPal: ${String(json.error_description ?? `HTTP ${res.status}`).slice(0, 200)}`,
-      true,
+      rechazo,
+      json.error,
     );
   }
   return json.access_token;
@@ -206,7 +215,11 @@ export async function verificarOrdenPaypal(
   try {
     token = await tokenPaypal(cfg, f);
   } catch (err) {
-    return { estado: "error", detalle: err instanceof Error ? err.message : "fallo de red" };
+    return {
+      estado: "error",
+      detalle: err instanceof Error ? err.message : "fallo de red",
+      credencial: err instanceof ErrorPasarela && err.credencial,
+    };
   }
 
   const ruta = `/v2/checkout/orders/${encodeURIComponent(ref)}`;
@@ -249,12 +262,18 @@ export async function verificarOrdenPaypal(
 export async function probarPaypal(cfg: ConfigPaypal, f: FetchLike = fetch): Promise<ResultadoPrueba> {
   try {
     await tokenPaypal(cfg, f);
-    return { ok: true, detalle: cfg.entorno === "sandbox" ? "credenciales válidas (sandbox)" : "credenciales válidas" };
+    return {
+      ok: true,
+      detalle: cfg.entorno === "sandbox" ? "credenciales válidas (sandbox)" : "credenciales válidas",
+      codigo: "ok",
+    };
   } catch (err) {
+    const rechazo = err instanceof ErrorPasarela && err.credencial;
     return {
       ok: false,
       detalle: err instanceof Error ? err.message : "fallo de red",
-      motivo: err instanceof ErrorPasarela && err.credencial ? "credencial" : "red",
+      motivo: rechazo ? "credencial" : "red",
+      codigo: rechazo ? "credencial-invalida" : "sin-respuesta",
     };
   }
 }

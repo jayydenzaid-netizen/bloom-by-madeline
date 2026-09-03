@@ -108,6 +108,14 @@ const AVISOS: Record<string, { tone: BadgeTone; label: string; texto: string }> 
     label: "Cobro",
     texto: "Este pedido no tiene ninguna sesión de pago online que verificar.",
   },
+  // Distinto de «no hay cobro»: aquí NO SE PUDO PREGUNTAR. Decir lo primero
+  // llevaría a cancelar un pedido que a lo mejor está cobrado.
+  "pago-sin-respuesta": {
+    tone: "warning",
+    label: "Sin respuesta",
+    texto:
+      "No pudimos preguntarle a la pasarela si este pedido se cobró (puede estar caída, o las llaves de la tienda ya no valen). NO significa que la clienta no haya pagado: revisa Pagos en el panel y vuelve a intentarlo antes de cancelar nada.",
+  },
 };
 
 /**
