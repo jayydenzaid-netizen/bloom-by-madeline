@@ -5,12 +5,20 @@ import {
   CONFIG_PAGOS_VACIA,
   metodosOnlineActivos,
   type ConfigPagos,
+  type MetodoOnline,
   paypalConfigurado,
   squareConfigurado,
   stripeConfigurado,
 } from "@/lib/payments/config";
 import { minimoOnlineCents } from "@/lib/payments";
 import { diasDesde, limpiarSalud, saludPermiteCobrar } from "@/lib/payments/estado";
+import {
+  limpiarPegado,
+  PROVEEDORES,
+  proveedorPorId,
+  reconocerConValores,
+  reconocerCredencial,
+} from "@/lib/payments/proveedores";
 import { armarOrdenPaypal, probarPaypal, verificarOrdenPaypal } from "@/lib/payments/paypal";
 import { armarLinkSquare, diagnosticoSquare, probarSquare, verificarOrdenSquare } from "@/lib/payments/square";
 import { armarParamsSesionStripe, probarStripe, verificarSesionStripe } from "@/lib/payments/stripe";
@@ -572,4 +580,144 @@ test("diasDesde: cuenta los días y aguanta una fecha rota", () => {
   assert.equal(diasDesde({ resultado: "ok", codigo: "ok", en: "2026-09-03T12:00:00.000Z" }, ahora), 7);
   assert.equal(diasDesde({ resultado: "ok", codigo: "ok", en: "no es una fecha" }, ahora), null);
   assert.equal(diasDesde(undefined, ahora), null);
+});
+
+/* ════════════════════ reconocer lo que se pega ════════════════════
+ *
+ * Es la pieza que permite que el panel tenga UNA caja donde pegar. Lo que hay
+ * que vigilar aquí no es que acierte —eso es fácil—, sino que NO SE EQUIVOQUE:
+ * meter un token de Square en el campo del secreto de PayPal manda a cobrar al
+ * sitio equivocado, y eso es peor que no reconocer nada.
+ */
+
+/** Longitudes realistas: las credenciales de verdad son largas. */
+const SK_LIVE = "sk_live_" + "A1b2C3d4E5".repeat(3);
+const SK_TEST = "sk_test_" + "A1b2C3d4E5".repeat(3);
+const RK_LIVE = "rk_live_" + "A1b2C3d4E5".repeat(3);
+const PK_LIVE = "pk_live_" + "A1b2C3d4E5".repeat(3);
+const SQ_TOKEN = "EAAA" + "lMnOpQrStU".repeat(4);
+const SQ_LOCAL = "L8FPZ7DK9YXBQ";
+const PP_ID = "A" + "21AbCdEfGh".repeat(8);
+const PP_SECRET = "E" + "LmNoPqRsTu".repeat(7);
+
+test("cada credencial se reconoce por su forma, y su entorno solo si lo dice", () => {
+  assert.deepEqual(reconocerCredencial(SK_LIVE), { proveedor: "stripe", campo: "secretKey", entorno: "real" });
+  assert.deepEqual(reconocerCredencial(SK_TEST), { proveedor: "stripe", campo: "secretKey", entorno: "pruebas" });
+  assert.deepEqual(reconocerCredencial(RK_LIVE), { proveedor: "stripe", campo: "secretKey", entorno: "real" });
+
+  // Square y PayPal NO dicen su entorno: queda sin decidir a propósito, porque
+  // adivinarlo mandaría a cobrar al entorno equivocado. Lo resuelve la sonda.
+  const sq = reconocerCredencial(SQ_TOKEN);
+  assert.equal(sq?.proveedor, "square");
+  assert.equal(sq?.campo, "accessToken");
+  assert.equal(sq?.entorno, undefined);
+
+  assert.equal(reconocerCredencial(SQ_LOCAL)?.campo, "locationId");
+  assert.equal(reconocerCredencial(PP_ID)?.campo, "clientId");
+  assert.equal(reconocerCredencial(PP_SECRET)?.campo, "clientSecret");
+  assert.equal(reconocerCredencial(PP_SECRET)?.proveedor, "paypal");
+});
+
+test("⭐ un token de Square NUNCA se confunde con el secreto de PayPal", () => {
+  // Los dos empiezan por E. Si el patrón de PayPal se comprobara antes, TODOS
+  // los tokens de Square acabarían en la casilla equivocada y el cobro se
+  // intentaría contra la cuenta de otro proveedor.
+  for (const cola of ["lMnOpQrStU", "0123456789", "ZzYyXxWwVv", "_-_-_-_-_-"]) {
+    const token = "EAAA" + cola.repeat(4);
+    const pista = reconocerCredencial(token);
+    assert.equal(pista?.proveedor, "square", `«${token.slice(0, 14)}…» debería ser de Square`);
+  }
+});
+
+test("la llave publicable de Stripe se reconoce PARA PODER RECHAZARLA", () => {
+  const pista = reconocerCredencial(PK_LIVE);
+  assert.equal(pista?.proveedor, "stripe");
+  assert.equal(pista?.problema, "llave-no-secreta");
+});
+
+test("lo que no se parece a nada no se fuerza a ningún sitio", () => {
+  for (const basura of ["", "   ", "hola", "1234", "bloombymadeline", "https://squareup.com/dashboard", "sk_live_corta"]) {
+    assert.equal(reconocerCredencial(basura), null, `«${basura}» no debería reconocerse`);
+  }
+});
+
+test("aguanta cómo se pega de verdad: con etiqueta, comillas y saltos de línea", () => {
+  assert.equal(limpiarPegado(`  ${SK_LIVE}  `), SK_LIVE);
+  assert.equal(limpiarPegado(`Secret key: ${SK_LIVE}`), SK_LIVE);
+  assert.equal(limpiarPegado(`"${SK_LIVE}"`), SK_LIVE);
+  assert.equal(limpiarPegado(`STRIPE_SECRET_KEY="${SK_LIVE}"`), SK_LIVE);
+});
+
+test("⭐ juntar los trozos solo si no cambia la respuesta", () => {
+  // (a) Etiqueta SIN dos puntos. Juntándolo daría «AccesstokenEAAA…», que
+  // empieza por A y pasa por un Client ID de PayPal: un token de Square leído
+  // como credencial de OTRO proveedor. Manda el trozo.
+  assert.equal(reconocerCredencial(`Access token ${SQ_TOKEN}`)?.proveedor, "square");
+  assert.equal(reconocerCredencial(`Access token ${SQ_TOKEN}`)?.campo, "accessToken");
+
+  // (b) Un valor cortado por el ancho de la ventana al copiar: los dos
+  // veredictos coinciden (Stripe), así que se junta y se reconoce entero.
+  const pista = reconocerCredencial(`${SK_LIVE.slice(0, 20)} ${SK_LIVE.slice(20)}`);
+  assert.equal(pista?.proveedor, "stripe");
+  assert.equal(pista?.entorno, "real");
+
+  // Y una llave pegada entera se guarda entera.
+  assert.equal(reconocerConValores(SK_LIVE)[0]?.valor, SK_LIVE);
+});
+
+test("pegar el bloque entero de PayPal saca las dos credenciales de golpe", () => {
+  // Tal cual se copia de developer.paypal.com: etiquetas y valores mezclados.
+  const bloque = `
+    Client ID
+    ${PP_ID}
+    Secret
+    ${PP_SECRET}
+  `;
+  const pistas = reconocerConValores(bloque);
+  assert.equal(pistas.length, 2);
+  assert.deepEqual(
+    pistas.map((p) => p.campo).sort(),
+    ["clientId", "clientSecret"],
+  );
+  assert.equal(pistas.every((p) => p.proveedor === "paypal"), true);
+  assert.equal(pistas.find((p) => p.campo === "clientId")?.valor, PP_ID);
+  assert.equal(pistas.find((p) => p.campo === "clientSecret")?.valor, PP_SECRET);
+});
+
+test("pegar credenciales de DOS procesadores se detecta como tal", () => {
+  // La acción lo rechaza en vez de guardar media configuración de cada uno.
+  const pistas = reconocerConValores(`${SK_LIVE}\n${SQ_TOKEN}`);
+  assert.equal(new Set(pistas.map((p) => p.proveedor)).size, 2);
+});
+
+test("el mismo campo dos veces: gana el primero", () => {
+  const otra = "sk_live_" + "Z9y8X7w6V5".repeat(3);
+  const pistas = reconocerConValores(`${SK_LIVE} ${otra}`);
+  assert.equal(pistas.length, 1);
+  assert.equal(pistas[0].valor, SK_LIVE);
+});
+
+test("el registro y el tipo de proveedores no se pueden desincronizar", () => {
+  // Si alguien añade "clover" al tipo y se olvida del registro, `proveedorPorId`
+  // lanzaría en producción al pintar el panel. Que salte aquí.
+  const delTipo: MetodoOnline[] = ["stripe", "paypal", "square"];
+  assert.deepEqual(PROVEEDORES.map((p) => p.id).sort(), [...delTipo].sort());
+  for (const id of delTipo) assert.equal(proveedorPorId(id).id, id);
+
+  // Y cada campo declarado tiene que existir de verdad en su configuración: un
+  // nombre mal escrito guardaría en un campo fantasma sin decir nada.
+  const vacias: Record<MetodoOnline, Record<string, unknown>> = {
+    stripe: CONFIG_PAGOS_VACIA.stripe as unknown as Record<string, unknown>,
+    paypal: CONFIG_PAGOS_VACIA.paypal as unknown as Record<string, unknown>,
+    square: CONFIG_PAGOS_VACIA.square as unknown as Record<string, unknown>,
+  };
+  for (const def of PROVEEDORES) {
+    for (const campo of def.campos) {
+      assert.ok(
+        campo.nombre in vacias[def.id],
+        `${def.id}: el campo «${campo.nombre}» no existe en su configuración`,
+      );
+      assert.ok(campo.id.length > 0, `${def.id}: el campo «${campo.nombre}» necesita un id estable`);
+    }
+  }
 });

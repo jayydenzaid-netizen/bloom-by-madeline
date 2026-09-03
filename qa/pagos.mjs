@@ -108,6 +108,83 @@ anota(
   await page.evaluate(() => !![...document.querySelectorAll("a")].find((a) => a.getAttribute("href") === "/admin/pagos")),
 );
 
+/* ── 2 bis. La caja de pegar: reconocer sin que la dueña elija nada ──
+ *
+ * Lo que se vigila aquí no es que acierte, sino que NO SE EQUIVOQUE DE
+ * PROVEEDOR. Un token de Square metido en el campo de PayPal manda a cobrar a
+ * la cuenta de otro, y el sitio donde eso puede pasar es el reconocimiento.
+ */
+async function pegarEnLaCaja(texto) {
+  await page.goto(`${BASE}/admin/pagos`, { waitUntil: "networkidle2", timeout: 90000 });
+  await esperar(page, () => !!document.querySelector("#pegar-credencial"));
+  const antes = await page.evaluate(() => location.search);
+  await page.evaluate((t) => {
+    const caja = document.querySelector("#pegar-credencial");
+    caja.value = t;
+    caja.dispatchEvent(new Event("input", { bubbles: true }));
+    caja.closest("form").querySelector('button[type="submit"]').click();
+  }, texto);
+  await esperarRespuesta(page, antes);
+  return page.evaluate(() => location.search);
+}
+
+anota(
+  "la caja de pegar existe y es lo primero de la página",
+  await page.evaluate(() => {
+    const caja = document.querySelector("#pegar-credencial");
+    if (!caja) return false;
+    const tarjetas = [...document.querySelectorAll(".adm-card")];
+    return tarjetas.length > 0 && tarjetas[0].contains(caja);
+  }),
+);
+
+anota(
+  "lo que no se parece a una credencial no se guarda en ningún sitio",
+  /error=pegado-desconocido/.test(await pegarEnLaCaja("hola que tal, esto no es una llave")),
+);
+
+anota(
+  "credenciales de DOS procesadores a la vez se rechazan, no se guardan a medias",
+  /error=pegado-mezclado/.test(
+    await pegarEnLaCaja(`sk_live_${"A1b2C3d4E5".repeat(3)}\nEAAA${"lMnOpQrStU".repeat(4)}`),
+  ),
+);
+
+anota(
+  "una llave pegada desde un .env se reconoce como Stripe (y la pasarela la rechaza)",
+  /error=stripe-fallo-activar/.test(
+    await pegarEnLaCaja(`STRIPE_SECRET_KEY="sk_live_${"A1b2C3d4E5".repeat(3)}"`),
+  ),
+);
+
+// ⭐ El caso peligroso: la etiqueta viene sin dos puntos, así que juntar los
+// trozos daría «AccesstokenEAAA…» — empieza por A y tiene la longitud de un
+// Client ID de PayPal. Si el reconocimiento se equivoca, el token de Square
+// acaba en la cuenta de otro proveedor.
+const trasSquare = await pegarEnLaCaja(`Access token EAAA${"lMnOpQrStU".repeat(4)}`);
+anota(
+  "⭐ «Access token EAAA…» va a Square, nunca a PayPal",
+  /error=square-fallo-activar/.test(trasSquare),
+  `url=${trasSquare}`,
+);
+
+// Se deja el panel como estaba para que las comprobaciones siguientes partan de
+// donde esperan.
+await page.goto(`${BASE}/admin/pagos`, { waitUntil: "networkidle2", timeout: 90000 });
+for (const proveedor of ["stripe", "square"]) {
+  const antes = await page.evaluate(() => location.search);
+  const habia = await page.evaluate((prov) => {
+    const f = [...document.querySelectorAll("form")].find(
+      (x) => x.querySelector(`input[name="proveedor"][value="${prov}"]`) && /Desconectar/.test(x.textContent),
+    );
+    const b = f?.querySelector("button");
+    if (!b || b.disabled) return false;
+    b.click();
+    return true;
+  }, proveedor);
+  if (habia) await esperarRespuesta(page, antes);
+}
+
 /* ── 2. Una llave publicable (pk_) se rechaza con su explicación ── */
 await page.type("#stripe-key", "pk_live_esta_no_cobra_nada");
 await enviarFormularioDe(page, "#stripe-key");
@@ -143,18 +220,27 @@ await enviarFormularioDe(page, "#stripe-key");
 // (OJO: los badges van en mayúsculas por CSS e innerText las devuelve así:
 // las regex van siempre con /i.)
 await esperar(page, () => /rechazó esa llave/i.test(document.querySelector(".pag-aviso")?.textContent ?? ""), 20000);
-const trasActivar = await page.evaluate(() => ({
-  aviso: document.querySelector(".pag-aviso")?.textContent?.trim() ?? "(sin aviso)",
-  activo: /Cobrando/i.test(document.body.innerText),
-  // El panel ahora dice POR QUE no se activo, no solo que no se activo: la
-  // insignia queda en «Rechazada» y la tarjeta explica que hacer.
-  rechazada: /Rechazada/i.test(document.body.innerText),
-  diagnostico: /rechazó esas llaves|copiaste enteras/i.test(document.body.innerText),
-}));
+// Se mira la INSIGNIA DE LA TARJETA DE STRIPE, no el texto de la pagina.
+// Mirando el texto suelto, la palabra «cobrando» de la ayuda de la caja de
+// pegar contaba como si el metodo estuviera activo: una comprobacion que
+// depende de la prosa de al lado no comprueba nada.
+const trasActivar = await page.evaluate(() => {
+  const tarjeta = document.querySelector("#stripe-key")?.closest(".adm-card");
+  const insignias = [...(tarjeta?.querySelectorAll(".adm-badge") ?? [])].map((b) => b.textContent?.trim() ?? "");
+  const suTexto = tarjeta?.textContent ?? "";
+  return {
+    aviso: document.querySelector(".pag-aviso")?.textContent?.trim() ?? "(sin aviso)",
+    insignias: insignias.join(" · ") || "(ninguna)",
+    activo: insignias.some((t) => /cobrando/i.test(t)),
+    // El panel ahora dice POR QUE no se activo, no solo que no se activo.
+    rechazada: insignias.some((t) => /rechazada/i.test(t)),
+    diagnostico: /rechazó esas llaves|copiaste enteras/i.test(suTexto),
+  };
+});
 anota(
   "una llave que la pasarela RECHAZA no puede activarse (queda guardada y apagada)",
   !trasActivar.activo && trasActivar.rechazada && trasActivar.diagnostico && /rechazó esa llave/i.test(trasActivar.aviso),
-  trasActivar.aviso.slice(0, 90),
+  `insignias=[${trasActivar.insignias}] diagnostico=${trasActivar.diagnostico}`,
 );
 anota(
   "la llave no se enseña entera: solo su final",

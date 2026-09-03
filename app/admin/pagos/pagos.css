@@ -166,3 +166,41 @@
   display: grid;
   gap: 6px;
 }
+
+/* La caja de pegar: el camino corto. El boton va al lado en pantalla ancha y
+   debajo en movil, donde una fila de dos deja el boton demasiado estrecho. */
+.pag-pegar {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  margin-bottom: 8px;
+}
+.pag-pegar textarea {
+  width: 100%;
+  min-height: 74px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+}
+@media (max-width: 640px) {
+  .pag-pegar {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* De donde sacar cada credencial: una linea por procesador que falte. */
+.pag-donde {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.pag-donde li {
+  display: grid;
+  gap: 2px;
+  padding-left: 13px;
+  border-left: 2px solid var(--adm-line);
+}

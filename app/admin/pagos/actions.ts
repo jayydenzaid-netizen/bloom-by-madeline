@@ -18,6 +18,12 @@ import { anotarSalud, leerSalud, olvidarSalud, type SaludProveedor } from "@/lib
 import { probarPaypal } from "@/lib/payments/paypal";
 import { probarSquare } from "@/lib/payments/square";
 import { probarStripe } from "@/lib/payments/stripe";
+import {
+  PROVEEDORES,
+  proveedorPorId,
+  reconocerConValores,
+  type PistaConValor,
+} from "@/lib/payments/proveedores";
 import type { ResultadoPrueba } from "@/lib/payments/tipos";
 import { requireOwner } from "@/lib/permissions";
 import { getSettings, saveSettings } from "@/lib/settings";
@@ -88,10 +94,55 @@ function terminar(resultado: { hecho?: string; error?: string }): never {
 /* ─────────────────────── sondeo y salud ─────────────────────── */
 
 /** Pregunta a la pasarela por las credenciales YA GUARDADAS de un proveedor. */
-async function sondear(proveedor: MetodoOnline, cfg: ConfigPagos): Promise<ResultadoPrueba> {
+async function sondearUnaVez(proveedor: MetodoOnline, cfg: ConfigPagos): Promise<ResultadoPrueba> {
   if (proveedor === "stripe") return probarStripe(cfg.stripe);
   if (proveedor === "paypal") return probarPaypal(cfg.paypal);
   return probarSquare(cfg.square);
+}
+
+/** El mismo `cfg` con el entorno del proveedor cambiado al otro. */
+function conElOtroEntorno(proveedor: MetodoOnline, cfg: ConfigPagos): ConfigPagos {
+  if (proveedor === "paypal") {
+    return { ...cfg, paypal: { ...cfg.paypal, entorno: cfg.paypal.entorno === "sandbox" ? "live" : "sandbox" } };
+  }
+  if (proveedor === "square") {
+    return {
+      ...cfg,
+      square: { ...cfg.square, entorno: cfg.square.entorno === "sandbox" ? "production" : "sandbox" },
+    };
+  }
+  return cfg;
+}
+
+/**
+ * Sondea y, si hace falta, AVERIGUA EL ENTORNO en vez de preguntárselo a nadie.
+ *
+ * Por qué: «Entorno» era el campo más confuso del panel y la causa número uno de
+ * que un cobro no funcione — se pega el token de la pestaña Sandbox teniendo el
+ * desplegable en «Real» (o al revés) y el proveedor solo contesta «no
+ * autorizado», que no explica nada. Los tokens de Square y las credenciales de
+ * PayPal no dicen de qué entorno son, así que la única fuente fiable es
+ * preguntar: si con el entorno guardado nos rechazan, se prueba el otro. Si allí
+ * funciona, ESE es el bueno y se guarda. La dueña no vuelve a elegirlo nunca.
+ *
+ * Stripe no entra aquí porque su llave lleva el entorno escrito (sk_live_ /
+ * sk_test_): probar el otro no tendría ningún sentido.
+ */
+async function sondear(
+  proveedor: MetodoOnline,
+  cfg: ConfigPagos,
+): Promise<{ r: ResultadoPrueba; cfg: ConfigPagos; entornoCambiado: boolean }> {
+  const primera = await sondearUnaVez(proveedor, cfg);
+  const puedeDeducirse = proveedorPorId(proveedor).entornoSeDeduce;
+  // Solo cuando la pasarela RECHAZA de verdad: un fallo de red no dice nada del
+  // entorno y reintentarlo en el otro solo alargaría la espera.
+  if (primera.ok || !puedeDeducirse || primera.motivo !== "credencial") {
+    return { r: primera, cfg, entornoCambiado: false };
+  }
+  const otro = conElOtroEntorno(proveedor, cfg);
+  const segunda = await sondearUnaVez(proveedor, otro);
+  if (!segunda.ok) return { r: primera, cfg, entornoCambiado: false };
+  return { r: segunda, cfg: otro, entornoCambiado: true };
 }
 
 /** El resultado del sondeo, traducido a lo que se guarda en `paymentsEstado`. */
@@ -178,8 +229,15 @@ export async function conectarProveedor(formData: FormData): Promise<void> {
   /* ── 2. Guardar APAGADO antes de hablar con nadie ── */
   await guardar(proveedor, cfg);
 
-  /* ── 3. Un solo sondeo ── */
-  const r = await sondear(proveedor, cfg);
+  /* ── 3. Un solo sondeo (que además averigua el entorno si hace falta) ── */
+  const sonda = await sondear(proveedor, cfg);
+  const r = sonda.r;
+  if (sonda.entornoCambiado) {
+    // El token era del otro entorno: se corrige y se guarda, en vez de
+    // devolverle un error que la obligue a adivinar cuál de los dos era.
+    cfg = sonda.cfg;
+    await guardar(proveedor, cfg);
+  }
 
   // Square: el identificador de local escrito a mano casi siempre viene mal (se
   // pone el nombre del negocio en vez del código). Si el token vale y la cuenta
@@ -273,7 +331,12 @@ export async function comprobarProveedor(formData: FormData): Promise<void> {
   let cfg = await leerConfigPagos();
   if (!hayCredenciales(proveedor, cfg)) terminar({ error: `${proveedor}-sin-llaves` });
 
-  const r = await sondear(proveedor, cfg);
+  const sonda = await sondear(proveedor, cfg);
+  const r = sonda.r;
+  if (sonda.entornoCambiado) {
+    cfg = sonda.cfg;
+    await guardar(proveedor, cfg);
+  }
 
   let rellenado = false;
   if (proveedor === "square" && "locales" in r) {
@@ -305,7 +368,9 @@ export async function comprobarProveedor(formData: FormData): Promise<void> {
 export async function comprobarTodas(): Promise<void> {
   const admin = await exigirDuena();
   const cfg = await leerConfigPagos();
-  const proveedores: MetodoOnline[] = ["stripe", "paypal", "square"];
+  // Del registro, no de una lista escrita a mano: un procesador nuevo entra
+  // aquí solo.
+  const proveedores: MetodoOnline[] = PROVEEDORES.map((x) => x.id);
   const hechas = proveedores.filter((p) => hayCredenciales(p, cfg));
   if (hechas.length === 0) terminar({ error: "nada-que-comprobar" });
 
@@ -313,9 +378,10 @@ export async function comprobarTodas(): Promise<void> {
   // lee y reescribe la misma fila. En paralelo se pisarían entre ellas.
   let fallos = 0;
   for (const p of hechas) {
-    const r = await sondear(p, cfg);
-    if (!r.ok) fallos += 1;
-    await anotarSalud(p, saludDe(p, r, cfg));
+    const sonda = await sondear(p, cfg);
+    if (sonda.entornoCambiado) await guardar(p, sonda.cfg);
+    if (!sonda.r.ok) fallos += 1;
+    await anotarSalud(p, saludDe(p, sonda.r, sonda.cfg));
   }
 
   await registrarActividad({
@@ -381,4 +447,124 @@ export async function desconectarProveedor(formData: FormData): Promise<void> {
     summary: `Quitó las llaves de ${proveedor} en Pagos.`,
   });
   terminar({ hecho: `${proveedor}-quitado` });
+}
+
+/* ═══════════════════════ pegar y que se detecte solo ═══════════════════════ */
+
+/**
+ * UNA caja donde pegar lo que sea, y el sistema decide de quién es.
+ *
+ * Es la respuesta a lo que de verdad hace una dueña de boutique: abre el panel
+ * de su procesador, selecciona el bloque de credenciales y lo pega. No sabe (ni
+ * tiene por qué) si eso es un «Access token» de Square, un «Client ID» de PayPal
+ * o una llave secreta de Stripe, y menos aún si es de pruebas o real.
+ *
+ * `reconocerConValores` mira la FORMA de lo pegado y lo reparte. Después se
+ * guarda, se sondea —averiguando el entorno de paso— y se enciende si el
+ * proveedor confirma. Acepta varias credenciales del mismo proveedor a la vez,
+ * que es justo lo que hace falta en PayPal (Client ID + Secret).
+ *
+ * Lo que NO hace: adivinar. Si no reconoce nada, lo dice y no toca nada; si lo
+ * pegado es de dos proveedores distintos, también, porque mezclarlos dejaría una
+ * configuración a medias. Los campos de cada tarjeta siguen ahí para el caso raro.
+ */
+export async function pegarCredencial(formData: FormData): Promise<void> {
+  const admin = await exigirDuena();
+  const pegado = texto(formData, "pegado");
+  if (!pegado) terminar({ error: "pegado-vacio" });
+
+  const pistas = reconocerConValores(pegado);
+  if (pistas.length === 0) terminar({ error: "pegado-desconocido" });
+
+  // Un problema conocido (la llave publicable de Stripe) se dice tal cual: es
+  // más útil que un «no reconocido» y evita guardar algo que no puede cobrar.
+  const conProblema = pistas.find((p) => p.problema);
+  if (conProblema) {
+    await anotarSalud(conProblema.proveedor, {
+      resultado: "rechazada",
+      codigo: conProblema.problema ?? "credencial-invalida",
+      en: new Date().toISOString(),
+    });
+    terminar({ error: "stripe-clave" });
+  }
+
+  const proveedores = [...new Set(pistas.map((p) => p.proveedor))];
+  if (proveedores.length > 1) terminar({ error: "pegado-mezclado" });
+  const proveedor = proveedores[0];
+
+  /* ── Meter cada valor en su sitio, sin tocar lo que no venga ── */
+  const previa = await leerConfigPagos();
+  let cfg = aplicarPistas(previa, proveedor, pistas);
+
+  if (!hayCredenciales(proveedor, cfg)) {
+    // Reconocido pero incompleto: PayPal sin su Secret, por ejemplo. Se guarda
+    // lo que hay (no se pierde) y se dice qué falta.
+    await guardar(proveedor, cfg);
+    terminar({ error: `${proveedor}-sin-llaves` });
+  }
+
+  await guardar(proveedor, cfg);
+  const sonda = await sondear(proveedor, cfg);
+  if (sonda.entornoCambiado) {
+    cfg = sonda.cfg;
+    await guardar(proveedor, cfg);
+  }
+
+  // Square: el local se rellena solo cuando la cuenta tiene uno.
+  if (proveedor === "square" && "locales" in sonda.r) {
+    const locales = (sonda.r as { locales: { id: string; nombre: string }[] }).locales;
+    if (locales.length === 1 && cfg.square.locationId !== locales[0].id) {
+      cfg = { ...cfg, square: { ...cfg.square, locationId: locales[0].id } };
+      await guardar("square", cfg);
+    }
+  }
+
+  await anotarSalud(proveedor, saludDe(proveedor, sonda.r, cfg));
+  await registrarActividad({
+    admin,
+    action: "update",
+    entityType: "setting",
+    summary: `Pegó una credencial: reconocida como ${proveedor} (${pistas.map((p) => p.campo).join(", ")}); ${sonda.r.ok ? "conectada" : "rechazada"}.`,
+  });
+
+  if (!sonda.r.ok) {
+    terminar({ error: sonda.r.motivo === "red" ? `${proveedor}-sin-respuesta` : `${proveedor}-fallo-activar` });
+  }
+
+  // Reconocido, comprobado y funcionando: se enciende. Es el punto de todo esto
+  // — pegar y estar cobrando, sin pasar por tres botones y un desplegable.
+  await guardar(proveedor, encender(proveedor, cfg));
+  terminar({ hecho: `${proveedor}-activo` });
+}
+
+/** Coloca cada valor reconocido en su campo de la configuración. */
+function aplicarPistas(
+  previa: ConfigPagos,
+  proveedor: MetodoOnline,
+  pistas: PistaConValor[],
+): ConfigPagos {
+  const valor = (campo: string) => pistas.find((p) => p.campo === campo)?.valor;
+  if (proveedor === "stripe") {
+    return { ...previa, stripe: { activo: false, secretKey: valor("secretKey") ?? previa.stripe.secretKey } };
+  }
+  if (proveedor === "paypal") {
+    return {
+      ...previa,
+      paypal: {
+        ...previa.paypal,
+        activo: false,
+        clientId: valor("clientId") ?? previa.paypal.clientId,
+        clientSecret: valor("clientSecret") ?? previa.paypal.clientSecret,
+      },
+    };
+  }
+  return {
+    ...previa,
+    square: {
+      ...previa.square,
+      activo: false,
+      accessToken: valor("accessToken") ?? previa.square.accessToken,
+      locationId: valor("locationId") ?? previa.square.locationId,
+    },
+  };
 }

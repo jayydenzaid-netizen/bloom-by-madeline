@@ -10,6 +10,7 @@ import {
   type MetodoOnline,
 } from "@/lib/payments/config";
 import { diasDesde, leerSalud, type SaludProveedor } from "@/lib/payments/estado";
+import { PROVEEDORES, type CampoProveedor, type DefProveedor } from "@/lib/payments/proveedores";
 import { requireOwner } from "@/lib/permissions";
 import { getSettings } from "@/lib/settings";
 import { Badge, Card, Field, PageHeader, StatCard, type BadgeTone } from "../_components/ui";
@@ -20,6 +21,7 @@ import {
   conectarProveedor,
   desconectarProveedor,
   guardarManuales,
+  pegarCredencial,
 } from "./actions";
 import "./pagos.css";
 
@@ -102,6 +104,11 @@ const ERRORES: Record<string, string> = {
   "sin-metodos":
     "No puedes apagar el DM y la recogida sin tener una pasarela activa: nadie podría terminar una compra.",
   "nada-que-comprobar": "Todavía no has conectado ninguna pasarela, así que no hay nada que comprobar.",
+  "pegado-vacio": "No pegaste nada. Copia la credencial de tu procesador y pégala en la caja.",
+  "pegado-desconocido":
+    "Eso no se parece a ninguna credencial que reconozcamos. Copia el valor completo (sin recortarlo) de Stripe, Square o PayPal, o rellena los campos de su tarjeta a mano.",
+  "pegado-mezclado":
+    "Pegaste credenciales de dos procesadores distintos a la vez. Hazlo de uno en uno para que no quede nada a medias.",
   desconocido: "No se pudo aplicar el cambio. Inténtalo otra vez.",
 };
 
@@ -222,24 +229,105 @@ function Diagnostico({ e }: { e: EstadoProveedor }) {
 }
 
 /** Monograma de la marca. Texto, no logotipo: el nombre se puede usar, la marca no. */
-function Marca({ proveedor }: { proveedor: MetodoOnline }) {
-  const iniciales = { stripe: "S", paypal: "PP", square: "□" }[proveedor];
+function TituloProveedor({ def }: { def: DefProveedor }) {
   return (
-    <span className={`pag-marca pag-marca-${proveedor}`} aria-hidden="true">
-      {iniciales}
+    <span className="pag-titulo">
+      <span className={`pag-marca pag-marca-${def.id}`} aria-hidden="true">
+        {def.monograma}
+      </span>
+      <span>
+        {def.etiqueta}
+        <span className="adm-muted adm-small">{def.paraQue}</span>
+      </span>
     </span>
   );
 }
 
-function TituloProveedor({ proveedor, sub }: { proveedor: MetodoOnline; sub: string }) {
+/** Lo que promete cada método en la casilla de encender. */
+const TEXTO_ENCENDER: Record<MetodoOnline, string> = {
+  stripe: "La clienta paga con tarjeta en la página segura de Stripe y el dinero entra en tu cuenta.",
+  square: "La clienta paga con tarjeta en la página segura de Square — la misma cuenta que tu lector.",
+  paypal: "La clienta paga con su cuenta de PayPal o con tarjeta, sin crear cuenta.",
+};
+
+/** El valor guardado de un campo, sea del proveedor que sea. */
+function valorGuardado(config: ConfigPagos, proveedor: MetodoOnline, campo: string): string {
+  const fuente = config[proveedor] as unknown as Record<string, unknown>;
+  const v = fuente?.[campo];
+  return typeof v === "string" ? v : "";
+}
+
+/**
+ * Un campo de credencial, pintado desde el registro.
+ *
+ * Los secretos van como contraseña y no se rellenan con lo guardado: se enseña
+ * solo su final y dejarlo vacío lo conserva. Los que no son secretos (el local
+ * de Square, el Client ID de PayPal) sí se rellenan, porque hay que poder verlos
+ * y corregirlos.
+ */
+function CampoCredencial({
+  def,
+  campo,
+  config,
+}: {
+  def: DefProveedor;
+  campo: CampoProveedor;
+  config: ConfigPagos;
+}) {
+  const guardado = valorGuardado(config, def.id, campo.nombre);
+  const pista = campo.secreto
+    ? guardado
+      ? `Guardado (${final(guardado)}). Déjalo vacío para conservarlo.`
+      : `${campo.ayuda} Lo encuentras en ${def.donde}.`
+    : guardado
+      ? campo.ayuda
+      : `${campo.ayuda}`;
   return (
-    <span className="pag-titulo">
-      <Marca proveedor={proveedor} />
-      <span>
-        {ETIQUETA_PROVEEDOR[proveedor]}
-        <span className="adm-muted adm-small">{sub}</span>
-      </span>
-    </span>
+    <Field label={campo.etiqueta} htmlFor={campo.id} hint={pista}>
+      <input
+        type={campo.secreto ? "password" : "text"}
+        id={campo.id}
+        name={campo.nombre}
+        autoComplete="off"
+        {...(campo.secreto ? {} : { defaultValue: guardado })}
+        placeholder={campo.secreto && guardado ? final(guardado) : campo.ejemplo}
+      />
+    </Field>
+  );
+}
+
+/**
+ * La caja de pegar: UNA credencial (o las dos de PayPal) y el sistema decide de
+ * quién son, en qué campo van y de qué entorno son.
+ *
+ * Va arriba y es lo primero que se ve a propósito. El camino largo —ir a la
+ * tarjeta del procesador correcto, acertar el campo, elegir el entorno— sigue
+ * existiendo debajo para el caso raro, pero ya no es el camino por defecto.
+ */
+function CajaPegar() {
+  return (
+    <Card title="Pega aquí lo que te dio tu procesador">
+      <form action={pegarCredencial}>
+        <div className="pag-pegar">
+          <textarea
+            id="pegar-credencial"
+            name="pegado"
+            rows={3}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="Pega la llave, el token o las dos credenciales de PayPal. Da igual el orden y da igual si arrastras la etiqueta."
+          />
+          <button type="submit" className="adm-btn adm-btn-primary adm-btn-md">
+            Reconocer y conectar
+          </button>
+        </div>
+        <p className="adm-muted adm-small">
+          Reconoce Stripe, Square y PayPal por la forma de la credencial, la guarda en su sitio, le
+          pregunta al procesador si funciona y —si dice que sí— la deja cobrando. No hace falta que
+          sepas qué campo es ni si es de pruebas o real: eso se averigua preguntando.
+        </p>
+      </form>
+    </Card>
   );
 }
 
@@ -338,10 +426,13 @@ export default async function PagosPage({
     };
   };
 
-  const eStripe = estado("stripe");
-  const ePaypal = estado("paypal");
-  const eSquare = estado("square");
-  const todos = [eStripe, ePaypal, eSquare];
+  // Un estado por procesador, indexado por id: la pantalla se recorre el
+  // registro y busca aquí, sin nombrar a ninguno.
+  const todos = PROVEEDORES.map((def) => estado(def.id));
+  const porId = Object.fromEntries(todos.map((e) => [e.proveedor, e])) as Record<
+    MetodoOnline,
+    EstadoProveedor
+  >;
 
   const activos = todos.filter((e) => online[e.proveedor]);
   const conProblema = todos.filter((e) => e.fase === "rechazada" || e.fase === "ilegible");
@@ -428,173 +519,39 @@ export default async function PagosPage({
         </p>
       ) : null}
 
+      {/* La caja de pegar va ANTES de las tarjetas: es el camino corto y tiene
+          que ser lo primero que se vea. Las tarjetas quedan debajo para
+          corregir un campo suelto o apagar un método. */}
+      <CajaPegar />
+
       <div className="pag-grid">
-        {/* ─────────────────────────── Stripe ─────────────────────────── */}
-        <Card title={<TituloProveedor proveedor="stripe" sub="Tarjeta, Apple Pay y Google Pay" />}>
-          <LineaEstado e={eStripe} ahora={ahora} />
-          <Diagnostico e={eStripe} />
-          <form action={conectarProveedor}>
-            <input type="hidden" name="proveedor" value="stripe" />
-            <div className="pag-cols">
-              <Field
-                label="Llave secreta"
-                htmlFor="stripe-key"
-                hint={
-                  config.stripe.secretKey
-                    ? `Guardada (${final(config.stripe.secretKey)}). Déjalo vacío para conservarla.`
-                    : "En dashboard.stripe.com → Desarrolladores → Claves de API → «Clave secreta» (empieza por sk_live_)."
-                }
-              >
-                <input
-                  type="password"
-                  id="stripe-key"
-                  name="secretKey"
-                  autoComplete="off"
-                  placeholder={config.stripe.secretKey ? final(config.stripe.secretKey) : "sk_live_…"}
-                />
-              </Field>
-              <Encender
-                e={eStripe}
-                texto="La clienta paga con tarjeta en la página segura de Stripe y el dinero entra en tu cuenta."
-              />
-            </div>
-            <div className="pag-acciones">
-              <button type="submit" className="adm-btn adm-btn-primary adm-btn-md">
-                Conectar y comprobar
-              </button>
-            </div>
-          </form>
-          <Acciones e={eStripe} />
-        </Card>
-
-        {/* ─────────────────────────── Square ─────────────────────────── */}
-        <Card title={<TituloProveedor proveedor="square" sub="La misma cuenta que tu lector de mostrador" />}>
-          <LineaEstado e={eSquare} ahora={ahora} />
-          <Diagnostico e={eSquare} />
-          <form action={conectarProveedor}>
-            <input type="hidden" name="proveedor" value="square" />
-            <div className="pag-cols">
-              <Field
-                label="Token de acceso"
-                htmlFor="sq-token"
-                hint={
-                  config.square.accessToken
-                    ? `Guardado (${final(config.square.accessToken)}). Déjalo vacío para conservarlo.`
-                    : "En developer.squareup.com → tu aplicación → Production → Access token."
-                }
-              >
-                <input
-                  type="password"
-                  id="sq-token"
-                  name="accessToken"
-                  autoComplete="off"
-                  placeholder={config.square.accessToken ? final(config.square.accessToken) : "EAAA…"}
-                />
-              </Field>
-              <Field
-                label="Local"
-                htmlFor="sq-location"
-                hint={
-                  config.square.locationId
-                    ? `Tu local: ${config.square.locationId}. Bórralo y comprueba para que se rellene solo.`
-                    : "Déjalo vacío: al comprobar se rellena solo si tu cuenta tiene un único local."
-                }
-              >
-                <input
-                  type="text"
-                  id="sq-location"
-                  name="locationId"
-                  autoComplete="off"
-                  defaultValue={config.square.locationId}
-                  placeholder="se rellena solo"
-                />
-              </Field>
-              <Field
-                label="Entorno"
-                htmlFor="sq-entorno"
-                hint="«Real» cobra de verdad; «Pruebas» usa el sandbox de Square y no mueve dinero."
-              >
-                <select id="sq-entorno" name="entorno" defaultValue={config.square.entorno}>
-                  <option value="production">Real (production)</option>
-                  <option value="sandbox">Pruebas (sandbox)</option>
-                </select>
-              </Field>
-              <Encender
-                e={eSquare}
-                texto="La clienta paga con tarjeta en la página segura de Square — la misma cuenta que tu lector."
-              />
-            </div>
-            <div className="pag-acciones">
-              <button type="submit" className="adm-btn adm-btn-primary adm-btn-md">
-                Conectar y comprobar
-              </button>
-            </div>
-          </form>
-          <Acciones e={eSquare} />
-        </Card>
-
-        {/* ─────────────────────────── PayPal ─────────────────────────── */}
-        <Card title={<TituloProveedor proveedor="paypal" sub="Cuenta de PayPal o tarjeta, sin registrarse" />}>
-          <LineaEstado e={ePaypal} ahora={ahora} />
-          <Diagnostico e={ePaypal} />
-          <form action={conectarProveedor}>
-            <input type="hidden" name="proveedor" value="paypal" />
-            <div className="pag-cols">
-              <Field
-                label="Client ID"
-                htmlFor="pp-id"
-                hint="En developer.paypal.com → Apps & Credentials (pestaña Live) → tu app → Client ID."
-              >
-                <input
-                  type="text"
-                  id="pp-id"
-                  name="clientId"
-                  autoComplete="off"
-                  defaultValue={config.paypal.clientId}
-                  placeholder="A21…"
-                />
-              </Field>
-              <Field
-                label="Secret"
-                htmlFor="pp-secret"
-                hint={
-                  config.paypal.clientSecret
-                    ? `Guardado (${final(config.paypal.clientSecret)}). Déjalo vacío para conservarlo.`
-                    : "El «Secret key» de la misma app."
-                }
-              >
-                <input
-                  type="password"
-                  id="pp-secret"
-                  name="clientSecret"
-                  autoComplete="off"
-                  placeholder={config.paypal.clientSecret ? final(config.paypal.clientSecret) : "EL…"}
-                />
-              </Field>
-              <Field
-                label="Entorno"
-                htmlFor="pp-entorno"
-                hint="«Real» cobra de verdad. «Pruebas» (sandbox) es solo para ensayar con cuentas falsas."
-              >
-                <select id="pp-entorno" name="entorno" defaultValue={config.paypal.entorno}>
-                  <option value="live">Real (live)</option>
-                  <option value="sandbox">Pruebas (sandbox)</option>
-                </select>
-              </Field>
-              <Encender
-                e={ePaypal}
-                texto="La clienta paga con su cuenta de PayPal o con tarjeta, sin crear cuenta."
-              />
-            </div>
-            <div className="pag-acciones">
-              <button type="submit" className="adm-btn adm-btn-primary adm-btn-md">
-                Conectar y comprobar
-              </button>
-            </div>
-          </form>
-          <Acciones e={ePaypal} />
-        </Card>
-
+        {/* Una tarjeta por procesador, generada desde el registro: añadir uno
+            nuevo no toca esta pantalla. Antes eran tres bloques de JSX casi
+            idénticos y cualquier cambio había que hacerlo tres veces. */}
+        {PROVEEDORES.map((def) => {
+          const e = porId[def.id];
+          return (
+            <Card key={def.id} title={<TituloProveedor def={def} />}>
+              <LineaEstado e={e} ahora={ahora} />
+              <Diagnostico e={e} />
+              <form action={conectarProveedor}>
+                <input type="hidden" name="proveedor" value={def.id} />
+                <div className="pag-cols">
+                  {def.campos.map((campo) => (
+                    <CampoCredencial key={campo.nombre} def={def} campo={campo} config={config} />
+                  ))}
+                  <Encender e={e} texto={TEXTO_ENCENDER[def.id]} />
+                </div>
+                <div className="pag-acciones">
+                  <button type="submit" className="adm-btn adm-btn-primary adm-btn-md">
+                    Conectar y comprobar
+                  </button>
+                </div>
+              </form>
+              <Acciones e={e} />
+            </Card>
+          );
+        })}
         {/* ───────────────────── métodos sin pasarela ───────────────────── */}
         <Card title="Sin pasarela" className="pag-manuales">
           <form action={guardarManuales}>
@@ -624,41 +581,34 @@ export default async function PagosPage({
         </Card>
       </div>
 
-      {/* La guía solo sale si queda algo por conectar: cuando ya está todo
-          hecho, un muro de instrucciones solo estorba. */}
+      {/* La guía solo sale si queda algo por conectar, y solo los pasos de LO
+          QUE FALTA: cuando ya está todo hecho, un muro de instrucciones estorba.
+          Los textos salen del registro, así que un procesador nuevo trae su
+          propia ayuda sin tocar esta pantalla. */}
       {todos.some((e) => e.fase === "sin-conectar") ? (
-        <Card title="Cómo conectar una cuenta de cobro">
+        <Card title="De dónde sacar la credencial">
           <div className="pag-guia">
             <p>
-              Pega la credencial del método que quieras y pulsa <strong>«Conectar y comprobar»</strong>.
-              Ese botón hace las tres cosas: guarda, le pregunta a la pasarela si funciona y solo lo
-              enciende si dice que sí. Si algo falla, su tarjeta te dice qué pasa y qué hacer.
+              Entra en el sitio de tu procesador, copia lo que te dé y pégalo en la caja de arriba.
+              No hace falta saber qué campo es: se reconoce por su forma, se comprueba con el
+              procesador y se enciende solo si funciona. Si algo falla, su tarjeta te dice qué pasa
+              y qué hacer.
             </p>
-            {eStripe.fase === "sin-conectar" ? (
-              <p>
-                <strong>Stripe</strong> — entra en <strong>dashboard.stripe.com</strong>, ve a{" "}
-                <em>Desarrolladores → Claves de API</em> y copia la <em>clave secreta</em> (empieza por{" "}
-                <code>sk_live_</code>).
-              </p>
-            ) : null}
-            {eSquare.fase === "sin-conectar" ? (
-              <p>
-                <strong>Square</strong> — entra en <strong>developer.squareup.com</strong> con tu cuenta
-                de Square, abre (o crea) una aplicación, pestaña <em>Production</em>, y copia el{" "}
-                <em>Access token</em>. El local se rellena solo al comprobar.
-              </p>
-            ) : null}
-            {ePaypal.fase === "sin-conectar" ? (
-              <p>
-                <strong>PayPal</strong> — entra en <strong>developer.paypal.com</strong> con tu cuenta de
-                PayPal Business, ve a <em>Apps &amp; Credentials</em>, pestaña <em>Live</em>, crea una app
-                si no tienes y copia su <em>Client ID</em> y su <em>Secret</em>.
-              </p>
-            ) : null}
+            <ul className="pag-donde">
+              {PROVEEDORES.filter((def) => porId[def.id].fase === "sin-conectar").map((def) => (
+                <li key={def.id}>
+                  <strong>{def.etiqueta}</strong> — {def.donde}
+                  <span className="adm-muted adm-small">
+                    {def.campos.map((c) => c.etiqueta).join(" + ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
             <p className="adm-muted adm-small">
-              Las llaves se guardan cifradas y aquí solo se enseña su final. Un pedido pagado online se
-              marca «Pagado» él solo en cuanto la pasarela confirma el cobro; si una clienta abandona el
-              pago, su pedido queda «Por cobrar» y puedes cancelarlo para liberar el stock.
+              Las llaves se guardan cifradas y aquí solo se enseña su final. Un pedido pagado online
+              se marca «Pagado» él solo en cuanto el procesador confirma el cobro; si una clienta
+              abandona el pago, su pedido queda «Por cobrar» y puedes cancelarlo para liberar el
+              stock.
             </p>
           </div>
         </Card>
