@@ -148,6 +148,17 @@ export default async function PagosPage({
         }
       />
 
+      {hecho ? (
+        <p className="pag-aviso is-ok" role="status">
+          {hecho}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="pag-aviso is-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+
       {/* Aviso de tienda coja: sin pasarela y sin DM, lo único que queda es la
           recogida en la boutique, o sea que NADIE de fuera de Hamilton puede
           comprar aunque la portada prometa envíos a todo el país. Es el estado
@@ -162,16 +173,6 @@ export default async function PagosPage({
         </p>
       ) : null}
 
-      {hecho ? (
-        <p className="pag-aviso is-ok" role="status">
-          {hecho}
-        </p>
-      ) : null}
-      {error ? (
-        <p className="pag-aviso is-error" role="alert">
-          {error}
-        </p>
-      ) : null}
 
       <div className="pag-grid">
         {/* ─────────────────────────── Stripe ─────────────────────────── */}

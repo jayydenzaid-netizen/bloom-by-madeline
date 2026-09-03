@@ -173,6 +173,17 @@ export async function guardarSquare(formData: FormData): Promise<void> {
   };
   if (cfg.activo && !squareConfigurado(cfg)) terminar({ error: "square-sin-llaves" });
 
+  // El Location ID escrito a mano casi siempre viene mal (se pone el nombre del
+  // negocio en vez del código de Square). Si el token vale y la cuenta tiene un
+  // solo local, se corrige aquí mismo: así activar funciona a la primera en vez
+  // de rebotar con un error que nadie sabe traducir.
+  if (cfg.activo && cfg.accessToken.length >= 10) {
+    const sonda = await probarSquare(cfg);
+    if (sonda.locales.length === 1 && cfg.locationId !== sonda.locales[0].id) {
+      cfg.locationId = sonda.locales[0].id;
+    }
+  }
+
   if (cfg.activo) {
     const prueba = await credencialesValen("square", { ...(await leerConfigPagos()), square: cfg });
     if (!prueba.vale) {
@@ -279,7 +290,14 @@ export async function probarConexion(formData: FormData): Promise<void> {
     // prueba lo rellena cuando la cuenta tiene un único local.
     if (cfg.square.accessToken.length < 10) terminar({ error: "square-sin-llaves" });
     const r = await probarSquare(cfg.square);
-    if (r.ok && !cfg.square.locationId && r.locales.length === 1) {
+    /*
+     * El Location ID es un código de Square (tipo «L8FPZ7DK9YXBQ»), no el
+     * nombre del negocio — y es dato fácil de confundir: alguien escribe
+     * «bloombymadeline» y Square rechaza el cobro sin decir por qué.
+     * Si el token SÍ vale (devolvió locales) y la cuenta tiene uno solo, se
+     * pone el bueno automáticamente: no hay nada que elegir.
+     */
+    if (r.locales.length === 1 && cfg.square.locationId !== r.locales[0].id) {
       await guardarConfigSquare({ ...cfg.square, locationId: r.locales[0].id });
       await registrarActividad({
         admin,
