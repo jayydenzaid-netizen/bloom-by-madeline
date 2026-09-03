@@ -6,6 +6,7 @@ import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { logActivity } from "@/lib/activity";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { slugify, uniqueProductSlug } from "@/lib/slug";
@@ -462,11 +463,34 @@ export async function accionEnLote(fd: FormData): Promise<void> {
       n = ids.length;
       break;
     }
-    case "borrar-confirmado":
+    case "borrar-confirmado": {
+      /*
+       * Borrar es la acción MÁS destructiva del catálogo: se lleva por cascada
+       * las fotos, las variantes y su historial de stock, y no hay papelera.
+       * Hasta ahora era además la única que NO dejaba rastro — una prenda
+       * desaparecía y en la bitácora no había nada que mirar. Se anota ANTES
+       * de borrar, que es cuando todavía se sabe qué había.
+       */
+      const aBorrar = await db.product.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, title: true, slug: true, status: true },
+      });
       await db.product.deleteMany({ where: { id: { in: ids } } });
+      for (const p of aBorrar) {
+        await logActivity({
+          userId: admin.id,
+          userEmail: admin.email,
+          action: "delete",
+          entityType: "product",
+          entityId: p.id,
+          summary: `Borró «${p.title}» del catálogo`,
+          meta: { slug: p.slug, estado: p.status },
+        });
+      }
       hecho = "borrados";
-      n = ids.length;
+      n = aBorrar.length;
       break;
+    }
     default:
       redirect(conParametros(volver, { hecho: "nada" }));
   }
