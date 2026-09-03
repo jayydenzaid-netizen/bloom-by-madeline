@@ -181,7 +181,9 @@
   min-height: 74px;
   resize: vertical;
   font-family: inherit;
-  font-size: 14px;
+  /* 16px, no 14: esta regla pisaba a la del panel por ir despues en la cascada,
+     y dejaba con zoom de iOS justo la caja donde mas se escribe desde el movil. */
+  font-size: 16px;
   line-height: 1.5;
 }
 @media (max-width: 640px) {
