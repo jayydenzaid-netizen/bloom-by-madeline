@@ -28,6 +28,7 @@ import {
   leerConfigPagos,
   metodosOnlineActivos,
 } from "@/lib/payments";
+import { leerSalud } from "@/lib/payments/estado";
 
 /**
  * Server Actions del checkout.
@@ -170,7 +171,7 @@ export async function submitCheckout(
   // El método de pago se comprueba contra los ajustes y las pasarelas REALMENTE
   // configuradas: que el <input> exista en el HTML no significa que Madeline lo
   // tenga activo, y un toggle encendido sin credenciales tampoco cobra nada.
-  const online = metodosOnlineActivos(await leerConfigPagos());
+  const online = metodosOnlineActivos(await leerConfigPagos(), await leerSalud());
   const habilitado: Record<OrderPaymentMethod, boolean> = {
     dm: settings.payDm,
     pickup: settings.payPickup,

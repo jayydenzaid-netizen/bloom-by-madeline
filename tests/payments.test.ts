@@ -4,11 +4,13 @@ import { cifrar, descifrar } from "@/lib/payments/cifrado";
 import {
   CONFIG_PAGOS_VACIA,
   metodosOnlineActivos,
+  type ConfigPagos,
   paypalConfigurado,
   squareConfigurado,
   stripeConfigurado,
 } from "@/lib/payments/config";
 import { minimoOnlineCents } from "@/lib/payments";
+import { diasDesde, limpiarSalud, saludPermiteCobrar } from "@/lib/payments/estado";
 import { armarOrdenPaypal, probarPaypal, verificarOrdenPaypal } from "@/lib/payments/paypal";
 import { armarLinkSquare, diagnosticoSquare, probarSquare, verificarOrdenSquare } from "@/lib/payments/square";
 import { armarParamsSesionStripe, probarStripe, verificarSesionStripe } from "@/lib/payments/stripe";
@@ -499,4 +501,75 @@ test("la verificación distingue «no pagó» de «no pudimos preguntar»", asyn
   ]));
   assert.equal(caida.estado, "error");
   assert.equal(caida.estado === "error" && caida.credencial, false);
+});
+
+/* ════════════════════════ salud de las pasarelas ════════════════════════
+ *
+ * La fila `paymentsEstado` viaja SIN CIFRAR en las copias de seguridad, así que
+ * lo que entra en ella está acotado a propósito. Estos tests son el candado.
+ */
+
+test("la salud guardada solo admite códigos, fechas y el nombre del comercio", () => {
+  // Un objeto con basura pegada —el `detail` crudo de la pasarela, un token—
+  // sale limpio: solo sobreviven los campos previstos.
+  const sucio = limpiarSalud({
+    resultado: "rechazada",
+    codigo: "token-caducado",
+    en: "2026-09-03T10:00:00.000Z",
+    cuenta: "Bloom by Madeline",
+    entornoReal: "real",
+    detalle: "This request could not be authorized.",
+    accessToken: "EAAAxxxxxxxx",
+    secretKey: "sk_live_nunca_aqui",
+  });
+  assert.ok(sucio);
+  assert.deepEqual(Object.keys(sucio).sort(), ["codigo", "cuenta", "en", "entornoReal", "resultado"]);
+  assert.equal(JSON.stringify(sucio).includes("sk_live"), false);
+  assert.equal(JSON.stringify(sucio).includes("EAAA"), false);
+  assert.equal(JSON.stringify(sucio).includes("could not be authorized"), false);
+});
+
+test("la salud sin resultado o sin fecha se descarta entera", () => {
+  assert.equal(limpiarSalud(null), null);
+  assert.equal(limpiarSalud("ok"), null);
+  assert.equal(limpiarSalud({ codigo: "ok", en: "2026-09-03T10:00:00.000Z" }), null);
+  assert.equal(limpiarSalud({ resultado: "inventado", en: "2026-09-03T10:00:00.000Z" }), null);
+  assert.equal(limpiarSalud({ resultado: "ok" }), null);
+  // El nombre del comercio se recorta: es un nombre, no un campo libre.
+  const largo = limpiarSalud({ resultado: "ok", codigo: "ok", en: "2026-09-03T10:00:00.000Z", cuenta: "x".repeat(500) });
+  assert.equal(largo?.cuenta?.length, 60);
+});
+
+test("solo un RECHAZO explícito retira el método del checkout", () => {
+  const cfg: ConfigPagos = {
+    stripe: { activo: true, secretKey: "sk_live_" + "x".repeat(20) },
+    paypal: { activo: true, clientId: "A".repeat(20), clientSecret: "E".repeat(20), entorno: "live" },
+    square: { activo: true, accessToken: "EAAA" + "x".repeat(20), locationId: "L123", entorno: "production" },
+  };
+
+  // Sin salud: exactamente como antes, los tres ofrecidos.
+  assert.deepEqual(metodosOnlineActivos(cfg), { stripe: true, paypal: true, square: true });
+
+  const en = "2026-09-03T10:00:00.000Z";
+  const conSalud = metodosOnlineActivos(cfg, {
+    stripe: { resultado: "rechazada" },
+    // Un bajón de la pasarela NO apaga nada: las llaves pueden ser perfectas.
+    paypal: { resultado: "sin-respuesta" },
+    square: { resultado: "ok" },
+  });
+  assert.deepEqual(conSalud, { stripe: false, paypal: true, square: true });
+
+  assert.equal(saludPermiteCobrar({ resultado: "rechazada", codigo: "token-caducado", en }), false);
+  assert.equal(saludPermiteCobrar({ resultado: "sin-respuesta", codigo: "sin-respuesta", en }), true);
+  assert.equal(saludPermiteCobrar({ resultado: "ok", codigo: "ok", en }), true);
+  // Nunca comprobado tampoco veta: solo se veta con una prueba en contra.
+  assert.equal(saludPermiteCobrar(undefined), true);
+});
+
+test("diasDesde: cuenta los días y aguanta una fecha rota", () => {
+  const ahora = new Date("2026-09-10T12:00:00.000Z");
+  assert.equal(diasDesde({ resultado: "ok", codigo: "ok", en: "2026-09-10T09:00:00.000Z" }, ahora), 0);
+  assert.equal(diasDesde({ resultado: "ok", codigo: "ok", en: "2026-09-03T12:00:00.000Z" }, ahora), 7);
+  assert.equal(diasDesde({ resultado: "ok", codigo: "ok", en: "no es una fecha" }, ahora), null);
+  assert.equal(diasDesde(undefined, ahora), null);
 });

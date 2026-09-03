@@ -1,5 +1,6 @@
 /* Página Pagos del panel. Reusa los tokens y botones de admin.css; aquí solo
-   vive lo propio: el estado de cada pasarela y sus formularios. */
+   vive lo propio: el resumen de arriba, el estado de cada pasarela y sus
+   formularios. */
 
 /* Mismo molde de aviso que envíos: verde = hecho, rojo = error. */
 .pag-aviso {
@@ -20,19 +21,105 @@
   color: var(--adm-danger);
 }
 
+/* Resumen: contesta «¿está cobrando mi tienda?» antes de leer nada más. */
+/* 160px de minimo, no 210: en un movil eso da dos columnas en vez de tres
+   bloques apilados que empujaban el trabajo de verdad por debajo del pliegue. */
+.pag-resumen {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin-bottom: 16px;
+}
+
 .pag-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   align-items: start;
 }
 
+/* Los metodos sin pasarela ocupan la fila entera. Como tarjeta normal caia a una
+   fila nueva con dos tercios de pantalla vacios a su derecha. */
+.pag-manuales {
+  grid-column: 1 / -1;
+}
+.pag-manuales .pag-check {
+  max-width: 62ch;
+}
+
+/* Título de la tarjeta: monograma + nombre + para qué sirve. */
+.pag-titulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+}
+.pag-titulo > span {
+  display: grid;
+  gap: 1px;
+  line-height: 1.25;
+}
+/* El sub va en peso normal: dentro de un <h2> heredaría la negrita. */
+.pag-titulo .adm-small {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Monograma de la marca. Es texto, no logotipo: el nombre se puede usar tal
+   cual, el logo de un tercero no. Los colores son de nuestra paleta, no los
+   corporativos, para que la pantalla siga pareciendo de Bloom. */
+.pag-marca {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--adm-on-ink);
+  background: var(--adm-ink-3);
+}
+.pag-marca-stripe { background: #4b4468; }
+.pag-marca-paypal { background: #2b5470; font-size: 11px; }
+.pag-marca-square { background: #2c271e; font-size: 16px; }
+
+/* Línea de estado: insignia + cuenta conectada + cuándo se comprobó. */
 .pag-estado {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 8px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
+}
+.pag-cuenta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--adm-text);
+}
+
+/* Diagnóstico: qué pasa y qué hacer. Solo aparece cuando hay algo que decir. */
+.pag-diag {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  border-radius: var(--adm-r);
+  border: 1px solid var(--adm-line);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.pag-diag strong { font-weight: 600; }
+.pag-diag.is-error {
+  background: var(--adm-danger-soft);
+  border-color: rgba(160, 48, 42, 0.28);
+  color: var(--adm-danger);
+}
+.pag-diag.is-aviso {
+  background: var(--adm-warning-soft);
+  border-color: rgba(138, 87, 19, 0.28);
+  color: var(--adm-warning);
 }
 
 .pag-cols {

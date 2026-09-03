@@ -98,20 +98,33 @@ function normSquare(x: unknown): ConfigSquare {
 
 /* ─────────────────────────── lectura y escritura ─────────────────────────── */
 
+/**
+ * `ilegible` = la fila EXISTE pero no se puede descifrar (cambió
+ * `SESSION_SECRET`, se restauró una copia de otro entorno, el valor se corrompió).
+ *
+ * Se distingue de `null` («no hay nada guardado») a propósito: son dos problemas
+ * distintos con dos instrucciones distintas, y antes se veían igual. El panel
+ * decía «Sin conectar» junto a «Guardado el 3 sept» —contradiciéndose— y encima
+ * el botón de quitar las llaves salía deshabilitado, así que la fila ilegible no
+ * se podía ni limpiar desde la interfaz.
+ */
+const ILEGIBLE = Symbol("credenciales-ilegibles");
+
 function parsear(valor: string | undefined): unknown {
   if (!valor) return null;
-  // Si no descifra (SESSION_SECRET cambió, valor corrupto) se trata como no
-  // configurado: el panel pedirá pegar las llaves otra vez. Nunca a medias.
   const plano = descifrar(valor);
-  if (plano === null) return null;
+  if (plano === null) return ILEGIBLE;
   try {
     return JSON.parse(plano);
   } catch {
-    return null;
+    return ILEGIBLE;
   }
 }
 
 export type MetaConfigPagos = Record<MetodoOnline, Date | null>;
+
+/** Qué proveedores tienen llaves guardadas que este servidor no puede leer. */
+export type IlegiblesPagos = Record<MetodoOnline, boolean>;
 
 export async function leerConfigPagos(): Promise<ConfigPagos> {
   const { config } = await leerConfigPagosConMeta();
@@ -122,6 +135,7 @@ export async function leerConfigPagos(): Promise<ConfigPagos> {
 export async function leerConfigPagosConMeta(): Promise<{
   config: ConfigPagos;
   actualizado: MetaConfigPagos;
+  ilegible: IlegiblesPagos;
 }> {
   const filas = await db.setting.findMany({
     where: { key: { in: Object.values(CLAVE) } },
@@ -129,16 +143,26 @@ export async function leerConfigPagosConMeta(): Promise<{
   const mapa = new Map(filas.map((f) => [f.key, f]));
 
   const fila = (p: MetodoOnline) => mapa.get(CLAVE[p]);
+  const crudo = {
+    stripe: parsear(fila("stripe")?.value),
+    paypal: parsear(fila("paypal")?.value),
+    square: parsear(fila("square")?.value),
+  };
   return {
     config: {
-      stripe: normStripe(parsear(fila("stripe")?.value)),
-      paypal: normPaypal(parsear(fila("paypal")?.value)),
-      square: normSquare(parsear(fila("square")?.value)),
+      stripe: normStripe(crudo.stripe),
+      paypal: normPaypal(crudo.paypal),
+      square: normSquare(crudo.square),
     },
     actualizado: {
       stripe: fila("stripe")?.updatedAt ?? null,
       paypal: fila("paypal")?.updatedAt ?? null,
       square: fila("square")?.updatedAt ?? null,
+    },
+    ilegible: {
+      stripe: crudo.stripe === ILEGIBLE,
+      paypal: crudo.paypal === ILEGIBLE,
+      square: crudo.square === ILEGIBLE,
     },
   };
 }
@@ -184,11 +208,27 @@ export function squareConfigurado(c: ConfigSquare): boolean {
 /**
  * Qué métodos online puede ofrecer el checkout AHORA: activados por Madeline
  * Y con credenciales completas. Un toggle encendido sin llaves no promete nada.
+ *
+ * El segundo parámetro es OPCIONAL a propósito. Sin él el comportamiento es
+ * idéntico al de siempre (y los tests que construyen configuraciones a mano
+ * siguen valiendo). Con él se aplica un VETO: un proveedor cuya última
+ * comprobación diga que la pasarela RECHAZÓ las llaves no se ofrece, aunque su
+ * `activo` siga en true.
+ *
+ * Es un veto de solo lectura y no un apagado de verdad por una razón concreta:
+ * apagar exigiría escribir en la configuración cifrada desde caminos anónimos
+ * (el checkout, la vuelta de la pasarela), y `guardar()` reescribe el blob entero
+ * sin candado — se pisaría con lo que esté guardando Madeline en el panel. Así
+ * las credenciales tienen UN solo escritor y la salud solo veta.
  */
-export function metodosOnlineActivos(cfg: ConfigPagos): Record<MetodoOnline, boolean> {
+export function metodosOnlineActivos(
+  cfg: ConfigPagos,
+  salud?: Partial<Record<MetodoOnline, { resultado: string }>>,
+): Record<MetodoOnline, boolean> {
+  const permitido = (p: MetodoOnline) => salud?.[p]?.resultado !== "rechazada";
   return {
-    stripe: cfg.stripe.activo && stripeConfigurado(cfg.stripe),
-    paypal: cfg.paypal.activo && paypalConfigurado(cfg.paypal),
-    square: cfg.square.activo && squareConfigurado(cfg.square),
+    stripe: cfg.stripe.activo && stripeConfigurado(cfg.stripe) && permitido("stripe"),
+    paypal: cfg.paypal.activo && paypalConfigurado(cfg.paypal) && permitido("paypal"),
+    square: cfg.square.activo && squareConfigurado(cfg.square) && permitido("square"),
   };
 }

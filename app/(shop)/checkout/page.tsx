@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getCart, readCartToken } from "@/lib/cart";
 import { leerConfigPagos, metodosOnlineActivos } from "@/lib/payments";
+import { leerSalud } from "@/lib/payments/estado";
 import { getSettings } from "@/lib/settings";
 import CheckoutForm, { type CheckoutMethodOption } from "./CheckoutForm";
 import "../checkout.css";
@@ -28,7 +29,10 @@ export default async function CheckoutPage() {
     leerConfigPagos(),
   ]);
   // Al formulario solo viajan booleanos: las credenciales se quedan en el servidor.
-  const online = metodosOnlineActivos(configPagos);
+  // Con la salud delante: una pasarela que ya rechazo las llaves no se ofrece,
+  // aunque siga encendida. Ofrecer una tarjeta que no cobra deja a la clienta
+  // con el pedido hecho, su talla apartada y sin forma de pagar.
+  const online = metodosOnlineActivos(configPagos, await leerSalud());
 
   // Las líneas agotadas siguen en el carrito para poder quitarlas (ver
   // lib/cart.ts), pero aquí no pintan nada: no se pueden comprar.

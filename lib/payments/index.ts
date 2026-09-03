@@ -17,7 +17,8 @@ import {
 import { crearOrdenPaypal, verificarOrdenPaypal } from "./paypal";
 import { anularLinkSquare, crearLinkSquare, verificarOrdenSquare } from "./square";
 import { anularSesionStripe, crearSesionStripe, verificarSesionStripe } from "./stripe";
-import type { DatosPago, Verificacion } from "./tipos";
+import { ErrorPasarela, type DatosPago, type Verificacion } from "./tipos";
+import { anotarSalud, leerSalud } from "./estado";
 
 export { esMetodoOnline, ETIQUETA_PROVEEDOR, leerConfigPagos, metodosOnlineActivos };
 export type { MetodoOnline };
@@ -171,7 +172,7 @@ export async function iniciarPagoOnline(orderId: string): Promise<InicioPago> {
     if (!esMetodoOnline(metodo)) return { ok: false, error: "Este pedido no se paga online." };
 
     const cfg = await leerConfigPagos();
-    if (!metodosOnlineActivos(cfg)[metodo]) {
+    if (!metodosOnlineActivos(cfg, await leerSalud())[metodo]) {
       return { ok: false, error: "Ese método de pago no está disponible ahora mismo." };
     }
 
@@ -258,6 +259,23 @@ export async function iniciarPagoOnline(orderId: string): Promise<InicioPago> {
     return { ok: true, url: sesion.url };
   } catch (err) {
     console.error("[pagos] no se pudo iniciar el pago:", err);
+    // La mejor senal del sistema entero pasaba por aqui y se tiraba: si la
+    // pasarela acaba de RECHAZAR las llaves intentando cobrar de verdad, queda
+    // apuntado y el veto retira el metodo del checkout en el acto. Nadie mas se
+    // encuentra el callejon de rellenar sus datos para un cobro imposible.
+    if (err instanceof ErrorPasarela && err.credencial) {
+      const metodoFallido = await db.order
+        .findUnique({ where: { id: orderId }, select: { paymentMethod: true } })
+        .then((o) => o?.paymentMethod ?? "")
+        .catch(() => "");
+      if (esMetodoOnline(metodoFallido)) {
+        await anotarSalud(metodoFallido, {
+          resultado: "rechazada",
+          codigo: "credencial-invalida",
+          en: new Date().toISOString(),
+        });
+      }
+    }
     return { ok: false, error: "No pudimos conectar con la pasarela de pago." };
   }
 }
@@ -422,6 +440,13 @@ export async function verificarPagoPedido(orderId: string): Promise<ResultadoPag
     // duren esas llaves, NINGÚN cobro se va a poder confirmar.
     if (muda) {
       if (muda.credencial) {
+        if (esMetodoOnline(order.paymentMethod)) {
+          await anotarSalud(order.paymentMethod, {
+            resultado: "rechazada",
+            codigo: "credencial-invalida",
+            en: new Date().toISOString(),
+          });
+        }
         await anotarAviso(
           order.id,
           order.number,

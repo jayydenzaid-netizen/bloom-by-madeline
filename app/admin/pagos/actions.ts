@@ -11,14 +11,14 @@ import {
   leerConfigPagos,
   metodosOnlineActivos,
   paypalConfigurado,
-  squareConfigurado,
-  stripeConfigurado,
   type ConfigPagos,
   type MetodoOnline,
 } from "@/lib/payments/config";
+import { anotarSalud, leerSalud, olvidarSalud, type SaludProveedor } from "@/lib/payments/estado";
 import { probarPaypal } from "@/lib/payments/paypal";
 import { probarSquare } from "@/lib/payments/square";
 import { probarStripe } from "@/lib/payments/stripe";
+import type { ResultadoPrueba } from "@/lib/payments/tipos";
 import { requireOwner } from "@/lib/permissions";
 import { getSettings, saveSettings } from "@/lib/settings";
 
@@ -26,15 +26,31 @@ import { getSettings, saveSettings } from "@/lib/settings";
  * Acciones de la página Pagos (solo la dueña).
  *
  * Reglas que mandan aquí:
+ *
  *  - Las credenciales JAMÁS aparecen en la URL, en la bitácora ni en un error.
  *    Los resultados viajan como CÓDIGOS (?hecho= / ?error=) que la página
  *    traduce con sus mapas — un texto libre en la querystring es un cartel que
  *    cualquiera puede fabricar con un enlace.
- *  - Un campo secreto vacío CONSERVA lo guardado: así Madeline puede activar o
+ *
+ *  - Un campo secreto vacío CONSERVA lo guardado: así se puede activar o
  *    desactivar un método sin volver a pegar la llave cada vez.
- *  - Activar sin credenciales completas no se guarda: prometer una forma de
- *    pago que no puede cobrar deja a una clienta con el carrito lleno y sin
- *    manera de pagar.
+ *
+ *  - **Se guarda APAGADO antes de sondear.** Una credencial recién pegada no se
+ *    pierde nunca, aunque la pasarela tarde quince segundos en contestar o
+ *    aunque el cifrado falle. Antes era al revés y por eso guardar Square podía
+ *    morir sin escribir nada.
+ *
+ *  - **Se sondea UNA sola vez** y se reutiliza el resultado. Antes, guardar
+ *    Square llamaba a `probarSquare` para rellenar el local y acto seguido otra
+ *    comprobación la volvía a llamar tirando la primera: hasta cuatro peticiones
+ *    en la misma acción.
+ *
+ *  - **Encender exige confirmación; seguir encendido, no.** Para activar un
+ *    método hace falta que la pasarela diga que sí. Un fallo de red no apaga
+ *    nada (eso lo decide el veto de `metodosOnlineActivos`, que solo veta un
+ *    rechazo explícito), pero tampoco sirve para encender: prometer una tarjeta
+ *    sin haber confirmado que cobra deja a la clienta con el pedido hecho, su
+ *    talla apartada y sin forma de pagar.
  */
 
 async function exigirDuena() {
@@ -51,29 +67,10 @@ function marcado(formData: FormData, campo: string): boolean {
   return formData.get(campo) === "on";
 }
 
-/**
- * Antes de ENCENDER un método se le pregunta al proveedor si sus llaves cobran
- * de verdad. Sin esto, el checkout puede quedar ofreciendo «Pagar con tarjeta»
- * con un token que la pasarela rechaza: la clienta rellena sus datos, el pedido
- * se crea con su stock apartado, y el cobro no ocurre nunca. Pasó de verdad
- * (Square activo con un token rechazado), y por eso este guardia existe.
- *
- * Un fallo de RED no apaga nada: la pasarela puede estar de bajón y las llaves
- * ser correctas. Solo un rechazo explícito de credenciales impide activar.
- */
-async function credencialesValen(
-  proveedor: MetodoOnline,
-  cfg: ConfigPagos,
-): Promise<{ vale: boolean; motivo?: "credencial" | "red" }> {
-  const r =
-    proveedor === "stripe"
-      ? await probarStripe(cfg.stripe)
-      : proveedor === "paypal"
-        ? await probarPaypal(cfg.paypal)
-        : await probarSquare(cfg.square);
-  // Con la red caída se guarda como pedía la dueña: no se puede concluir nada.
-  if (!r.ok && r.motivo === "red") return { vale: true, motivo: "red" };
-  return { vale: r.ok, motivo: r.motivo };
+function proveedorDe(formData: FormData): MetodoOnline {
+  const p = texto(formData, "proveedor");
+  if (p === "stripe" || p === "paypal" || p === "square") return p;
+  terminar({ error: "desconocido" });
 }
 
 function terminar(resultado: { hecho?: string; error?: string }): never {
@@ -88,118 +85,246 @@ function terminar(resultado: { hecho?: string; error?: string }): never {
   redirect(`/admin/pagos?${qs}`);
 }
 
-/* ────────────────────────────── Stripe ────────────────────────────── */
+/* ─────────────────────── sondeo y salud ─────────────────────── */
 
-export async function guardarStripe(formData: FormData): Promise<void> {
-  const admin = await exigirDuena();
-  const previa = (await leerConfigPagos()).stripe;
-
-  const pegada = texto(formData, "secretKey");
-  // Una llave publicable (pk_) no puede cobrar: es el error de pegado más común.
-  if (pegada && !pegada.startsWith("sk_") && !pegada.startsWith("rk_")) {
-    terminar({ error: "stripe-clave" });
-  }
-
-  const cfg = {
-    activo: marcado(formData, "activo"),
-    secretKey: pegada || previa.secretKey,
-  };
-  if (cfg.activo && !stripeConfigurado(cfg)) terminar({ error: "stripe-sin-llave" });
-
-  // No se enciende un cobro que la pasarela no acepta (ver `credencialesValen`).
-  if (cfg.activo) {
-    const prueba = await credencialesValen("stripe", { ...(await leerConfigPagos()), stripe: cfg });
-    if (!prueba.vale) {
-      await guardarConfigStripe({ ...cfg, activo: false });
-      terminar({ error: "stripe-fallo-activar" });
-    }
-  }
-
-  await guardarConfigStripe(cfg);
-  await registrarActividad({
-    admin,
-    action: "update",
-    entityType: "setting",
-    summary: `Stripe ${cfg.activo ? "activado" : "guardado (inactivo)"} en Pagos.`,
-  });
-  terminar({ hecho: cfg.activo ? "stripe-activo" : "stripe-guardado" });
+/** Pregunta a la pasarela por las credenciales YA GUARDADAS de un proveedor. */
+async function sondear(proveedor: MetodoOnline, cfg: ConfigPagos): Promise<ResultadoPrueba> {
+  if (proveedor === "stripe") return probarStripe(cfg.stripe);
+  if (proveedor === "paypal") return probarPaypal(cfg.paypal);
+  return probarSquare(cfg.square);
 }
 
-/* ────────────────────────────── PayPal ────────────────────────────── */
-
-export async function guardarPaypal(formData: FormData): Promise<void> {
-  const admin = await exigirDuena();
-  const previa = (await leerConfigPagos()).paypal;
-
-  const cfg = {
-    activo: marcado(formData, "activo"),
-    clientId: texto(formData, "clientId") || previa.clientId,
-    clientSecret: texto(formData, "clientSecret") || previa.clientSecret,
-    entorno: (texto(formData, "entorno") === "sandbox" ? "sandbox" : "live") as "live" | "sandbox",
+/** El resultado del sondeo, traducido a lo que se guarda en `paymentsEstado`. */
+function saludDe(proveedor: MetodoOnline, r: ResultadoPrueba, cfg: ConfigPagos): SaludProveedor {
+  const salud: SaludProveedor = {
+    resultado: r.ok ? "ok" : r.motivo === "red" ? "sin-respuesta" : "rechazada",
+    codigo: r.codigo ?? (r.ok ? "ok" : "credencial-invalida"),
+    en: new Date().toISOString(),
   };
-  if (cfg.activo && !paypalConfigurado(cfg)) terminar({ error: "paypal-sin-llaves" });
-
-  if (cfg.activo) {
-    const prueba = await credencialesValen("paypal", { ...(await leerConfigPagos()), paypal: cfg });
-    if (!prueba.vale) {
-      await guardarConfigPaypal({ ...cfg, activo: false });
-      terminar({ error: "paypal-fallo-activar" });
-    }
+  if (r.cuenta) salud.cuenta = r.cuenta;
+  // El entorno se deduce de lo que se está usando de verdad, no del desplegable.
+  if (proveedor === "stripe" && r.ok) {
+    salud.entornoReal = cfg.stripe.secretKey.startsWith("sk_test_") ? "pruebas" : "real";
   }
-
-  await guardarConfigPaypal(cfg);
-  await registrarActividad({
-    admin,
-    action: "update",
-    entityType: "setting",
-    summary: `PayPal ${cfg.activo ? "activado" : "guardado (inactivo)"} en Pagos (${cfg.entorno}).`,
-  });
-  terminar({ hecho: cfg.activo ? "paypal-activo" : "paypal-guardado" });
+  if (proveedor === "paypal" && r.ok) {
+    salud.entornoReal = cfg.paypal.entorno === "sandbox" ? "pruebas" : "real";
+  }
+  if (proveedor === "square" && r.ok) {
+    salud.entornoReal = cfg.square.entorno === "sandbox" ? "pruebas" : "real";
+  }
+  return salud;
 }
 
-/* ────────────────────────────── Square ────────────────────────────── */
+/** ¿Tiene lo mínimo para poder sondear? (Sin esto el sondeo acaba en un error confuso.) */
+function hayCredenciales(proveedor: MetodoOnline, cfg: ConfigPagos): boolean {
+  if (proveedor === "stripe") return cfg.stripe.secretKey.length > 0;
+  if (proveedor === "paypal") return paypalConfigurado(cfg.paypal);
+  // Para Square basta el token: el local lo rellena el propio sondeo.
+  return cfg.square.accessToken.length >= 10;
+}
 
-export async function guardarSquare(formData: FormData): Promise<void> {
+/* ─────────────────────── conectar (un solo gesto) ─────────────────────── */
+
+/**
+ * Guarda las credenciales pegadas, pregunta a la pasarela y, si dice que sí,
+ * enciende el método. Un solo botón donde antes había guardar → probar → volver
+ * a guardar, tres pasos que además estaban explicados al final de la página.
+ */
+export async function conectarProveedor(formData: FormData): Promise<void> {
   const admin = await exigirDuena();
-  const previa = (await leerConfigPagos()).square;
+  const proveedor = proveedorDe(formData);
+  const previa = await leerConfigPagos();
+  const quiereActivo = marcado(formData, "activo");
 
-  const cfg = {
-    activo: marcado(formData, "activo"),
-    accessToken: texto(formData, "accessToken") || previa.accessToken,
-    locationId: texto(formData, "locationId") || previa.locationId,
-    entorno: (texto(formData, "entorno") === "sandbox" ? "sandbox" : "production") as
-      | "production"
-      | "sandbox",
-  };
-  if (cfg.activo && !squareConfigurado(cfg)) terminar({ error: "square-sin-llaves" });
+  /* ── 1. Armar la configuración con lo pegado (vacío = conservar) ── */
+  let cfg: ConfigPagos;
+  if (proveedor === "stripe") {
+    const pegada = texto(formData, "secretKey");
+    // Una llave publicable (pk_) no puede cobrar: es el error de pegado más
+    // común y se ataja antes de guardar nada.
+    if (pegada && !pegada.startsWith("sk_") && !pegada.startsWith("rk_")) {
+      await anotarSalud("stripe", {
+        resultado: "rechazada",
+        codigo: "llave-no-secreta",
+        en: new Date().toISOString(),
+      });
+      terminar({ error: "stripe-clave" });
+    }
+    cfg = { ...previa, stripe: { activo: false, secretKey: pegada || previa.stripe.secretKey } };
+  } else if (proveedor === "paypal") {
+    cfg = {
+      ...previa,
+      paypal: {
+        activo: false,
+        clientId: texto(formData, "clientId") || previa.paypal.clientId,
+        clientSecret: texto(formData, "clientSecret") || previa.paypal.clientSecret,
+        entorno: texto(formData, "entorno") === "sandbox" ? "sandbox" : "live",
+      },
+    };
+  } else {
+    cfg = {
+      ...previa,
+      square: {
+        activo: false,
+        accessToken: texto(formData, "accessToken") || previa.square.accessToken,
+        locationId: texto(formData, "locationId") || previa.square.locationId,
+        entorno: texto(formData, "entorno") === "sandbox" ? "sandbox" : "production",
+      },
+    };
+  }
 
-  // El Location ID escrito a mano casi siempre viene mal (se pone el nombre del
-  // negocio en vez del código de Square). Si el token vale y la cuenta tiene un
-  // solo local, se corrige aquí mismo: así activar funciona a la primera en vez
-  // de rebotar con un error que nadie sabe traducir.
-  if (cfg.activo && cfg.accessToken.length >= 10) {
-    const sonda = await probarSquare(cfg);
-    if (sonda.locales.length === 1 && cfg.locationId !== sonda.locales[0].id) {
-      cfg.locationId = sonda.locales[0].id;
+  if (!hayCredenciales(proveedor, cfg)) terminar({ error: `${proveedor}-sin-llaves` });
+
+  /* ── 2. Guardar APAGADO antes de hablar con nadie ── */
+  await guardar(proveedor, cfg);
+
+  /* ── 3. Un solo sondeo ── */
+  const r = await sondear(proveedor, cfg);
+
+  // Square: el identificador de local escrito a mano casi siempre viene mal (se
+  // pone el nombre del negocio en vez del código). Si el token vale y la cuenta
+  // tiene un solo local, se corrige aquí y no se vuelve a sondear.
+  if (proveedor === "square" && "locales" in r) {
+    const locales = (r as { locales: { id: string; nombre: string }[] }).locales;
+    if (locales.length === 1 && cfg.square.locationId !== locales[0].id) {
+      cfg = { ...cfg, square: { ...cfg.square, locationId: locales[0].id } };
+      await guardar("square", cfg);
     }
   }
 
-  if (cfg.activo) {
-    const prueba = await credencialesValen("square", { ...(await leerConfigPagos()), square: cfg });
-    if (!prueba.vale) {
-      await guardarConfigSquare({ ...cfg, activo: false });
-      terminar({ error: "square-fallo-activar" });
-    }
+  await anotarSalud(proveedor, saludDe(proveedor, r, cfg));
+
+  /* ── 4. Encender solo si la pasarela ha dicho que sí ── */
+  if (!quiereActivo) {
+    await registrarActividad({
+      admin,
+      action: "update",
+      entityType: "setting",
+      summary: `${proveedor}: credenciales guardadas sin activar en Pagos.`,
+    });
+    terminar({ hecho: r.ok ? `${proveedor}-guardado` : `${proveedor}-guardado-con-fallo` });
   }
 
-  await guardarConfigSquare(cfg);
+  if (!r.ok) {
+    await registrarActividad({
+      admin,
+      action: "update",
+      entityType: "setting",
+      summary: `${proveedor}: no se pudo activar (${r.motivo === "red" ? "sin respuesta" : "rechazado"}).`,
+    });
+    // Un fallo de red no es culpa de las llaves, así que el mensaje es otro.
+    terminar({ error: r.motivo === "red" ? `${proveedor}-sin-respuesta` : `${proveedor}-fallo-activar` });
+  }
+
+  await guardar(proveedor, encender(proveedor, cfg));
   await registrarActividad({
     admin,
     action: "update",
     entityType: "setting",
-    summary: `Square ${cfg.activo ? "activado" : "guardado (inactivo)"} en Pagos (${cfg.entorno}).`,
+    summary: `${proveedor} conectado y ACTIVO en el checkout.`,
   });
-  terminar({ hecho: cfg.activo ? "square-activo" : "square-guardado" });
+  terminar({ hecho: `${proveedor}-activo` });
+}
+
+function encender(proveedor: MetodoOnline, cfg: ConfigPagos): ConfigPagos {
+  if (proveedor === "stripe") return { ...cfg, stripe: { ...cfg.stripe, activo: true } };
+  if (proveedor === "paypal") return { ...cfg, paypal: { ...cfg.paypal, activo: true } };
+  return { ...cfg, square: { ...cfg.square, activo: true } };
+}
+
+async function guardar(proveedor: MetodoOnline, cfg: ConfigPagos): Promise<void> {
+  if (proveedor === "stripe") return guardarConfigStripe(cfg.stripe);
+  if (proveedor === "paypal") return guardarConfigPaypal(cfg.paypal);
+  return guardarConfigSquare(cfg.square);
+}
+
+/* ─────────────────────── apagar sin desconectar ─────────────────────── */
+
+/**
+ * Deja de ofrecer un método sin borrar sus llaves. Existe porque apagar no
+ * debería exigir volver a pegar nada, y porque juntar «apagar» con «guardar
+ * credenciales» en el mismo botón hacía que apagar disparase un sondeo.
+ */
+export async function apagarProveedor(formData: FormData): Promise<void> {
+  const admin = await exigirDuena();
+  const proveedor = proveedorDe(formData);
+  const cfg = await leerConfigPagos();
+
+  if (proveedor === "stripe") await guardarConfigStripe({ ...cfg.stripe, activo: false });
+  else if (proveedor === "paypal") await guardarConfigPaypal({ ...cfg.paypal, activo: false });
+  else await guardarConfigSquare({ ...cfg.square, activo: false });
+
+  await registrarActividad({
+    admin,
+    action: "update",
+    entityType: "setting",
+    summary: `${proveedor} apagado en el checkout (las llaves siguen guardadas).`,
+  });
+  terminar({ hecho: `${proveedor}-apagado` });
+}
+
+/* ─────────────────────── comprobar ─────────────────────── */
+
+/** Vuelve a preguntarle a la pasarela por las llaves guardadas y apunta la salud. */
+export async function comprobarProveedor(formData: FormData): Promise<void> {
+  const admin = await exigirDuena();
+  const proveedor = proveedorDe(formData);
+  // Siempre desde la base, nunca de un caché: se prueba lo que está GUARDADO.
+  let cfg = await leerConfigPagos();
+  if (!hayCredenciales(proveedor, cfg)) terminar({ error: `${proveedor}-sin-llaves` });
+
+  const r = await sondear(proveedor, cfg);
+
+  let rellenado = false;
+  if (proveedor === "square" && "locales" in r) {
+    const locales = (r as { locales: { id: string; nombre: string }[] }).locales;
+    if (locales.length === 1 && cfg.square.locationId !== locales[0].id) {
+      cfg = { ...cfg, square: { ...cfg.square, locationId: locales[0].id } };
+      await guardarConfigSquare(cfg.square);
+      rellenado = true;
+    }
+  }
+
+  await anotarSalud(proveedor, saludDe(proveedor, r, cfg));
+  await registrarActividad({
+    admin,
+    action: "update",
+    entityType: "setting",
+    summary: `Comprobó la conexión con ${proveedor}: ${r.ok ? "bien" : `falló (${r.codigo ?? "sin código"})`}.`,
+  });
+
+  if (r.ok) terminar({ hecho: rellenado ? "square-local" : `${proveedor}-conexion` });
+  terminar({ error: r.motivo === "red" ? `${proveedor}-sin-respuesta` : `${proveedor}-fallo` });
+}
+
+/**
+ * Comprueba de una vez las que estén configuradas. Es el botón de la cabecera:
+ * la pregunta que se hace de verdad es «¿está todo cobrando?», no «¿cómo está
+ * Stripe?».
+ */
+export async function comprobarTodas(): Promise<void> {
+  const admin = await exigirDuena();
+  const cfg = await leerConfigPagos();
+  const proveedores: MetodoOnline[] = ["stripe", "paypal", "square"];
+  const hechas = proveedores.filter((p) => hayCredenciales(p, cfg));
+  if (hechas.length === 0) terminar({ error: "nada-que-comprobar" });
+
+  // En serie a propósito: son tres llamadas con timeout de 15 s y `anotarSalud`
+  // lee y reescribe la misma fila. En paralelo se pisarían entre ellas.
+  let fallos = 0;
+  for (const p of hechas) {
+    const r = await sondear(p, cfg);
+    if (!r.ok) fallos += 1;
+    await anotarSalud(p, saludDe(p, r, cfg));
+  }
+
+  await registrarActividad({
+    admin,
+    action: "update",
+    entityType: "setting",
+    summary: `Comprobó ${hechas.length} ${hechas.length === 1 ? "pasarela" : "pasarelas"}: ${fallos} con problemas.`,
+  });
+  terminar({ hecho: fallos === 0 ? "todas-bien" : "todas-con-fallos" });
 }
 
 /* ─────────────────────── métodos sin pasarela ─────────────────────── */
@@ -211,7 +336,7 @@ export async function guardarManuales(formData: FormData): Promise<void> {
   const payPickup = marcado(formData, "payPickup");
 
   // La tienda no puede quedarse sin NINGUNA forma de terminar una compra.
-  const online = metodosOnlineActivos(await leerConfigPagos());
+  const online = metodosOnlineActivos(await leerConfigPagos(), await leerSalud());
   const hayOnline = online.stripe || online.paypal || online.square;
   if (!payDm && !payPickup && !hayOnline) terminar({ error: "sin-metodos" });
 
@@ -225,9 +350,9 @@ export async function guardarManuales(formData: FormData): Promise<void> {
   terminar({ hecho: "manuales" });
 }
 
-/* ───────────────────────── quitar llaves ───────────────────────── */
+/* ─────────────────────── desconectar ─────────────────────── */
 
-const CLAVE_SETTING: Record<string, string> = {
+const CLAVE_SETTING: Record<MetodoOnline, string> = {
   stripe: "paymentsStripe",
   paypal: "paymentsPaypal",
   square: "paymentsSquare",
@@ -235,15 +360,20 @@ const CLAVE_SETTING: Record<string, string> = {
 
 /**
  * Borra las credenciales guardadas de un proveedor (rotación de llaves o
- * desconexión). No es destructivo de verdad: se recupera pegándolas otra vez.
+ * desconexión) y olvida su salud. No es destructivo de verdad: se recupera
+ * pegándolas otra vez.
+ *
+ * Borra por CLAVE, no por lo que se pudo descifrar: si la fila existe pero este
+ * servidor ya no puede leerla (cambió `SESSION_SECRET`), esto es lo único que
+ * permite limpiarla desde la interfaz. Antes el botón salía deshabilitado
+ * justamente en ese caso, que es cuando más falta hacía.
  */
-export async function quitarProveedor(formData: FormData): Promise<void> {
+export async function desconectarProveedor(formData: FormData): Promise<void> {
   const admin = await exigirDuena();
-  const proveedor = texto(formData, "proveedor");
-  const clave = CLAVE_SETTING[proveedor];
-  if (!clave) terminar({ error: "desconocido" });
+  const proveedor = proveedorDe(formData);
 
-  await db.setting.deleteMany({ where: { key: clave } });
+  await db.setting.deleteMany({ where: { key: CLAVE_SETTING[proveedor] } });
+  await olvidarSalud(proveedor);
   await registrarActividad({
     admin,
     action: "delete",
@@ -251,75 +381,4 @@ export async function quitarProveedor(formData: FormData): Promise<void> {
     summary: `Quitó las llaves de ${proveedor} en Pagos.`,
   });
   terminar({ hecho: `${proveedor}-quitado` });
-}
-
-/* ───────────────────────── probar conexión ───────────────────────── */
-
-export async function probarConexion(formData: FormData): Promise<void> {
-  const admin = await exigirDuena();
-  const proveedor = texto(formData, "proveedor");
-  // Siempre desde la BD, nunca de un caché: se prueba lo que está GUARDADO.
-  const cfg = await leerConfigPagos();
-
-  if (proveedor === "stripe") {
-    if (!stripeConfigurado(cfg.stripe)) terminar({ error: "stripe-sin-llave" });
-    const r = await probarStripe(cfg.stripe);
-    await registrarActividad({
-      admin,
-      action: "update",
-      entityType: "setting",
-      summary: `Probó la conexión con Stripe: ${r.ok ? `bien (${r.detalle})` : "falló"}.`,
-    });
-    terminar(r.ok ? { hecho: "stripe-conexion" } : { error: "stripe-fallo" });
-  }
-
-  if (proveedor === "paypal") {
-    if (!paypalConfigurado(cfg.paypal)) terminar({ error: "paypal-sin-llaves" });
-    const r = await probarPaypal(cfg.paypal);
-    await registrarActividad({
-      admin,
-      action: "update",
-      entityType: "setting",
-      summary: `Probó la conexión con PayPal: ${r.ok ? "bien" : "falló"}.`,
-    });
-    terminar(r.ok ? { hecho: "paypal-conexion" } : { error: "paypal-fallo" });
-  }
-
-  if (proveedor === "square") {
-    // Para probar Square basta el token: si falta el Location ID, la propia
-    // prueba lo rellena cuando la cuenta tiene un único local.
-    if (cfg.square.accessToken.length < 10) terminar({ error: "square-sin-llaves" });
-    const r = await probarSquare(cfg.square);
-    /*
-     * El Location ID es un código de Square (tipo «L8FPZ7DK9YXBQ»), no el
-     * nombre del negocio — y es dato fácil de confundir: alguien escribe
-     * «bloombymadeline» y Square rechaza el cobro sin decir por qué.
-     * Si el token SÍ vale (devolvió locales) y la cuenta tiene uno solo, se
-     * pone el bueno automáticamente: no hay nada que elegir.
-     */
-    if (r.locales.length === 1 && cfg.square.locationId !== r.locales[0].id) {
-      await guardarConfigSquare({ ...cfg.square, locationId: r.locales[0].id });
-      await registrarActividad({
-        admin,
-        action: "update",
-        entityType: "setting",
-        summary: `Probó la conexión con Square: bien. Location ID rellenado solo (${r.locales[0].nombre}).`,
-      });
-      terminar({ hecho: "square-local" });
-    }
-    await registrarActividad({
-      admin,
-      action: "update",
-      entityType: "setting",
-      summary: `Probó la conexión con Square: ${r.ok ? `bien (${r.detalle})` : `falló (${r.detalle})`}.`,
-    });
-    if (r.ok) terminar({ hecho: "square-conexion" });
-    // Si el token es del OTRO entorno se dice tal cual: es el fallo más común
-    // y con «Unauthorized» a secas nadie adivina qué hacer.
-    if (/PRUEBAS \(Sandbox\)/.test(r.detalle)) terminar({ error: "square-es-sandbox" });
-    if (/PRODUCCIÓN \(Real\)/.test(r.detalle)) terminar({ error: "square-es-produccion" });
-    terminar({ error: "square-fallo" });
-  }
-
-  terminar({ error: "desconocido" });
 }

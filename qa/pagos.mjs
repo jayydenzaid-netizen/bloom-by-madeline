@@ -98,7 +98,10 @@ await page.goto(`${BASE}/admin/pagos`, { waitUntil: "networkidle2", timeout: 900
 const tarjetas = await page.evaluate(() => document.body.innerText);
 anota(
   "la página Pagos pinta las tres pasarelas y los métodos sin pasarela",
-  /Stripe/.test(tarjetas) && /PayPal/.test(tarjetas) && /Square/.test(tarjetas) && /Sin pasarela/.test(tarjetas),
+  // Con /i a la fuerza: los titulos van en mayusculas por CSS e innerText las
+  // devuelve asi. Sin /i, esta comprobacion solo pasaba de casualidad, porque el
+  // nombre aparecia ademas en la guia de abajo escrito en minusculas.
+  /stripe/i.test(tarjetas) && /paypal/i.test(tarjetas) && /square/i.test(tarjetas) && /sin pasarela/i.test(tarjetas),
 );
 anota(
   "el enlace Pagos está en el menú lateral",
@@ -142,12 +145,15 @@ await enviarFormularioDe(page, "#stripe-key");
 await esperar(page, () => /rechazó esa llave/i.test(document.querySelector(".pag-aviso")?.textContent ?? ""), 20000);
 const trasActivar = await page.evaluate(() => ({
   aviso: document.querySelector(".pag-aviso")?.textContent?.trim() ?? "(sin aviso)",
-  activo: /Activo en el checkout/i.test(document.body.innerText),
-  guardadoSinActivar: /Guardado, sin activar/i.test(document.body.innerText),
+  activo: /Cobrando/i.test(document.body.innerText),
+  // El panel ahora dice POR QUE no se activo, no solo que no se activo: la
+  // insignia queda en «Rechazada» y la tarjeta explica que hacer.
+  rechazada: /Rechazada/i.test(document.body.innerText),
+  diagnostico: /rechazó esas llaves|copiaste enteras/i.test(document.body.innerText),
 }));
 anota(
   "una llave que la pasarela RECHAZA no puede activarse (queda guardada y apagada)",
-  !trasActivar.activo && trasActivar.guardadoSinActivar && /rechazó esa llave/i.test(trasActivar.aviso),
+  !trasActivar.activo && trasActivar.rechazada && trasActivar.diagnostico && /rechazó esa llave/i.test(trasActivar.aviso),
   trasActivar.aviso.slice(0, 90),
 );
 anota(
@@ -159,7 +165,7 @@ anota(
 const antesDeProbar = await page.evaluate(() => location.search);
 await page.evaluate(() => {
   [...document.querySelectorAll("form")]
-    .find((f) => f.querySelector('input[name="proveedor"][value="stripe"]') && /Probar/.test(f.textContent))
+    .find((f) => f.querySelector('input[name="proveedor"][value="stripe"]') && /Probar|Comprobar/.test(f.textContent))
     ?.querySelector("button")
     ?.click();
 });
@@ -167,7 +173,7 @@ await esperarRespuesta(page, antesDeProbar);
 await esperar(page, () => /rechaz/i.test(document.querySelector(".pag-aviso")?.textContent ?? ""), 25000);
 anota(
   "probar conexión con la llave falsa avisa del rechazo",
-  await page.evaluate(() => /rechazó la llave/i.test(document.querySelector(".pag-aviso")?.textContent ?? "")),
+  await page.evaluate(() => /rechaz/i.test(document.querySelector(".pag-aviso")?.textContent ?? "") && /Rechazada/i.test(document.body.innerText)),
   await page.evaluate(() => `url=${location.search} aviso=«${document.querySelector(".pag-aviso")?.textContent?.trim().slice(0, 80) ?? "(sin aviso)"}»`),
 );
 
@@ -265,7 +271,7 @@ await page.goto(`${BASE}/admin/pagos`, { waitUntil: "networkidle2" });
 const antesDeQuitar = await page.evaluate(() => location.search);
 await page.evaluate(() => {
   [...document.querySelectorAll("form")]
-    .find((f) => f.querySelector('input[name="proveedor"][value="stripe"]') && /Quitar/.test(f.textContent))
+    .find((f) => f.querySelector('input[name="proveedor"][value="stripe"]') && /Quitar|Desconectar/.test(f.textContent))
     ?.querySelector("button")
     ?.click();
 });
