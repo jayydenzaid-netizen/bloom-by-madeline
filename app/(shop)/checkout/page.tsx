@@ -138,6 +138,16 @@ export default async function CheckoutPage() {
     : [...metodosManuales, ...metodosOnline];
 
   const hayMetodo = methods.some((m) => m.enabled);
+  /*
+   * ¿Se puede comprar SIN venir a la boutique?
+   *
+   * «Recoger en la boutique» no es una forma de comprar para quien vive en otro
+   * estado, y la portada promete envíos a todo el país. Si se apagan el DM y las
+   * pasarelas, el checkout se queda solo con la recogida y una clienta de fuera
+   * rellena su nombre y su correo para descubrir al final que no puede pedir.
+   * Cuando pasa, se dice arriba y se le da una salida real.
+   */
+  const hayEnvio = methods.some((m) => m.enabled && m.id !== "pickup");
 
   return (
     <div className="shop-page section">
@@ -147,6 +157,17 @@ export default async function CheckoutPage() {
           Casi <em className="serif-it">tuyo</em>
         </h1>
       </header>
+
+      {hayMetodo && !hayEnvio ? (
+        <p className="co-alert co-alert-envio">
+          Ahora mismo solo se puede <strong>recoger en la boutique</strong> ({settings.address}).
+          Si necesitas que te lo enviemos,{" "}
+          <a href={settings.instagramDm} target="_blank" rel="noopener">
+            escríbenos por Instagram
+          </a>{" "}
+          y lo cerramos por ahí.
+        </p>
+      ) : null}
 
       {hayMetodo ? (
         <CheckoutForm

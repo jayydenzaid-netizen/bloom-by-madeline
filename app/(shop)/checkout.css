@@ -565,3 +565,13 @@
   .co-row-3,
   .op-estados { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Aviso de «hoy solo hay recogida»: es información útil, no un error, así que
+   va en tinta de la casa y no en el rojo de las alarmas. */
+.co-alert-envio {
+  border-color: var(--line);
+  background: var(--cream);
+  color: var(--ink);
+  margin-bottom: 18px;
+}
+.co-alert-envio a { color: var(--clay); text-underline-offset: 3px; }

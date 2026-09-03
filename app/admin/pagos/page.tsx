@@ -148,6 +148,20 @@ export default async function PagosPage({
         }
       />
 
+      {/* Aviso de tienda coja: sin pasarela y sin DM, lo único que queda es la
+          recogida en la boutique, o sea que NADIE de fuera de Hamilton puede
+          comprar aunque la portada prometa envíos a todo el país. Es el estado
+          más caro en el que puede estar la tienda, y hasta ahora no lo decía
+          nadie. */}
+      {activos === 0 && !settings.payDm ? (
+        <p className="pag-aviso is-error" role="alert">
+          <strong>Tu tienda solo permite recoger en la boutique.</strong> Sin una pasarela
+          activa y con el DM apagado, quien viva fuera de Hamilton no puede comprar. Conecta
+          una cuenta de cobro aquí abajo, o vuelve a encender el DM en «Sin pasarela» mientras
+          tanto.
+        </p>
+      ) : null}
+
       {hecho ? (
         <p className="pag-aviso is-ok" role="status">
           {hecho}
