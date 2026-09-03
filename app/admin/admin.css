@@ -537,6 +537,11 @@ body:has(.adm-auth)::after {
 .adm-field-hint { font-size: 12.5px; color: var(--adm-muted); margin-top: 5px; line-height: 1.5; }
 .adm-field-err { font-size: 12.5px; color: var(--adm-danger); margin-top: 5px; }
 
+/* `input:not([type])` no es un capricho: un <input> sin atributo `type` se
+   comporta como texto pero NO casa con `input[type="text"]`, así que se quedaba
+   con el estilo por defecto del navegador — a 13,3px y con otro borde. Pasaba en
+   Reseñas y era invisible salvo mirándolo al lado de otro campo. */
+.adm-shell input:not([type]),
 .adm-shell input[type="text"],
 .adm-shell input[type="email"],
 .adm-shell input[type="password"],
@@ -1123,6 +1128,7 @@ body:has(.adm-auth)::after {
      ZOOM al enfocar cualquier campo por debajo de 16px, y no vuelve solo — la
      dueña se queda con el panel ampliado y desplazado a la derecha. El panel
      entero iba a 15px. */
+  .adm-shell input:not([type]),
   .adm-shell input[type="text"],
   .adm-shell input[type="email"],
   .adm-shell input[type="password"],
