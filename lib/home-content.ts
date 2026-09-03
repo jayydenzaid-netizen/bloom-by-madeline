@@ -36,6 +36,7 @@ export const KINDS_PORTADA = [
   "marquee",
   "coleccion",
   "cita",
+  "exclusividad",
   "filosofia",
   "boutique",
   "comoComprar",
@@ -54,6 +55,7 @@ export type KindPortada = (typeof KINDS_PORTADA)[number];
 export const KINDS_ORDENABLES = [
   "coleccion",
   "cita",
+  "exclusividad",
   "filosofia",
   "boutique",
   "comoComprar",
@@ -104,6 +106,20 @@ export type ContenidoColeccion = {
 };
 
 export type ContenidoCita = { visible: boolean; texto: string };
+
+/**
+ * Bloque de ESCASEZ. No lleva las piezas dentro: las pone la portada leyendo el
+ * stock de verdad (ver app/(shop)/page.tsx). Aquí solo vive el texto, para que
+ * Madeline pueda cambiarlo desde /admin/contenido sin tocar el inventario.
+ */
+export type ContenidoExclusividad = {
+  visible: boolean;
+  overline: string;
+  titulo: string;
+  intro: string;
+  /** Cuántas unidades como mucho para considerar que una pieza «vuela». */
+  umbral: number;
+};
 
 export type ContenidoFilosofia = {
   visible: boolean;
@@ -165,6 +181,7 @@ export type Portada = {
   marquee: ContenidoMarquee;
   coleccion: ContenidoColeccion;
   cita: ContenidoCita;
+  exclusividad: ContenidoExclusividad;
   filosofia: ContenidoFilosofia;
   boutique: ContenidoBoutique;
   comoComprar: ContenidoComoComprar;
@@ -252,7 +269,15 @@ const SEMILLA: (Partial<SlotBloque> & { kind: KindPortada })[] = [
     body: `«${FINO}Cada prenda cuenta una historia…\n*haz que la tuya brille con estilo.*${FINO}»`,
   },
   {
+    kind: "exclusividad",
+    subtitle: "02 — Piezas contadas",
+    title: "Cuando vuela, *no vuelve*",
+    body:
+      "Madeline trae poquitas de cada talla, elegidas a mano y sin reposición. Lo de aquí abajo es, literalmente, lo que queda en la boutique ahora mismo.",
+  },
+  {
     kind: "filosofia",
+    isVisible: false,
     subtitle: "02 — Nuestra Filosofía",
     title: "Vestir con *intención*",
     body:
@@ -436,6 +461,7 @@ export function construirPortada(filas: FilaBloque[], settings: StoreSettings): 
   const marquee = sacar("marquee");
   const coleccion = sacar("coleccion");
   const cita = sacar("cita");
+  const exclusividad = sacar("exclusividad");
   const filosofia = sacar("filosofia");
   const boutique = sacar("boutique");
   const comoComprar = sacar("comoComprar");
@@ -488,6 +514,16 @@ export function construirPortada(filas: FilaBloque[], settings: StoreSettings): 
     },
 
     cita: { visible: cita.isVisible, texto: texto(cita.body, comunes) },
+
+    exclusividad: {
+      visible: exclusividad.isVisible,
+      overline: texto(exclusividad.subtitle, comunes),
+      titulo: texto(exclusividad.title, comunes),
+      intro: texto(exclusividad.body, comunes),
+      // 3 = «quedan pocas» para una boutique que trae 3 por talla. Si Madeline
+      // trae más, lo sube desde /admin/contenido sin tocar código.
+      umbral: 3,
+    },
 
     filosofia: {
       visible: filosofia.isVisible,

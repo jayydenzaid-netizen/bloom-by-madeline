@@ -3,12 +3,14 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { cargarPortada, type KindOrdenable } from "@/lib/home-content";
 import { DEFAULT_SETTINGS, getSettings, type StoreSettings } from "@/lib/settings";
+import { unidadesQueQuedan } from "./_components/Filtros";
 import { type ProductCardItem } from "./_components/ProductCard";
 import {
   Banner,
   Boutique,
   Cita,
   Coleccion,
+  Exclusividad,
   ComoComprar,
   Filosofia,
   Hero,
@@ -16,6 +18,7 @@ import {
   Preloader,
   Visitanos,
   type InspiracionItem,
+  type PiezaEscasa,
 } from "./_components/HomeSections";
 import "./home.css";
 
@@ -95,6 +98,7 @@ export default async function HomePage() {
     // cero: en dropshipping lo normal es vender sin inventario propio.
     soldOut:
       p.variants.length > 0 && p.variants.every((v) => v.trackStock && v.stock <= 0),
+    quedan: unidadesQueQuedan(p.variants),
   }));
 
   // Sin nada publicado la portada no puede enseñar una rejilla vacía: se cae a la
@@ -110,11 +114,61 @@ export default async function HomePage() {
   // Cada sección movible, lista para pintar. El orden y qué se pinta lo decide
   // `portada.orden`, que ya viene ordenado por `position` y sin lo apagado: así
   // apagar «cita» desde el panel es literalmente no pintarla, sin huecos.
+  /*
+   * PIEZAS QUE VUELAN — escasez de verdad, sacada del inventario.
+   *
+   * Se cuentan solo variantes que llevan control de stock (en dropshipping el
+   * stock lo tiene el proveedor y decir «queda 1» sería mentir) y se ordenan
+   * de la que menos queda a la que más. Si nadie está por debajo del umbral,
+   * `piezasEscasas` sale vacío y el bloque no se pinta: mejor no enseñar nada
+   * que fabricar una urgencia que no existe.
+   */
+  const umbral = portada.exclusividad.umbral;
+  // Se mira el catálogo ENTERO, no solo las ocho de la portada: lo que está a
+  // punto de agotarse puede ser cualquier pieza de la tienda.
+  const candidatas = await db.product.findMany({
+    where: { status: "active", priceCents: { gt: 0 } },
+    select: {
+      slug: true,
+      title: true,
+      priceCents: true,
+      compareAtCents: true,
+      images: { select: { url: true }, orderBy: { position: "asc" }, take: 1 },
+      variants: { select: { option1: true, stock: true, trackStock: true }, orderBy: { position: "asc" } },
+    },
+  });
+  const piezasEscasas: PiezaEscasa[] = candidatas
+    .map((p): PiezaEscasa | null => {
+      const conControl = p.variants.filter((v) => v.trackStock);
+      if (conControl.length === 0) return null;
+      const quedan = conControl.reduce((s, v) => s + Math.max(0, v.stock), 0);
+      if (quedan <= 0 || quedan > umbral) return null;
+      return {
+        slug: p.slug,
+        title: p.title,
+        imageUrl: p.images[0]?.url ?? null,
+        priceCents: p.priceCents,
+        compareAtCents: p.compareAtCents,
+        quedan,
+        tallas: conControl
+          .filter((v) => v.stock > 0)
+          .map((v) => v.option1)
+          .filter((t): t is string => !!t)
+          .join(" · "),
+      };
+    })
+    .filter((x): x is PiezaEscasa => x !== null)
+    .sort((a, b) => a.quedan - b.quedan)
+    .slice(0, 4);
+
   const secciones: Record<KindOrdenable, ReactNode> = {
     coleccion: (
       <Coleccion contenido={portada.coleccion} productos={productos} inspiracion={inspiracion} />
     ),
     cita: <Cita contenido={portada.cita} />,
+    exclusividad: (
+      <Exclusividad contenido={portada.exclusividad} piezas={piezasEscasas} />
+    ),
     filosofia: <Filosofia contenido={portada.filosofia} />,
     boutique: <Boutique contenido={portada.boutique} />,
     comoComprar: <ComoComprar contenido={portada.comoComprar} />,

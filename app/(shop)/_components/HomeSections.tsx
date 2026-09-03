@@ -6,12 +6,14 @@ import type {
   ContenidoCita,
   ContenidoColeccion,
   ContenidoComoComprar,
+  ContenidoExclusividad,
   ContenidoFilosofia,
   ContenidoHero,
   ContenidoInstagram,
   ContenidoMarquee,
   ContenidoVisitanos,
 } from "@/lib/home-content";
+import { formatCents } from "@/lib/money";
 import ProductCard, { type ProductCardItem } from "./ProductCard";
 
 /**
@@ -372,6 +374,81 @@ export function Filosofia({ contenido }: { contenido: ContenidoFilosofia }) {
           ))}
         </ol>
       </div>
+    </section>
+  );
+}
+
+/* ═══════════ PIEZAS CONTADAS (escasez real) ═══════════ */
+
+/** Una pieza a punto de agotarse, con las unidades que quedan DE VERDAD. */
+export type PiezaEscasa = {
+  slug: string;
+  title: string;
+  imageUrl: string | null;
+  priceCents: number;
+  compareAtCents: number | null;
+  /** Unidades que quedan sumando todas las tallas. */
+  quedan: number;
+  /** Tallas que aún tienen alguna unidad: "S · M". */
+  tallas: string;
+};
+
+/**
+ * Escasez HONESTA: los números salen del inventario, no de un contador
+ * inventado que baja solo. Si Madeline repone, el bloque desaparece; si no
+ * queda nada por debajo del umbral, tampoco se pinta. Un «¡solo quedan 2!»
+ * falso se nota y quema la confianza de la clienta, que es justo lo que esta
+ * boutique no se puede permitir.
+ */
+export function Exclusividad({
+  contenido,
+  piezas,
+}: {
+  contenido: ContenidoExclusividad;
+  piezas: PiezaEscasa[];
+}) {
+  if (piezas.length === 0) return null;
+
+  return (
+    <section className="section escasez" id="escasez">
+      <div className="section-head">
+        <div>
+          <p className="overline reveal">{contenido.overline}</p>
+          <h2 className="reveal">{conFormato(contenido.titulo, "titular")}</h2>
+        </div>
+        <p className="section-note reveal">{conFormato(contenido.intro)}</p>
+      </div>
+
+      <ul className="escasez-grid">
+        {piezas.map((p) => {
+          const ultima = p.quedan === 1;
+          const rebajado = !!p.compareAtCents && p.compareAtCents > p.priceCents;
+          return (
+            <li className="escasez-item reveal" key={p.slug}>
+              <Link href={`/producto/${p.slug}`}>
+                <span className="escasez-foto">
+                  {p.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- fotos del almacén de la tienda
+                    <img src={p.imageUrl} alt={p.title} loading="lazy" />
+                  ) : (
+                    <span className="cd-noimg" aria-hidden="true" />
+                  )}
+                  <span className={ultima ? "escasez-sello es-ultima" : "escasez-sello"}>
+                    {ultima ? "Última unidad" : `Quedan ${p.quedan}`}
+                  </span>
+                </span>
+
+                <h3>{p.title}</h3>
+                <p className="escasez-tallas">{p.tallas}</p>
+                <p className="escasez-precio">
+                  {rebajado ? <s>{formatCents(p.compareAtCents as number)}</s> : null}
+                  <strong>{formatCents(p.priceCents)}</strong>
+                </p>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }

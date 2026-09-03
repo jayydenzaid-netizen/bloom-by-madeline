@@ -183,3 +183,115 @@
 @media (max-width: 640px) {
   .atc-add { padding-top: 16px; padding-bottom: 16px; }
 }
+
+/* ═══════════ SELLOS DE ESCASEZ Y REBAJA ═══════════
+   Los números salen del inventario, nunca de un contador inventado: un «solo
+   queda 1» falso se nota y se lleva por delante la confianza de la clienta.
+   Por eso el sello de rebaja va con el % ya calculado y el de unidades solo
+   aparece si la prenda lleva control de stock de verdad. */
+
+/* Cuando coinciden rebaja y escasez, la segunda baja para no solaparse. */
+.pc-flag-sale + .pc-flag-pocas,
+.pc-flag-sale + .pc-flag-ultima { top: 48px; }
+
+.pc-flag-pocas {
+  background: var(--bone);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+}
+
+/* «¡Última!» es el único sello que se mueve: la urgencia se gana un latido,
+   pero suave y respetando a quien pide menos animación. */
+.pc-flag-ultima {
+  background: var(--clay);
+  color: var(--bone);
+  animation: pulso-ultima 2.4s var(--ease) infinite;
+}
+@keyframes pulso-ultima {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pc-flag-ultima { animation: none; }
+}
+
+/* Precio rebajado: primero lo que costaba (tachado, discreto) y luego lo que
+   cuesta ahora, que es lo que tiene que leerse. */
+.pc-price s {
+  color: var(--stone);
+  text-decoration-thickness: 1px;
+  margin-right: 8px;
+  font-size: .92em;
+}
+.pc-ahora { color: var(--clay); }
+
+/* ═══════════ PIEZAS CONTADAS (bloque de escasez de la portada) ═══════════ */
+
+.escasez-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: clamp(18px, 2.6vw, 32px);
+}
+
+.escasez-item a { display: block; }
+
+.escasez-foto {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--petal-card);
+  background: var(--cream);
+  margin-bottom: 14px;
+}
+.escasez-item:nth-child(even) .escasez-foto { border-radius: var(--petal-card-alt); }
+.escasez-foto img {
+  width: 100%;
+  aspect-ratio: 3/4;
+  object-fit: cover;
+  transition: transform .7s var(--ease);
+}
+.escasez-item a:hover .escasez-foto img { transform: scale(1.04); }
+
+.escasez-sello {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--bone);
+  color: var(--ink);
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.escasez-sello.es-ultima {
+  background: var(--clay);
+  color: var(--bone);
+  animation: pulso-ultima 2.4s var(--ease) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .escasez-sello.es-ultima { animation: none; }
+}
+
+.escasez-item h3 {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.escasez-tallas {
+  margin-top: 5px;
+  font-size: 11.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--stone);
+}
+.escasez-precio {
+  margin-top: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.escasez-precio s { color: var(--stone); font-size: 14px; text-decoration-thickness: 1px; }
+.escasez-precio strong { font-family: var(--serif); font-size: 19px; font-weight: 500; }

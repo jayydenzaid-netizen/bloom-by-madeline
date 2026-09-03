@@ -285,7 +285,21 @@ export function tarjetaDeProducto(p: FilaTarjeta): ProductCardItem {
     imageAlt: p.images[0]?.alt || p.title,
     meta: partes.length ? partes.join(" — ") : p.productType || null,
     soldOut: estaAgotado(p.variants),
+    quedan: unidadesQueQuedan(p.variants),
   };
+}
+
+/**
+ * Unidades que quedan sumando las tallas. `null` cuando NINGUNA variante lleva
+ * control de stock: ahí el inventario es del proveedor y anunciar «quedan 2»
+ * sería inventado.
+ */
+export function unidadesQueQuedan(
+  variantes: { stock: number; trackStock: boolean }[],
+): number | null {
+  const conControl = variantes.filter((v) => v.trackStock);
+  if (conControl.length === 0) return null;
+  return conControl.reduce((s, v) => s + Math.max(0, v.stock), 0);
 }
 
 /** trackStock false = dropshipping: el stock lo tiene el proveedor, nunca se agota. */
