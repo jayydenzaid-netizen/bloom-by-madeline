@@ -290,3 +290,80 @@ export function StatCard({
     </div>
   );
 }
+
+/* ─────────────────────────────── Paso ───────────────────────────────── */
+
+/**
+ * Un trozo de trabajo con principio y fin, no «una tarjeta más».
+ *
+ * Sale del alta de prendas (`/admin/productos/nueva-prenda`), que es la pantalla
+ * que mejor funciona del panel. Acertaba por tres decisiones, y son las que este
+ * componente obliga a tomar:
+ *
+ *  1. `numero` — el orden es el orden en el que ELLA trabaja, no el del modelo
+ *     de datos. Si no puedes numerar los pasos, probablemente estás volcando una
+ *     tabla en vez de acompañar una tarea.
+ *  2. `titulo` — una PREGUNTA en su idioma («¿Cómo te encuentran?»), no el
+ *     nombre de la columna («Datos de contacto»).
+ *  3. `ayuda` — la CONSECUENCIA, no la definición. «Esto sale en el pie de la
+ *     web» vale; «campo de texto libre» no.
+ *
+ * `pie` es donde va el botón de guardar de ese paso: cada paso guarda lo suyo,
+ * así que equivocarse en uno nunca pisa lo demás.
+ */
+export function Paso({
+  numero,
+  titulo,
+  ayuda,
+  children,
+  pie,
+}: {
+  numero?: number | string;
+  titulo: ReactNode;
+  ayuda?: ReactNode;
+  children: ReactNode;
+  pie?: ReactNode;
+}) {
+  return (
+    <section className="adm-paso">
+      <h2 className="adm-paso-cab">
+        {numero !== undefined ? <span className="adm-paso-num">{numero}</span> : null}
+        <span>{titulo}</span>
+      </h2>
+      {ayuda ? <p className="adm-paso-ayuda">{ayuda}</p> : null}
+      {children}
+      {pie ? <div className="adm-paso-pie">{pie}</div> : null}
+    </section>
+  );
+}
+
+/* ─────────────────────────────── Ficha ──────────────────────────────── */
+
+/**
+ * Elegir tocando, en vez de un desplegable.
+ *
+ * Un `<select>` en un móvil abre la rueda del sistema y esconde las opciones
+ * hasta que la abres; estas fichas se ven todas a la vez. Va sobre un
+ * checkbox/radio de verdad, así que funciona **sin JavaScript** — importa,
+ * porque la boutique tiene mala cobertura y el panel se abre desde el móvil.
+ */
+export function Ficha({
+  name,
+  value,
+  tipo = "checkbox",
+  defaultChecked,
+  children,
+}: {
+  name: string;
+  value?: string;
+  tipo?: "checkbox" | "radio";
+  defaultChecked?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <label className="adm-chip">
+      <input type={tipo} name={name} value={value} defaultChecked={defaultChecked} />
+      <span>{children}</span>
+    </label>
+  );
+}

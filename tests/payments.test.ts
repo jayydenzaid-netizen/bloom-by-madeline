@@ -721,3 +721,25 @@ test("el registro y el tipo de proveedores no se pueden desincronizar", () => {
     }
   }
 });
+
+test("⭐ pegar el bloque de Stripe con las DOS llaves se queda la que cobra", () => {
+  // El panel de Stripe enseña la publicable ARRIBA y la secreta debajo, así que
+  // lo natural es seleccionar el bloque entero y pegarlo. Con «gana la primera»,
+  // la publicable se quedaba el sitio y la respuesta era «esa no es la secreta»
+  // teniendo la buena en el mismo pegado.
+  const pk = "pk_live_" + "A1b2C3d4E5".repeat(3);
+  const sk = "sk_live_" + "Z9y8X7w6V5".repeat(3);
+
+  for (const bloque of [`Publishable key\n${pk}\nSecret key\n${sk}`, `Secret key\n${sk}\nPublishable key\n${pk}`]) {
+    const pistas = reconocerConValores(bloque);
+    assert.equal(pistas.length, 1);
+    assert.equal(pistas[0].valor, sk, "tiene que quedarse la secreta, que es la que cobra");
+    assert.equal(pistas[0].problema, undefined);
+  }
+
+  // Pero si SOLO viene la publicable, hay que decirlo: ahí sí hay algo que
+  // explicar y callarse sería peor.
+  const sola = reconocerConValores(`Publishable key\n${pk}`);
+  assert.equal(sola.length, 1);
+  assert.equal(sola[0].problema, "llave-no-secreta");
+});

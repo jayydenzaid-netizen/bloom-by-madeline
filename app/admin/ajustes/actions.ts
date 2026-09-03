@@ -55,9 +55,22 @@ function terminar(seccion: string, error?: string): never {
 
 /* ─────────────────────────────── tienda ─────────────────────────────── */
 
-const tiendaSchema = z.object({
+/**
+ * Los datos de la tienda van en DOS esquemas, no en uno.
+ *
+ * Antes eran un solo formulario que guardaba los ocho campos de golpe. Al
+ * partir la pantalla en pasos —cada paso guarda lo suyo— eso se vuelve
+ * peligroso: un formulario que no incluya `address` lo mandaría vacío y
+ * `saveSettings` lo escribiría como "". O sea, borrar la dirección de la
+ * boutique por haber tocado el lema. Cada esquema valida SOLO sus campos y
+ * `saveSettings` es parcial, así que lo que no viaja no se toca.
+ */
+const identidadSchema = z.object({
   storeName: z.string().trim().min(1, "El nombre de la tienda no puede quedar vacío.").max(80),
   tagline: z.string().trim().max(160, "El lema es demasiado largo."),
+});
+
+const contactoSchema = z.object({
   email: z.union([z.literal(""), z.string().trim().email("El correo no tiene un formato válido.")]),
   phone: z.string().trim().max(40),
   address: z.string().trim().max(200),
@@ -66,12 +79,23 @@ const tiendaSchema = z.object({
   instagramDm: z.union([z.literal(""), z.string().trim().url("El enlace del DM debe ser una URL completa.")]),
 });
 
-export async function guardarTienda(formData: FormData): Promise<void> {
+export async function guardarIdentidad(formData: FormData): Promise<void> {
   await exigirSesion();
 
-  const datos = tiendaSchema.safeParse({
+  const datos = identidadSchema.safeParse({
     storeName: texto(formData, "storeName"),
     tagline: texto(formData, "tagline"),
+  });
+  if (!datos.success) terminar("identidad", datos.error.issues[0]?.message);
+
+  await saveSettings(datos.data);
+  terminar("identidad");
+}
+
+export async function guardarContacto(formData: FormData): Promise<void> {
+  await exigirSesion();
+
+  const datos = contactoSchema.safeParse({
     email: texto(formData, "email"),
     phone: texto(formData, "phone"),
     address: texto(formData, "address"),
@@ -80,12 +104,12 @@ export async function guardarTienda(formData: FormData): Promise<void> {
     instagram: texto(formData, "instagram").replace(/^@+/, ""),
     instagramDm: texto(formData, "instagramDm"),
   });
-
-  if (!datos.success) terminar("tienda", datos.error.issues[0]?.message);
+  if (!datos.success) terminar("contacto", datos.error.issues[0]?.message);
 
   await saveSettings(datos.data);
-  terminar("tienda");
+  terminar("contacto");
 }
+
 
 /* ─────────────────────────────── precios ─────────────────────────────── */
 

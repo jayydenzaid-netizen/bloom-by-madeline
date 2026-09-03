@@ -4,8 +4,8 @@ import { requireOwner } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { applyPricing, formatCents, margin } from "@/lib/money";
 import { getSettings } from "@/lib/settings";
-import { Badge, Button, Card, Field, PageHeader } from "../_components/ui";
-import { guardarEnvio, guardarPrecios, guardarTienda, regenerarToken } from "./actions";
+import { Badge, Button, Card, Ficha, Field, PageHeader, Paso } from "../_components/ui";
+import { guardarContacto, guardarEnvio, guardarIdentidad, guardarPrecios, regenerarToken } from "./actions";
 
 /**
  * Ajustes de la tienda. Cada sección es un formulario independiente con su
@@ -29,7 +29,8 @@ const IMPORT_TOKEN_KEY = "importToken";
 const EJEMPLOS = [500, 1200, 2500, 4900];
 
 const MENSAJES: Record<string, string> = {
-  tienda: "Datos de la tienda guardados.",
+  contacto: "Guardado. Así es como te encuentran ahora en la web.",
+  identidad: "Nombre y lema guardados.",
   precios: "Regla de precios guardada. Se aplicará a las próximas importaciones.",
   envio: "Ajustes de envío guardados.",
   token: "Token nuevo generado. Vuelve a instalar el marcador en tu navegador.",
@@ -66,7 +67,7 @@ export default async function AjustesPage({
     <>
       <style dangerouslySetInnerHTML={{ __html: ESTILOS }} />
 
-      <PageHeader title="Ajustes" subtitle="Datos de la tienda, precios, envío, cobros e importación" />
+      <PageHeader title="Ajustes" subtitle="Cómo te encuentran, cómo te llamas, cuánto cobras por enviar y cómo pones los precios" />
 
       {guardado || error ? (
         <Card flush>
@@ -90,57 +91,161 @@ export default async function AjustesPage({
         </Card>
       ) : null}
 
-      {/* ─────────────────────────── tienda ─────────────────────────── */}
-      <Card title="Tienda">
-        <form action={guardarTienda}>
-          <div className="aju-cols">
-            <Field label="Nombre de la tienda" htmlFor="storeName" required>
-              <input type="text" id="storeName" name="storeName" defaultValue={settings.storeName} maxLength={80} />
-            </Field>
-            <Field label="Lema" htmlFor="tagline" hint="Sale bajo el nombre en la portada.">
-              <input type="text" id="tagline" name="tagline" defaultValue={settings.tagline} maxLength={160} />
-            </Field>
-            <Field label="Correo de contacto" htmlFor="email" hint="Déjalo vacío si prefieres que no se publique.">
-              <input id="email" name="email" type="email" defaultValue={settings.email} placeholder="hola@…" />
-            </Field>
-            <Field label="Teléfono" htmlFor="phone" hint="Solo si quieres que aparezca en la web.">
-              <input type="text" id="phone" name="phone" defaultValue={settings.phone} maxLength={40} />
-            </Field>
-            <Field label="Dirección" htmlFor="address">
-              <input type="text" id="address" name="address" defaultValue={settings.address} maxLength={200} />
-            </Field>
-            <Field label="Horario" htmlFor="hours">
-              <input type="text" id="hours" name="hours" defaultValue={settings.hours} maxLength={140} />
-            </Field>
-            <Field label="Instagram" htmlFor="instagram" hint="Solo el usuario, sin la arroba.">
-              <input type="text" id="instagram" name="instagram" defaultValue={settings.instagram} maxLength={60} />
-            </Field>
-            <Field
-              label="Enlace del DM"
-              htmlFor="instagramDm"
-              hint="El botón de «pedir por DM» del sitio lleva aquí."
-            >
-              <input type="text" id="instagramDm" name="instagramDm" defaultValue={settings.instagramDm} placeholder="https://ig.me/m/…" />
-            </Field>
-          </div>
-          <button type="submit" className="adm-btn adm-btn-primary adm-btn-md">
-            Guardar datos de la tienda
-          </button>
-        </form>
-      </Card>
+      <div className="adm-pasos">
+        {/* ───────── 1. cómo te encuentran ─────────
+            Va primero porque es lo que más se toca y lo que más se nota fuera:
+            estos seis campos son el pie de la web, el mapa y el botón de pedir
+            por DM. Antes estaban mezclados con el nombre y el lema en una sola
+            tarjeta llamada «Tienda». */}
+        <Paso
+          numero={1}
+          titulo="¿Cómo te encuentran?"
+          ayuda="Esto es lo que sale en el pie de la web, en el mapa de «Visítanos» y en el botón de pedir por Instagram. Lo que dejes vacío, sencillamente no se publica."
+        >
+          <form action={guardarContacto}>
+            <div className="aju-cols">
+              <Field label="Dirección de la boutique" htmlFor="address" hint="Sale en el pie y marca el mapa de la portada.">
+                <input type="text" id="address" name="address" defaultValue={settings.address} maxLength={200} />
+              </Field>
+              <Field label="Horario" htmlFor="hours" hint="Tal cual quieres que lo lea una clienta.">
+                <input type="text" id="hours" name="hours" defaultValue={settings.hours} maxLength={140} />
+              </Field>
+              <Field label="Instagram" htmlFor="instagram" hint="Solo el usuario, sin la arroba.">
+                <input type="text" id="instagram" name="instagram" defaultValue={settings.instagram} maxLength={60} />
+              </Field>
+              <Field
+                label="Enlace para escribirte por DM"
+                htmlFor="instagramDm"
+                hint="El botón «Pedir por DM» de toda la web lleva aquí."
+              >
+                <input
+                  type="text"
+                  id="instagramDm"
+                  name="instagramDm"
+                  defaultValue={settings.instagramDm}
+                  placeholder="https://ig.me/m/…"
+                  inputMode="url"
+                />
+              </Field>
+              <Field label="Teléfono" htmlFor="phone" hint="Solo si quieres que aparezca en la web. Hoy no aparece ninguno.">
+                <input type="tel" id="phone" name="phone" defaultValue={settings.phone} maxLength={40} inputMode="tel" />
+              </Field>
+              <Field label="Correo de contacto" htmlFor="email" hint="Déjalo vacío si prefieres que no se publique.">
+                <input id="email" name="email" type="email" defaultValue={settings.email} placeholder="hola@…" inputMode="email" />
+              </Field>
+            </div>
+            <div className="adm-paso-pie">
+              <button type="submit" className="adm-btn adm-btn-primary adm-btn-md">
+                Guardar cómo te encuentran
+              </button>
+            </div>
+          </form>
+        </Paso>
 
-      {/* ─────────────────────────── precios ─────────────────────────── */}
-      <Card title="Precios de importación">
+        {/* ───────── 2. cómo te llamas ───────── */}
+        <Paso
+          numero={2}
+          titulo="¿Cómo se llama tu tienda?"
+          ayuda="El nombre sale en la cabecera, en la pestaña del navegador y cuando alguien comparte el enlace por WhatsApp. El lema va justo debajo, en la portada."
+        >
+          <form action={guardarIdentidad}>
+            <div className="aju-cols">
+              <Field label="Nombre" htmlFor="storeName" required>
+                <input type="text" id="storeName" name="storeName" defaultValue={settings.storeName} maxLength={80} />
+              </Field>
+              <Field label="Lema" htmlFor="tagline" hint="Una frase corta. Sale bajo el nombre en la portada.">
+                <input type="text" id="tagline" name="tagline" defaultValue={settings.tagline} maxLength={160} />
+              </Field>
+            </div>
+            <div className="adm-paso-pie">
+              <button type="submit" className="adm-btn adm-btn-primary adm-btn-md">
+                Guardar el nombre
+              </button>
+            </div>
+          </form>
+        </Paso>
+
+        {/* ───────── 3. envío ───────── */}
+        <Paso
+          numero={3}
+          titulo="¿Cuánto cobras por enviar?"
+          ayuda="Es lo que ve una clienta al final de la compra. Para las zonas y las tarifas por estado hay una pantalla propia, «Envíos»."
+        >
+          <form action={guardarEnvio}>
+            <div className="aju-cols">
+              <Field
+                label="Envío gratis a partir de"
+                htmlFor="freeShippingOverCents"
+                hint="Pon 0 y el envío será siempre gratis."
+              >
+                <input
+                  type="text"
+                  id="freeShippingOverCents"
+                  name="freeShippingOverCents"
+                  inputMode="decimal"
+                  defaultValue={formatCents(settings.freeShippingOverCents)}
+                />
+              </Field>
+              <Field label="Si no llega, cobras" htmlFor="flatShippingCents" hint="La tarifa plana de envío.">
+                <input
+                  type="text"
+                  id="flatShippingCents"
+                  name="flatShippingCents"
+                  inputMode="decimal"
+                  defaultValue={formatCents(settings.flatShippingCents)}
+                />
+              </Field>
+            </div>
+
+            {/* Ficha en vez de casilla: se toca con el pulgar y se ve encendida
+                de un vistazo, sin acertarle a un cuadradito de 20px. */}
+            <div className="adm-chips" style={{ margin: "4px 0 16px" }}>
+              <Ficha name="localPickup" defaultChecked={settings.localPickup}>
+                Puede recoger en la boutique
+              </Ficha>
+            </div>
+            <p className="adm-paso-ayuda">
+              {settings.localPickup
+                ? `Si la marcas, en el checkout puede elegir venir a por ello a ${settings.address || "la boutique"}.`
+                : "Ahora mismo no se ofrece recoger en tienda: todo pedido va por envío."}
+            </p>
+
+            <Field
+              label="¿Cuánto tardas en mandarlo?"
+              htmlFor="shippingNotice"
+              hint="Se enseña en el carrito y en el checkout. Si algo viene del proveedor y tarda semanas, dilo aquí: es la promesa que ella va a recordar."
+            >
+              <textarea id="shippingNotice" name="shippingNotice" rows={2} defaultValue={settings.shippingNotice} maxLength={300} />
+            </Field>
+
+            <div className="adm-paso-pie">
+              <button type="submit" className="adm-btn adm-btn-primary adm-btn-md">
+                Guardar el envío
+              </button>
+            </div>
+          </form>
+        </Paso>
+
+        {/* ───────── 4. la regla de precios ─────────
+            Va la ULTIMA de los pasos porque es la que menos se toca: se pone
+            una vez y ya. Pero es la que mas dinero mueve, y por eso conserva su
+            calculadora — un x2.6 mal puesto se replica en cada producto que se
+            importe despues. */}
+        <Paso
+          numero={4}
+          titulo="¿Cuánto le sumas a lo que te cuesta?"
+          ayuda="Solo afecta a lo que traes de AliExpress o Alibaba: convierte lo que te cuesta allí en el precio de tu tienda. Las prendas que subes tú llevan el precio que tú pongas."
+        >
         <p className="adm-muted adm-small aju-intro">
           Cuando traes un producto de AliExpress o Alibaba, esta regla convierte lo que cuesta allí en el precio de
-          tu tienda: <b>coste × multiplicador + suma fija</b>, y después se redondea. Ahora mismo, algo que te cuesta{" "}
+          tu tienda. Ahora mismo, algo que te cuesta{" "}
           {formatCents(costeEjemplo)} se vendería a <b>{formatCents(precioEjemplo)}</b>
           {margenEjemplo.percent !== null ? ` (margen del ${margenEjemplo.percent}%)` : ""}.
         </p>
 
         <form action={guardarPrecios} id="aju-precios">
           <div className="aju-cols">
-            <Field label="Multiplicador" htmlFor="aju-multiplier" hint="2.6 significa vender a 2,6 veces el coste.">
+            <Field label="Multiplicar el coste por" htmlFor="aju-multiplier" hint="2.6 significa venderlo a 2,6 veces lo que te costó.">
               <input
                 type="text"
                 id="aju-multiplier"
@@ -150,10 +255,10 @@ export default async function AjustesPage({
                 autoComplete="off"
               />
             </Field>
-            <Field label="Suma fija" htmlFor="aju-add" hint="Se suma después del multiplicador: cubre envío y empaque.">
+            <Field label="Y sumarle" htmlFor="aju-add" hint="Se suma al final. Sirve para cubrir el envío y el empaque.">
               <input type="text" id="aju-add" name="addCents" inputMode="decimal" defaultValue={formatCents(regla.addCents)} autoComplete="off" />
             </Field>
-            <Field label="Redondeo" htmlFor="aju-rounding">
+            <Field label="Terminar el precio en" htmlFor="aju-rounding">
               <select id="aju-rounding" name="rounding" defaultValue={regla.rounding}>
                 <option value="none">Sin redondear</option>
                 <option value="99">Terminar en .99</option>
@@ -171,7 +276,7 @@ export default async function AjustesPage({
                 <input type="text" id="aju-coste" inputMode="decimal" defaultValue={formatCents(costeEjemplo)} autoComplete="off" />
               </Field>
               <p className="adm-small adm-muted">
-                Este campo no se guarda: es solo para probar. Cambia también el multiplicador de arriba y mira cómo se
+                Este campo no se guarda: es solo para probar. Cambia también los números de arriba y mira cómo se
                 mueve el precio.
               </p>
             </div>
@@ -192,7 +297,7 @@ export default async function AjustesPage({
           </div>
 
           <button type="submit" className="adm-btn adm-btn-primary adm-btn-md">
-            Guardar regla de precios
+            Guardar la regla de precios
           </button>
         </form>
 
@@ -223,60 +328,11 @@ export default async function AjustesPage({
             })}
           </tbody>
         </table>
-      </Card>
-
-      {/* ──────────────────────────── envío ──────────────────────────── */}
-      <Card title="Envío">
-        <form action={guardarEnvio}>
-          <div className="aju-cols">
-            <Field
-              label="Envío gratis a partir de"
-              htmlFor="freeShippingOverCents"
-              hint="Pon 0 para que el envío sea siempre gratis."
-            >
-              <input
-                type="text"
-                id="freeShippingOverCents"
-                name="freeShippingOverCents"
-                inputMode="decimal"
-                defaultValue={formatCents(settings.freeShippingOverCents)}
-              />
-            </Field>
-            <Field label="Tarifa plana de envío" htmlFor="flatShippingCents" hint="Lo que se cobra si no llega al mínimo.">
-              <input
-                type="text"
-                id="flatShippingCents"
-                name="flatShippingCents"
-                inputMode="decimal"
-                defaultValue={formatCents(settings.flatShippingCents)}
-              />
-            </Field>
-          </div>
-
-          <label className="aju-check">
-            <input type="checkbox" name="localPickup" defaultChecked={settings.localPickup} />
-            <span>
-              Permitir recogida en la boutique
-              <span className="adm-muted adm-small">{settings.address || "Sin dirección configurada"}</span>
-            </span>
-          </label>
-
-          <Field
-            label="Aviso de plazos"
-            htmlFor="shippingNotice"
-            hint="Se enseña en el carrito y en el checkout. Si un producto viene del proveedor y tarda semanas, dilo aquí."
-          >
-            <textarea id="shippingNotice" name="shippingNotice" rows={2} defaultValue={settings.shippingNotice} maxLength={300} />
-          </Field>
-
-          <button type="submit" className="adm-btn adm-btn-primary adm-btn-md">
-            Guardar envío
-          </button>
-        </form>
-      </Card>
+        </Paso>
+      </div>
 
       {/* ──────────────────────────── pagos ──────────────────────────── */}
-      <Card title="Formas de pago">
+      <Card title="¿Cómo te pagan?">
         <p className="adm-muted">
           Los cobros viven ahora en su propia página: ahí conectas tus cuentas de Stripe,
           PayPal y Square (pegando sus llaves, cifradas en la base de datos) y enciendes o
@@ -290,9 +346,9 @@ export default async function AjustesPage({
       </Card>
 
       {/* ───────────────────────── importación ───────────────────────── */}
-      <Card title="Importación">
+      <Card title="Traer productos de AliExpress o Alibaba">
         <p className="adm-muted adm-small aju-intro">
-          El marcador (bookmarklet) que traes de AliExpress o Alibaba manda los datos a{" "}
+          El marcador que arrastras a tu navegador manda a tu tienda lo que ves en AliExpress o Alibaba, a{" "}
           <code>{urlIngest}</code> firmados con este token. Trátalo como una contraseña: quien lo tenga puede meter
           productos en tu tienda.
         </p>

@@ -315,21 +315,31 @@ export type PistaConValor = PistaPegado & { valor: string };
  */
 export function reconocerConValores(pegado: string): PistaConValor[] {
   const trozos = (pegado ?? "")
-    .split(/[\s\r\n]+/)
+    .split(/\s+/)
     .map((t) => limpiarPegado(t))
     // 12 es el corte: por debajo no hay ninguna credencial de verdad y solo
     // entrarían palabras de las etiquetas.
     .filter((t) => t.length >= 12);
 
-  const vistos = new Set<string>();
-  const pistas: PistaConValor[] = [];
+  /**
+   * Gana la primera credencial USABLE de cada campo, no la primera a secas.
+   *
+   * Importa por un caso muy real: el panel de Stripe enseña la llave publicable
+   * ARRIBA y la secreta debajo, así que lo natural es seleccionar el bloque
+   * entero y pegarlo. Con «gana la primera», la publicable se quedaba el sitio y
+   * la respuesta era «esa no es la secreta» — teniendo la buena en el mismo
+   * pegado. Una credencial con problema solo se conserva si no hay ninguna sana
+   * para ese campo, porque entonces sí hay algo que explicar.
+   */
+  const porCampo = new Map<string, PistaConValor>();
   for (const trozo of trozos) {
     const pista = reconocerCredencial(trozo);
     if (!pista) continue;
     const clave = `${pista.proveedor}:${pista.campo}`;
-    if (vistos.has(clave)) continue;
-    vistos.add(clave);
-    pistas.push({ ...pista, valor: trozo });
+    const previa = porCampo.get(clave);
+    if (previa && !previa.problema) continue; // ya hay una sana: se queda
+    if (previa && pista.problema) continue; // dos con problema: gana la primera
+    porCampo.set(clave, { ...pista, valor: trozo });
   }
-  return pistas;
+  return [...porCampo.values()];
 }

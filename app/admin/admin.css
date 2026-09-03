@@ -544,6 +544,9 @@ body:has(.adm-auth)::after {
 .adm-shell input[type="search"],
 .adm-shell input[type="url"],
 .adm-shell input[type="date"],
+/* `tel` faltaba: un campo de teléfono se pintaba con el borde por defecto del
+   navegador y se veía distinto a todos los demás. */
+.adm-shell input[type="tel"],
 .adm-shell select,
 .adm-shell textarea,
 .adm-auth input {
@@ -1106,4 +1109,145 @@ body:has(.adm-auth)::after {
   .adm-sheet-scroll { max-height: 58vh; overflow-y: auto; }
 
   .adm-crumbs { margin: 0 0 12px; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EL PANEL EN EL MÓVIL
+   ═══════════════════════════════════════════════════════════
+   Madeline abre esto desde el teléfono, en la boutique y con clientas delante.
+   Lo de aquí es lo que ya se había resuelto a mano en el alta de prendas
+   (prenda.css) y que faltaba en las otras 300 y pico casillas del panel. */
+
+@media (max-width: 760px) {
+  /* ⚠️ 16px NO es una preferencia estética: es el umbral de iOS. Safari hace
+     ZOOM al enfocar cualquier campo por debajo de 16px, y no vuelve solo — la
+     dueña se queda con el panel ampliado y desplazado a la derecha. El panel
+     entero iba a 15px. */
+  .adm-shell input[type="text"],
+  .adm-shell input[type="email"],
+  .adm-shell input[type="password"],
+  .adm-shell input[type="number"],
+  .adm-shell input[type="search"],
+  .adm-shell input[type="url"],
+  .adm-shell input[type="date"],
+  .adm-shell input[type="tel"],
+  .adm-shell select,
+  .adm-shell textarea,
+  .adm-auth input {
+    font-size: 16px;
+    /* 48px de alto: un dedo no acierta en 40. */
+    min-height: 48px;
+    padding: 12px 14px;
+  }
+  .adm-shell textarea { min-height: 96px; }
+
+  /* Las casillas de marcar también se tocan con el pulgar. */
+  .adm-shell input[type="checkbox"],
+  .adm-shell input[type="radio"] {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PASOS  ·  el molde de «hacer una cosa», no «rellenar una tabla»
+   ═══════════════════════════════════════════════════════════
+   Sale del alta de prendas, que es la pantalla que mejor funciona del panel, y
+   que acertaba por tres decisiones que aquí se generalizan:
+
+     1. El orden es el orden en el que ELLA trabaja, no el del modelo de datos.
+     2. El título es una PREGUNTA en su idioma («¿Qué tipo de prenda es?»), no
+        el nombre de la columna («Categoría»).
+     3. Debajo se dice la CONSECUENCIA, no la definición: «sin categoría la
+        prenda no aparece en ninguna sección de la tienda».
+
+   Un `Paso` no es una tarjeta más: es un trozo de trabajo con principio y fin. */
+
+.adm-pasos { display: grid; gap: 14px; }
+
+.adm-paso {
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-r);
+  padding: 18px 18px 16px;
+}
+.adm-paso-cab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--adm-text);
+}
+.adm-paso-num {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--adm-ink);
+  color: var(--adm-surface);
+  font-size: 13px;
+  font-weight: 500;
+}
+.adm-paso-ayuda {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--adm-muted);
+}
+.adm-paso-ayuda:last-child { margin-bottom: 0; }
+.adm-paso > form > .adm-field:last-of-type { margin-bottom: 0; }
+.adm-paso-pie {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+/* ── fichas: elegir tocando, sin desplegables ──────────────
+   Un <select> en un móvil abre una rueda del sistema y esconde las opciones
+   hasta que la abres. Estas fichas se ven todas a la vez y se tocan. Y van
+   sobre un checkbox/radio de verdad: funcionan sin JavaScript, que en la
+   boutique con mala cobertura no es un detalle. */
+
+.adm-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.adm-chip { position: relative; display: inline-flex; }
+.adm-chip input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.adm-chip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--adm-line);
+  border-radius: 999px;
+  background: var(--adm-surface);
+  color: var(--adm-text);
+  font-size: 14.5px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.adm-chip input:checked + span {
+  background: var(--adm-ink);
+  border-color: var(--adm-ink);
+  color: var(--adm-on-ink);
+}
+.adm-chip input:focus-visible + span {
+  outline: none;
+  border-color: var(--adm-accent);
+  box-shadow: 0 0 0 3px var(--adm-accent-soft);
+}
+@media (hover: hover) {
+  .adm-chip input:not(:checked):hover + span { border-color: var(--adm-ink); }
 }
