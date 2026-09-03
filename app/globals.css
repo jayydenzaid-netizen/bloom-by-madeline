@@ -930,6 +930,29 @@ html.static .hero-arch img { animation: none; }
 .footer-cols p { font-size: 15px; color: rgba(246,243,237,.75); line-height: 1.9; }
 .footer-cols a { border-bottom: 1px solid rgba(246,243,237,.25); transition: border-color .3s; }
 .footer-cols a:hover { border-color: var(--bone); }
+/*
+ * Zona para el dedo, sin mover ni un pixel del diseño.
+ *
+ * Estos enlaces miden 23 px de alto en un móvil y el mínimo de la WCAG 2.2
+ * (criterio 2.5.8, nivel AA) son 24. Un pixel — pero el pulgar no lee normas, y
+ * fallar el enlace del carrito en el pie es una venta menos.
+ *
+ * Se agranda con una capa invisible en vez de con padding a propósito: el padding
+ * bajaría el subrayado (la línea se pinta en el borde de la caja) y el
+ * `display:inline-block` haría lo mismo. Esto no pinta nada, no ocupa sitio en la
+ * línea y no toca el aspecto. El alto (26 px) se queda por debajo del hueco entre
+ * renglones (28,5 px) para que dos enlaces seguidos no se pisen la zona táctil.
+ */
+.footer-cols a { position: relative; }
+.footer-cols a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 26px;
+  transform: translateY(-50%);
+}
 .footer-bottom {
   max-width: 1316px;
   margin: 0 auto;

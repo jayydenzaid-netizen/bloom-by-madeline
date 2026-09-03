@@ -28,6 +28,20 @@
 }
 .pf-migas a { border-bottom: 1px solid transparent; transition: border-color .3s; }
 .pf-migas a:hover { border-color: var(--stone); }
+/* Las migas se pintan en 11 px, así que su enlace mide 17 px de alto: muy por
+ * debajo de los 24 que pide la WCAG 2.2. Misma solución que en el pie —una capa
+ * invisible— porque aquí el texto es tan pequeño que cualquier padding se vería.
+ * Se expande solo a lo alto: a lo ancho van seguidas y se pisarían entre ellas. */
+.pf-migas a { position: relative; }
+.pf-migas a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 26px;
+  transform: translateY(-50%);
+}
 .pf-migas i { font-style: normal; margin: 0 8px; opacity: .5; }
 
 /* ═══════════ CATÁLOGO: RAIL + RESULTADOS ═══════════ */
