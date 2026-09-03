@@ -124,6 +124,8 @@ export type CodigoDiagnostico =
   | "sin-locales"
   /** El identificador de local guardado no es de esta cuenta. */
   | "local-ajeno"
+  /** La cuenta tiene varios locales y no se ha elegido ninguno. */
+  | "local-sin-elegir"
   /** Se pegó una llave publicable donde iba la secreta. */
   | "llave-no-secreta"
   /** No se pudo ni preguntar: red, timeout, o la pasarela caída. */

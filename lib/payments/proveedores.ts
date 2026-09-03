@@ -296,7 +296,14 @@ export function reconocerCredencial(pegado: string): PistaPegado | null {
 export function limpiarPegado(pegado: string): string {
   let t = (pegado ?? "").trim();
   t = t.replace(/^[A-Za-z0-9_ .\-]{0,40}[:=]\s*/, "");
+  // Comillas Y la puntuación que las rodea en un JSON. La regla anterior exigía
+  // que la comilla fuera el ÚLTIMO carácter, así que en `"EAAA…",` la coma la
+  // dejaba fuera de juego: el token se quedaba con la coma pegada, no casaba con
+  // su patrón, y el único valor que se reconocía del bloque era el ÚLTIMO (el
+  // que no lleva coma). Pegar el JSON de Square guardaba solo el local.
+  t = t.replace(/[,;]+$/, "");
   t = t.replace(/^["'`]+|["'`]+$/g, "");
+  t = t.replace(/[,;]+$/, "");
   return t.trim();
 }
 
@@ -341,5 +348,31 @@ export function reconocerConValores(pegado: string): PistaConValor[] {
     if (previa && pista.problema) continue; // dos con problema: gana la primera
     porCampo.set(clave, { ...pista, valor: trozo });
   }
+
+  /**
+   * Una credencial PARTIDA en varias líneas se junta; un bloque con etiquetas, no.
+   *
+   * `reconocerCredencial` ya sabe juntar trozos, pero aquí nunca llegaba a
+   * hacerlo: se partía por espacios ANTES de llamarla, así que una llave que
+   * venía cortada por el ancho de un correo se guardaba TRUNCADA — y encima de
+   * la que estaba cobrando.
+   *
+   * La condición de seguridad: solo se junta si el pegado entero reconoce UN
+   * único campo. Con dos o más (el bloque de PayPal, o el de Stripe con sus dos
+   * llaves) hay etiquetas de por medio y juntar pegaría palabras al valor. Y aun
+   * así el veredicto tiene que coincidir: «Access token EAAA…» junto daría
+   * PayPal, distinto de Square, y se descarta.
+   */
+  if (porCampo.size === 1 && trozos.length > 1) {
+    const [clave, actual] = [...porCampo.entries()][0];
+    const juntos = reconocerCredencial(trozos.join(""));
+    if (juntos && `${juntos.proveedor}:${juntos.campo}` === clave) {
+      const entero = trozos.join("");
+      if (entero.length > actual.valor.length && !juntos.problema) {
+        porCampo.set(clave, { ...juntos, valor: entero });
+      }
+    }
+  }
+
   return [...porCampo.values()];
 }

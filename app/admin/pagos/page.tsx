@@ -142,6 +142,8 @@ type Fase =
   | "sin-conectar"
   /** Hay llaves guardadas que este servidor NO puede descifrar. */
   | "ilegible"
+  /** Se guardó algo pero falta otra credencial para poder cobrar. */
+  | "incompleto"
   /** Guardadas y sin comprobar nunca. */
   | "sin-comprobar"
   /** La pasarela rechazó las llaves. */
@@ -174,6 +176,7 @@ type EstadoProveedor = {
 const INSIGNIA: Record<Fase, { texto: string; tono: BadgeTone }> = {
   "sin-conectar": { texto: "Sin conectar", tono: "neutral" },
   ilegible: { texto: "Llaves ilegibles", tono: "danger" },
+  incompleto: { texto: "Falta un dato", tono: "warning" },
   "sin-comprobar": { texto: "Sin comprobar", tono: "warning" },
   rechazada: { texto: "Rechazada", tono: "danger" },
   "sin-respuesta": { texto: "Sin respuesta", tono: "warning" },
@@ -187,6 +190,7 @@ function faseDe(
   ilegible: boolean,
   salud: SaludProveedor | undefined,
   activoEnCheckout: boolean,
+  hayAlgo: boolean,
 ): Fase {
   if (ilegible) return "ilegible";
   const completo =
@@ -195,7 +199,9 @@ function faseDe(
       : proveedor === "paypal"
         ? paypalConfigurado(cfg.paypal)
         : squareConfigurado(cfg.square);
-  if (!completo) return "sin-conectar";
+  // Hay algo guardado pero falta una credencial: ni «sin conectar» (que niega lo
+  // que se ve al lado: «Guardado el 3 sept») ni «rechazada» (nadie rechazó nada).
+  if (!completo) return hayAlgo ? "incompleto" : "sin-conectar";
   if (salud?.resultado === "rechazada") return "rechazada";
   if (salud?.resultado === "sin-respuesta") return "sin-respuesta";
   if (!salud) return "sin-comprobar";
@@ -231,6 +237,18 @@ function Diagnostico({ e }: { e: EstadoProveedor }) {
         <span>
           Pasa cuando cambia la clave de seguridad del sitio o se restaura una copia hecha en otro
           entorno. Las llaves están ahí pero no sirven: pulsa «Desconectar» y vuelve a pegarlas.
+        </span>
+      </div>
+    );
+  }
+  if (e.fase === "incompleto") {
+    const def = PROVEEDORES.find((d) => d.id === e.proveedor);
+    return (
+      <div className="pag-diag is-aviso">
+        <strong>Falta una credencial para poder cobrar.</strong>
+        <span>
+          Lo que pegaste se guardó, pero {def?.etiqueta} necesita{" "}
+          {def?.campos.map((c) => c.etiqueta).join(" y ")}. Pega lo que falte y vuelve a conectar.
         </span>
       </div>
     );
@@ -438,7 +456,7 @@ export default async function PagosPage({
           : config.square.accessToken.length > 0;
     return {
       proveedor,
-      fase: faseDe(proveedor, config, ilegible[proveedor], salud[proveedor], online[proveedor]),
+      fase: faseDe(proveedor, config, ilegible[proveedor], salud[proveedor], online[proveedor], algoPegado),
       salud: salud[proveedor],
       hayLlaves: algoPegado || ilegible[proveedor],
       seOfrece: online[proveedor],
@@ -462,7 +480,12 @@ export default async function PagosPage({
   // rechaza. Se saca del verde y se avisa aparte.
   const enPruebas = activos.filter((e) => e.salud?.entornoReal === "pruebas");
   const cobranDeVerdad = activos.filter((e) => e.salud?.entornoReal !== "pruebas");
-  const conProblema = todos.filter((e) => e.fase === "rechazada" || e.fase === "ilegible");
+  // «sin-respuesta» también es un problema: sin contarlo, el resumen decía
+  // «todo lo conectado respondía bien» justo cuando ninguna había respondido,
+  // contradiciendo al banner de la misma pantalla.
+  const conProblema = todos.filter(
+    (e) => e.fase === "rechazada" || e.fase === "ilegible" || e.fase === "sin-respuesta",
+  );
   const comprobaciones = todos.map((e) => e.salud?.en).filter((x): x is string => !!x);
   const ultima = comprobaciones.sort().at(-1);
 

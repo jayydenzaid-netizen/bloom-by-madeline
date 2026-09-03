@@ -75,6 +75,16 @@ function marcado(formData: FormData, campo: string): boolean {
   return formData.get(campo) === "on";
 }
 
+/**
+ * El «entorno» solo si el formulario lo manda de verdad. `null` = no venía, y
+ * entonces manda el que ya estaba guardado (que lo dedujo la sonda).
+ */
+function esSandbox(formData: FormData): boolean | null {
+  const v = texto(formData, "entorno");
+  if (!v) return null;
+  return v === "sandbox";
+}
+
 function proveedorDe(formData: FormData): MetodoOnline {
   const p = texto(formData, "proveedor");
   if (p === "stripe" || p === "paypal" || p === "square") return p;
@@ -209,7 +219,11 @@ export async function conectarProveedor(formData: FormData): Promise<void> {
         activo: false,
         clientId: texto(formData, "clientId") || previa.paypal.clientId,
         clientSecret: texto(formData, "clientSecret") || previa.paypal.clientSecret,
-        entorno: texto(formData, "entorno") === "sandbox" ? "sandbox" : "live",
+        // El panel ya no dibuja «Entorno»: lo deduce la sonda. Si el formulario
+        // no lo manda hay que CONSERVAR el que se averiguó, no reiniciarlo a
+        // «real» — eso descartaba el sandbox recién deducido y obligaba a dos
+        // viajes extra a la pasarela en cada guardado.
+        entorno: esSandbox(formData) === null ? previa.paypal.entorno : esSandbox(formData) ? "sandbox" : "live",
       },
     };
   } else {
@@ -219,7 +233,7 @@ export async function conectarProveedor(formData: FormData): Promise<void> {
         activo: false,
         accessToken: texto(formData, "accessToken") || previa.square.accessToken,
         locationId: texto(formData, "locationId") || previa.square.locationId,
-        entorno: texto(formData, "entorno") === "sandbox" ? "sandbox" : "production",
+        entorno: esSandbox(formData) === null ? previa.square.entorno : esSandbox(formData) ? "sandbox" : "production",
       },
     };
   }

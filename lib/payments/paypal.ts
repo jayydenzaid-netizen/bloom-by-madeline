@@ -25,6 +25,20 @@ import {
  *    pedido con dos sesiones, PayPal rechaza la segunda captura (DUPLICATE_INVOICE_ID).
  */
 
+/**
+ * Motivos por los que PayPal dice que NO se cobró, de forma definitiva. Son
+ * respuestas suyas, no fallos de comunicación: el pedido sigue sin pagar y la
+ * clienta puede volver a intentarlo.
+ */
+const DEFINITIVOS = [
+  "INSTRUMENT_DECLINED",
+  "PAYER_ACTION_REQUIRED",
+  "ORDER_NOT_APPROVED",
+  "ORDER_EXPIRED",
+  "PAYMENT_DENIED",
+  "TRANSACTION_REFUSED",
+];
+
 function base(cfg: ConfigPaypal): string {
   return cfg.entorno === "sandbox" ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
 }
@@ -248,6 +262,22 @@ export async function verificarOrdenPaypal(
     if (captura.ok) return evaluarOrden(captura.json as OrdenPaypal, esperado);
     const yaCapturada = captura.json.details?.some((d) => d.issue === "ORDER_ALREADY_CAPTURED");
     if (!yaCapturada) {
+      /**
+       * Un «no» DEFINITIVO no es «no pudimos preguntar».
+       *
+       * Le preguntamos a PayPal y contestó: la tarjeta se rechazó, la orden
+       * caducó, la aprobación ya no vale. Eso significa QUE NO HAY COBRO —
+       * `pendiente`— y la clienta tiene que poder intentarlo otra vez.
+       *
+       * Devolverlo como `error` lo convertía río abajo en «sin-respuesta», que
+       * esconde el botón de pagar y le dice «no lo intentes de nuevo». O sea:
+       * a la clienta a la que le rechazan la tarjeta —el caso más normal del
+       * mundo— se le quitaba la única forma de pagar su pedido, para siempre.
+       */
+      if (DEFINITIVOS.some((issue) => captura.json.details?.some((d) => d.issue === issue))) {
+        return { estado: "pendiente" };
+      }
+      // Cualquier otro fallo sí puede ser nuestro o suyo: no se concluye nada.
       return { estado: "error", detalle: `PayPal: no se pudo capturar (HTTP ${captura.status}).` };
     }
     // Capturada por otra verificación en paralelo: releer y evaluar.

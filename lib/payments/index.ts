@@ -447,10 +447,15 @@ export async function verificarPagoPedido(orderId: string): Promise<ResultadoPag
             en: new Date().toISOString(),
           });
         }
+        // ⚠️ El marcador TIENE que aparecer en el texto: `anotarAviso` deduplica
+        // con `nota.includes(marcador)`. Con un marcador que no salía escrito, el
+        // aviso se repetía en CADA verificación —y la verificación la dispara
+        // cualquiera abriendo la página del pedido—, llenando la misma nota que
+        // lee la clienta.
         await anotarAviso(
           order.id,
           order.number,
-          "no-se-pudo-preguntar-credencial",
+          "no se puede confirmar si este pedido se cobró",
           "La pasarela rechazó las llaves de la tienda, así que no se puede confirmar si este pedido se cobró. Revisa Pagos en el panel.",
         );
       }

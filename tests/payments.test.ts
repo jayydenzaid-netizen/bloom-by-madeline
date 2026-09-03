@@ -801,3 +801,57 @@ test("⭐ una llave RESTRINGIDA de pruebas no se puede presentar como real", () 
   assert.equal(esDePruebas("square", { ...base, square: { ...base.square, entorno: "sandbox" } }), true);
   assert.equal(esDePruebas("square", { ...base, square: { ...base.square, entorno: "production" } }), false);
 });
+
+/* ═══════ los pegados que la revisión probó ejecutando el módulo ═══════ */
+
+test("⭐ una llave partida en dos líneas se guarda ENTERA, no truncada", () => {
+  // Llegaba envuelta en un correo o una nota. Se partía por espacios ANTES de
+  // poder juntarla, así que se guardaba el primer trozo —una llave truncada—
+  // ENCIMA de la que estaba cobrando.
+  const sk = "sk_live_" + "A1b2C3d4E5".repeat(3);
+  const pistas = reconocerConValores(`${sk.slice(0, 22)}\n${sk.slice(22)}`);
+  assert.equal(pistas.length, 1);
+  assert.equal(pistas[0].valor, sk);
+});
+
+test("⭐ el JSON de credenciales de Square da las DOS, no solo el local", () => {
+  // La coma detrás de la comilla dejaba al token sin limpiar, así que no casaba
+  // con su patrón y solo se reconocía el último valor (el que no lleva coma).
+  const token = "EAAA" + "lMnOpQrStU".repeat(4);
+  const pistas = reconocerConValores(`{\n "accessToken": "${token}",\n "locationId": "LH2K3J4K5L6M7"\n}`);
+  assert.deepEqual(pistas.map((p) => p.campo).sort(), ["accessToken", "locationId"]);
+  assert.equal(pistas.find((p) => p.campo === "accessToken")?.valor, token);
+});
+
+test("juntar NO se aplica cuando el pegado trae varias credenciales", () => {
+  // Con etiquetas de por medio, juntar pegaría palabras al valor. Solo se junta
+  // si el pegado entero reconoce UN único campo.
+  const id = "A" + "21AbCdEfGh".repeat(8);
+  const sec = "E" + "LmNoPqRsTu".repeat(7);
+  const pistas = reconocerConValores(`Client ID\n${id}\nSecret\n${sec}`);
+  assert.equal(pistas.length, 2);
+  assert.equal(pistas.find((p) => p.campo === "clientId")?.valor, id);
+  assert.equal(pistas.find((p) => p.campo === "clientSecret")?.valor, sec);
+});
+
+test("Square con varios locales y ninguno elegido NO se da por conectado", async () => {
+  // Antes salía «ok» porque el hueco se daba por bueno: se guardaba activo y el
+  // panel anunciaba que ya cobraba, mientras el checkout NO lo ofrecía porque
+  // `squareConfigurado` exige el local. La pantalla decía una cosa y la tienda
+  // hacía otra.
+  const cfg = { activo: true, accessToken: "EAAA" + "x".repeat(20), locationId: "", entorno: "production" as const };
+  const dos = await probarSquare(cfg, fetchFalso([
+    { url: "/v2/locations", cuerpo: { locations: [
+      { id: "LAAA1111111", name: "Boutique", status: "ACTIVE" },
+      { id: "LBBB2222222", name: "Por defecto", status: "ACTIVE" },
+    ] } },
+  ]));
+  assert.equal(dos.ok, false);
+  assert.equal(dos.codigo, "local-sin-elegir");
+
+  // Con UN solo local sí vale: el autorrelleno lo pone después.
+  const uno = await probarSquare(cfg, fetchFalso([
+    { url: "/v2/locations", cuerpo: { locations: [{ id: "LAAA1111111", name: "Boutique", status: "ACTIVE" }] } },
+  ]));
+  assert.equal(uno.ok, true);
+});

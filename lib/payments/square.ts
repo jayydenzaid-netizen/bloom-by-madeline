@@ -273,6 +273,21 @@ export async function probarSquare(cfg: ConfigSquare, f: FetchLike = fetch): Pro
     // El nombre del negocio según Square. Se enseña en el panel para que la
     // dueña confirme de un vistazo que conectó SU cuenta y no otra.
     const cuenta = crudos.find((l) => l.business_name)?.business_name || locales[0].nombre;
+    // Sin local elegido y con VARIOS activos, esto no está listo para cobrar.
+    // Antes salía `ok` (porque `!cfg.locationId` daba por bueno el hueco), se
+    // guardaba «activo» y el panel anunciaba que ya cobraba — mientras el
+    // checkout NO lo ofrecía, porque `squareConfigurado` exige el local. El
+    // estado más caro: la pantalla dice una cosa y la tienda hace otra.
+    if (!cfg.locationId && locales.length > 1) {
+      return {
+        ok: false,
+        detalle: `la cuenta tiene ${locales.length} locales y no hay ninguno elegido`,
+        locales,
+        cuenta,
+        motivo: "credencial",
+        codigo: "local-sin-elegir",
+      };
+    }
     const coincide = !cfg.locationId || locales.some((l) => l.id === cfg.locationId);
     return {
       ok: coincide,

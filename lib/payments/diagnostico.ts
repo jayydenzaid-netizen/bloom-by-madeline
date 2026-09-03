@@ -88,6 +88,13 @@ export function explicarDiagnostico(
         urgente: true,
       };
 
+    case "local-sin-elegir":
+      return {
+        titulo: `Tu cuenta de ${marca} tiene varios locales y no hay ninguno elegido.`,
+        queHacer: `Sin saber a cuál va el dinero no se puede cobrar. Entra en ${marca} → Locations, copia el identificador del local de la boutique (empieza por L) y pégalo en el campo «Local».`,
+        urgente: true,
+      };
+
     case "local-ajeno":
       return {
         titulo: "El identificador de local guardado no es de esta cuenta.",
