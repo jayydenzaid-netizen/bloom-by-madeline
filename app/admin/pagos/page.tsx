@@ -47,6 +47,17 @@ import "./pagos.css";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Margen para las Server Actions de esta ruta.
+ *
+ * Preguntarle a una pasarela puede costar hasta 15 s (es el timeout de los
+ * adaptadores) y hay acciones que encadenan varias: «Comprobar todas» toca las
+ * tres, y conectar Square puede sondear los dos entornos. Sin esto, Vercel corta
+ * la función a los 10-15 s por defecto y la dueña ve un error en mitad de una
+ * comprobación que en realidad iba bien. 60 s es el techo del plan más básico.
+ */
+export const maxDuration = 60;
+
 export const metadata = { title: "Pagos" };
 
 /** Los mensajes viven aquí, no en la URL: nadie fabrica un cartel con un enlace. */
@@ -341,7 +352,10 @@ function Acciones({ e }: { e: EstadoProveedor }) {
           Comprobar ahora
         </button>
       </form>
-      {e.activo ? (
+      {/* Solo si de verdad hay algo que dejar de ofrecer: «apagar» junto a una
+          insignia de «Sin conectar» es la clase de contradicción que tenía esta
+          pantalla y que este rediseño existe para quitar. */}
+      {e.activo && e.completo ? (
         <form action={apagarProveedor}>
           <input type="hidden" name="proveedor" value={e.proveedor} />
           <button type="submit" className="adm-btn adm-btn-ghost adm-btn-sm">

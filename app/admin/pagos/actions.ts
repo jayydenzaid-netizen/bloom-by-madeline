@@ -374,11 +374,16 @@ export async function comprobarTodas(): Promise<void> {
   const hechas = proveedores.filter((p) => hayCredenciales(p, cfg));
   if (hechas.length === 0) terminar({ error: "nada-que-comprobar" });
 
-  // En serie a propósito: son tres llamadas con timeout de 15 s y `anotarSalud`
-  // lee y reescribe la misma fila. En paralelo se pisarían entre ellas.
+  // Se PREGUNTA en paralelo y se ESCRIBE en serie.
+  //
+  // Antes era todo en serie porque `anotarSalud` lee y reescribe la misma fila y
+  // en paralelo se pisarían. Pero eso solo obliga a serializar la escritura: las
+  // preguntas son a tres servidores distintos. En serie, tres pasarelas lentas
+  // sumaban hasta 45 s dentro de una Server Action y Vercel la habría cortado a
+  // media comprobación.
+  const sondas = await Promise.all(hechas.map(async (p) => ({ p, sonda: await sondear(p, cfg) })));
   let fallos = 0;
-  for (const p of hechas) {
-    const sonda = await sondear(p, cfg);
+  for (const { p, sonda } of sondas) {
     if (sonda.entornoCambiado) await guardar(p, sonda.cfg);
     if (!sonda.r.ok) fallos += 1;
     await anotarSalud(p, saludDe(p, sonda.r, sonda.cfg));
