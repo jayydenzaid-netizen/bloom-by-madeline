@@ -76,7 +76,12 @@ test("cifrar/descifrar: ida y vuelta y rechazo de valores manipulados", () => {
   assert.equal(descifrar(guardado), secreto);
 
   // Manipular un carácter del cuerpo rompe la autenticación GCM → null, no basura.
-  const roto = guardado.slice(0, -6) + (guardado.endsWith("A") ? "B" : "A") + guardado.slice(-5);
+  // El carácter nuevo se elige mirando el QUE HAY, no el último de la cadena: al
+  // mirar el último, una de cada tantas veces se «sustituía» una A por otra A, el
+  // texto salía idéntico, descifraba bien y la prueba fallaba sin motivo. Un test
+  // que falla al azar acaba bloqueando un despliegue de verdad.
+  const i = guardado.length - 6;
+  const roto = guardado.slice(0, i) + (guardado[i] === "A" ? "B" : "A") + guardado.slice(i + 1);
   assert.equal(descifrar(roto), null);
   assert.equal(descifrar("cualquier cosa"), null);
   assert.equal(descifrar(""), null);

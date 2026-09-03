@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { menuPorDefecto } from "@/lib/navegacion";
+import { cargarMenu } from "@/lib/navegacion";
 
 /**
  * Mutaciones de los menús: los enlaces del nav de arriba y los del pie.
@@ -219,7 +219,10 @@ export async function sembrarMenus(fd?: FormData): Promise<void> {
   for (const menu of objetivo) {
     if (existentes.some((e) => e.menu === menu)) continue;
 
-    const enlaces = menuPorDefecto(menu);
+    // `cargarMenu`, no `menuPorDefecto`: el botón promete copiar «los enlaces que
+    // ya tenía la web», y la web no enseña los que apuntan a una sección apagada.
+    // Sembrarlos crearía enlaces rotos y un aviso rojo nada más pulsar.
+    const enlaces = await cargarMenu(menu);
     await db.$transaction(
       enlaces.map((enlace, i) =>
         db.menuItem.create({ data: { menu, label: enlace.label, url: enlace.href, position: i } }),

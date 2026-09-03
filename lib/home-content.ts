@@ -68,6 +68,78 @@ export type KindOrdenable = (typeof KINDS_ORDENABLES)[number];
 /** Bloques que NO se pueden apagar: sin ellos la página deja de ser la página. */
 export const KINDS_SIEMPRE_VISIBLES: readonly string[] = ["hero"];
 
+/**
+ * Las anclas de la portada: a qué `id` del HTML puede apuntar un enlace del menú.
+ *
+ * Existe porque un enlace `/#loquesea` no se puede validar «a ojo». La sección
+ * de Filosofía se apagó desde el panel y el menú siguió ofreciendo «Filosofía»
+ * durante días: la clienta pulsaba y no pasaba absolutamente nada. Esta lista es
+ * la única fuente de verdad — la usan el menú (para no enseñar enlaces muertos)
+ * y `/admin/menus` (para ofrecer solo destinos que existen).
+ *
+ * `kind: null` = el ancla no depende de ningún bloque apagable. Los bloques que
+ * no salen aquí (cita, cómo comprar, Instagram, banner) se pintan sin `id`, así
+ * que no se puede enlazar hacia ellos.
+ *
+ * ⚠️ Si cambias el `id` de una `<section>` en `HomeSections.tsx`, cámbialo aquí.
+ */
+export type AnclaPortada = {
+  /** El `id` del HTML, sin almohadilla. */
+  ancla: string;
+  /** Cómo se llama en el desplegable del panel. */
+  etiqueta: string;
+  /** El bloque que la pinta, o `null` si sale siempre. */
+  kind: KindOrdenable | null;
+};
+
+export const ANCLAS_PORTADA: readonly AnclaPortada[] = [
+  { ancla: "inicio", etiqueta: "Arriba del todo", kind: null },
+  { ancla: "coleccion", etiqueta: "Nuevas llegadas", kind: "coleccion" },
+  { ancla: "escasez", etiqueta: "Últimas piezas", kind: "exclusividad" },
+  { ancla: "filosofia", etiqueta: "Filosofía", kind: "filosofia" },
+  { ancla: "boutique", etiqueta: "La boutique", kind: "boutique" },
+  { ancla: "visitanos", etiqueta: "Visítanos", kind: "visitanos" },
+];
+
+/**
+ * En qué estado está cada ancla:
+ *  · `viva`    — la sección se está pintando, se puede enlazar.
+ *  · `apagada` — alguien la apagó desde /admin/contenido.
+ *  · `vacia`   — está encendida pero no tiene nada que enseñar, así que no se
+ *                pinta. Hoy solo le pasa a la de piezas contadas.
+ */
+export type EstadoAncla = "viva" | "apagada" | "vacia";
+
+/**
+ * El estado de cada ancla de la portada, dado el orden de bloques encendidos que
+ * devuelve `cargarPortada`.
+ *
+ * `hayEscasez` va aparte porque la sección de piezas contadas se apaga sola
+ * cuando no queda nada por debajo del umbral: está «encendida» en el panel y aun
+ * así no existe en el HTML (ver `Exclusividad`, que devuelve `null`).
+ *
+ * Puro a propósito: así se prueba sin base de datos.
+ */
+export function anclasDePortada(
+  orden: readonly KindOrdenable[],
+  hayEscasez: boolean,
+): Map<string, EstadoAncla> {
+  const encendidos = new Set<string>(orden);
+  const estados = new Map<string, EstadoAncla>();
+  for (const { ancla, kind } of ANCLAS_PORTADA) {
+    if (kind === null) {
+      estados.set(ancla, "viva"); // el hero se pinta siempre
+    } else if (!encendidos.has(kind)) {
+      estados.set(ancla, "apagada");
+    } else if (kind === "exclusividad" && !hayEscasez) {
+      estados.set(ancla, "vacia");
+    } else {
+      estados.set(ancla, "viva");
+    }
+  }
+  return estados;
+}
+
 export type Foto = { url: string; alt: string };
 /** Un par «título | explicación»: ventajas, pasos… */
 export type ParTexto = { titulo: string; texto: string };

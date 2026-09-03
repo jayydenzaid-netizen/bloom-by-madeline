@@ -13,6 +13,7 @@ import type {
   ContenidoMarquee,
   ContenidoVisitanos,
 } from "@/lib/home-content";
+import type { PiezaEscasa } from "@/lib/escasez";
 import { formatCents } from "@/lib/money";
 import ProductCard, { type ProductCardItem } from "./ProductCard";
 
@@ -380,18 +381,7 @@ export function Filosofia({ contenido }: { contenido: ContenidoFilosofia }) {
 
 /* ═══════════ PIEZAS CONTADAS (escasez real) ═══════════ */
 
-/** Una pieza a punto de agotarse, con las unidades que quedan DE VERDAD. */
-export type PiezaEscasa = {
-  slug: string;
-  title: string;
-  imageUrl: string | null;
-  priceCents: number;
-  compareAtCents: number | null;
-  /** Unidades que quedan sumando todas las tallas. */
-  quedan: number;
-  /** Tallas que aún tienen alguna unidad: "S · M". */
-  tallas: string;
-};
+
 
 /**
  * Escasez HONESTA: los números salen del inventario, no de un contador

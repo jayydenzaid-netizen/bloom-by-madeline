@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { explicarRoto, revisarMenus } from "@/lib/navegacion";
+import { estadoDeAnclas, explicarRoto, revisarMenus } from "@/lib/navegacion";
+import { ANCLAS_PORTADA } from "@/lib/home-content";
 import { Badge, Button, Card, EmptyState, PageHeader } from "../_components/ui";
 import {
   EditorMenu,
@@ -42,11 +43,14 @@ export default async function MenusPage({ searchParams }: Props) {
   const sp = await searchParams;
   const menuActivo = sp.menu === "footer" ? "footer" : "main";
 
-  const [items, colecciones, paginas] = await Promise.all([
+  const [items, colecciones, paginas, anclas] = await Promise.all([
     // Con el diagnóstico de cada enlace: `roto` dice por qué la web no lo enseña.
     revisarMenus(),
     db.collection.findMany({ where: { isVisible: true }, orderBy: { title: "asc" }, select: { title: true, slug: true } }),
     db.page.findMany({ orderBy: { title: "asc" }, select: { title: true, slug: true, status: true, showInFooter: true } }),
+    // Qué secciones de la portada existen ahora mismo: las apagadas se ofrecen
+    // igual, pero dichas por su nombre, para que no se elija un destino mudo.
+    estadoDeAnclas(),
   ]);
 
   // Destinos que se pueden elegir sin escribir una dirección a mano. Se arman
@@ -65,10 +69,16 @@ export default async function MenusPage({ searchParams }: Props) {
       valor: `/pagina/${p.slug}`,
       etiqueta: p.status === "published" ? p.title : `${p.title} (todavía en borrador)`,
     })),
-    { grupo: "Secciones de la portada", valor: "/#coleccion", etiqueta: "Nuevas llegadas" },
-    { grupo: "Secciones de la portada", valor: "/#filosofia", etiqueta: "Filosofía" },
-    { grupo: "Secciones de la portada", valor: "/#boutique", etiqueta: "La boutique" },
-    { grupo: "Secciones de la portada", valor: "/#visitanos", etiqueta: "Visítanos" },
+    // Salen de `ANCLAS_PORTADA`, la misma lista que usa el nav para decidir qué
+    // enlace enseña. Antes estaban escritas aquí a mano y se quedaron obsoletas:
+    // seguía ofreciendo «Filosofía» (sección apagada) y no ofrecía «Últimas
+    // piezas», que es la que la sustituyó.
+    ...ANCLAS_PORTADA.map((a) => ({
+      grupo: "Secciones de la portada",
+      valor: `/#${a.ancla}`,
+      etiqueta:
+        anclas.get(a.ancla) === "viva" ? a.etiqueta : `${a.etiqueta} (ahora mismo no se ve)`,
+    })),
   ];
 
   const enEdicion = sp.item ? items.find((i) => i.id === sp.item) ?? null : null;
