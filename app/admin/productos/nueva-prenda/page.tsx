@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdmin } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { PageHeader } from "../../_components/ui";
 import PrendaRapida from "./_components/PrendaRapida";
 import "./prenda.css";
@@ -26,6 +27,14 @@ export default async function NuevaPrendaPage({
   const admin = await getAdmin();
   if (!admin) redirect("/admin/login");
 
+  // Las categorías salen del catálogo, no de una lista escrita a fuego: si
+  // Madeline crea «Faldas» en Colecciones, aparece aquí sola.
+  const categorias = await db.collection.findMany({
+    where: { isVisible: true },
+    orderBy: [{ position: "asc" }, { title: "asc" }],
+    select: { id: true, title: true },
+  });
+
   const sp = await searchParams;
   const uno = (k: string) => ((Array.isArray(sp[k]) ? sp[k]?.[0] : sp[k]) ?? "").trim();
   const nombre = uno("hecha");
@@ -45,7 +54,7 @@ export default async function NuevaPrendaPage({
         }
       />
 
-      <PrendaRapida recienCreada={recienCreada} />
+      <PrendaRapida recienCreada={recienCreada} categorias={categorias} />
 
       <p className="np-avanzado">
         ¿Necesitas colores, precios distintos por talla o ajustes de buscadores?{" "}

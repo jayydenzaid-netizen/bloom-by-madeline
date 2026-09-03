@@ -264,3 +264,6 @@
 @media (max-width: 899px) {
   .np-avanzado { margin-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* Los chips de categoría son más anchos que los de talla (llevan palabras). */
+.np-cat { min-width: auto; padding: 0 16px; }

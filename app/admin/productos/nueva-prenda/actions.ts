@@ -35,6 +35,7 @@ const esquema = z.object({
   precio: z.string().trim().min(1, "Escribe el precio."),
   publicar: z.boolean(),
   fotos: z.array(z.string().trim().min(1)).max(12, "Como mucho 12 fotos por prenda."),
+  coleccionIds: z.array(z.string().trim().min(1)).max(6),
   tallas: z
     .array(
       z.object({
@@ -59,6 +60,7 @@ export async function crearPrenda(_prev: EstadoPrenda, fd: FormData): Promise<Es
       precio: String(fd.get("precio") ?? ""),
       publicar: String(fd.get("publicar") ?? "") === "si",
       fotos: JSON.parse(String(fd.get("fotosJson") ?? "[]")),
+      coleccionIds: JSON.parse(String(fd.get("coleccionesJson") ?? "[]")),
       tallas: JSON.parse(String(fd.get("tallasJson") ?? "[]")),
     });
   } catch (error) {
@@ -103,6 +105,12 @@ export async function crearPrenda(_prev: EstadoPrenda, fd: FormData): Promise<Es
           sourceProvider: "manual",
           images: {
             create: datos.fotos.map((url, i) => ({ url, alt: datos.nombre, position: i })),
+          },
+          // La categoría es lo que hace que la prenda aparezca en «Vestidos» o
+          // «Shorts» de la tienda. Sin ella el producto existe pero no está en
+          // ningún sitio por el que una clienta navegue.
+          collections: {
+            create: datos.coleccionIds.map((collectionId) => ({ collectionId })),
           },
           variants: {
             create: tallas.map((t, i) => ({
@@ -150,6 +158,7 @@ export async function crearPrenda(_prev: EstadoPrenda, fd: FormData): Promise<Es
   });
 
   revalidatePath("/admin/productos");
+  revalidatePath("/admin/colecciones");
   revalidatePath("/admin/inventario");
   if (publicar) {
     revalidatePath("/");

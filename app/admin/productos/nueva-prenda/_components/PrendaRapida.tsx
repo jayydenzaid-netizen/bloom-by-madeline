@@ -31,7 +31,15 @@ type Foto = {
 
 const ESTADO_INICIAL: EstadoPrenda = {};
 
-export default function PrendaRapida({ recienCreada }: { recienCreada: { nombre: string; publicada: boolean; id: string } | null }) {
+export type Categoria = { id: string; title: string };
+
+export default function PrendaRapida({
+  recienCreada,
+  categorias,
+}: {
+  recienCreada: { nombre: string; publicada: boolean; id: string } | null;
+  categorias: Categoria[];
+}) {
   const [estado, accion, enviando] = useActionState<EstadoPrenda, FormData>(crearPrenda, ESTADO_INICIAL);
 
   const [fotos, setFotos] = useState<Foto[]>([]);
@@ -41,6 +49,7 @@ export default function PrendaRapida({ recienCreada }: { recienCreada: { nombre:
   // Arranca con las tres tallas de la boutique marcadas y 1 pieza de cada una:
   // es el caso normal, y así no hay que tocar nada para el 80 % de las prendas.
   const [tallas, setTallas] = useState<Record<string, number>>({ S: 1, M: 1, L: 1 });
+  const [elegidas, setElegidas] = useState<string[]>([]);
   const entradaFoto = useRef<HTMLInputElement>(null);
 
   const subiendo = fotos.some((f) => !f.url && !f.error);
@@ -107,6 +116,7 @@ export default function PrendaRapida({ recienCreada }: { recienCreada: { nombre:
           ni un campo técnico. */}
       <input type="hidden" name="fotosJson" value={JSON.stringify(urls)} />
       <input type="hidden" name="tallasJson" value={JSON.stringify(tallasElegidas)} />
+      <input type="hidden" name="coleccionesJson" value={JSON.stringify(elegidas)} />
       <input type="hidden" name="descripcion" value={descripcion} />
 
       {recienCreada ? (
@@ -209,10 +219,41 @@ export default function PrendaRapida({ recienCreada }: { recienCreada: { nombre:
         </label>
       </section>
 
-      {/* ─────────── 3. TALLAS ─────────── */}
+      {/* ─────────── 3. CATEGORÍA ─────────── */}
       <section className="np-paso">
         <h2 className="np-titulo">
-          <span className="np-num">3</span> Tallas y cuántas tienes
+          <span className="np-num">3</span> ¿Qué tipo de prenda es?
+        </h2>
+        <p className="np-ayuda">
+          Es lo que hace que salga en «Vestidos», «Tops» o «Shorts» de la tienda. Puedes marcar
+          más de una.
+        </p>
+        <div className="np-tallas">
+          {categorias.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={elegidas.includes(c.id) ? "np-talla np-talla-on np-cat" : "np-talla np-cat"}
+              onClick={() =>
+                setElegidas((p) => (p.includes(c.id) ? p.filter((x) => x !== c.id) : [...p, c.id]))
+              }
+              aria-pressed={elegidas.includes(c.id)}
+            >
+              {c.title}
+            </button>
+          ))}
+        </div>
+        {elegidas.length === 0 ? (
+          <p className="np-ayuda np-ayuda-mal" style={{ marginTop: 12, marginBottom: 0 }}>
+            Sin categoría la prenda no aparece en ninguna sección de la tienda.
+          </p>
+        ) : null}
+      </section>
+
+      {/* ─────────── 4. TALLAS ─────────── */}
+      <section className="np-paso">
+        <h2 className="np-titulo">
+          <span className="np-num">4</span> Tallas y cuántas tienes
         </h2>
         <p className="np-ayuda">Toca una talla para añadirla o quitarla.</p>
 
@@ -252,7 +293,7 @@ export default function PrendaRapida({ recienCreada }: { recienCreada: { nombre:
         )}
       </section>
 
-      {/* ─────────── 4. GUARDAR ─────────── */}
+      {/* ─────────── 5. GUARDAR ─────────── */}
       <div className="np-guardar">
         <p className="np-resumen">
           {urls.length > 0 ? `${urls.length} ${urls.length === 1 ? "foto" : "fotos"}` : "Sin fotos"} ·{" "}
